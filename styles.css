@@ -1,0 +1,146 @@
+/* ============================================================
+   🔍 贅字與對話模式 (保持不變)
+   ============================================================ */
+.cm-redundant-text {
+    background-color: rgba(255, 80, 80, 0.25);
+    border-bottom: 2px solid rgba(255, 0, 0, 0.6);
+    border-radius: 4px;
+    padding: 0 2px;
+}
+
+body.mode-dialogue .cm-content,
+body.mode-dialogue .markdown-preview-view {
+    color: var(--text-faint) !important;
+    transition: color 0.3s ease;
+}
+
+body.mode-dialogue .cm-dialogue-text {
+    color: var(--text-normal) !important;
+    font-weight: 600;
+    text-shadow: 0 0 1px var(--text-normal);
+    opacity: 1 !important;
+}
+
+/* ============================================================
+   🙈 結構樣式 (Structure Decorators) - 安全縮小版
+   ============================================================ */
+
+/* 1. ID 標籤：縮小、變灰 */
+.cm-small-id {
+    font-size: 0.6em !important;
+    /* 縮細到 60% */
+    color: var(--text-faint) !important;
+    /* 最淡的灰色 */
+    font-family: var(--font-monospace);
+    /* 等寬字體 */
+    opacity: 0.4;
+    /* 增加透明度 */
+    letter-spacing: -0.5px;
+    /* 稍微擠一點 */
+}
+
+/* 2. 章節標題：變成分隔線風格的文字 */
+.cm-small-header {
+    font-size: 0.85em !important;
+    color: var(--interactive-accent) !important;
+    /* 使用主題色 */
+    font-weight: bold;
+    opacity: 0.8;
+
+    /* 讓它看起來像個小標籤 */
+    background-color: var(--background-primary-alt);
+    padding: 2px 8px;
+    border-radius: 4px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* ============================================================
+   📱 觸控大綱 (Structure View)
+   ============================================================ */
+
+/* 整個面板的容器 */
+.ns-structure-container {
+    padding: 15px 10px;
+    /* 上下加多點空間 (原本是 10px) */
+    height: 100%;
+    overflow-y: auto;
+}
+
+/* 1. 章節容器 (像一個個箱子) */
+.ns-chapter-box {
+    background-color: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    margin-bottom: 15px;
+    padding: 8px;
+}
+
+/* 章節標題卡片 */
+.ns-chapter-card {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    font-weight: bold;
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    text-align: center;
+    cursor: grab;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* 2. 情節列表 (放卡片的地方) */
+.ns-scene-list {
+    min-height: 20px;
+    /* 即使空的也能拖進去 */
+    padding: 2px;
+}
+
+/* 情節卡片 (特大號，方便手指篤) */
+.ns-scene-card {
+    background-color: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-left: 4px solid var(--text-muted);
+    /* 左邊加條線做識別 */
+    border-radius: 6px;
+    padding: 12px 10px;
+    /* 大一點的 Padding */
+    margin-bottom: 8px;
+    cursor: grab;
+    transition: transform 0.1s, box-shadow 0.1s;
+
+    /* 讓文字不換行，超出顯示 ... */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.9em;
+
+    cursor: pointer;
+}
+
+.ns-scene-card:hover {
+    border-color: var(--interactive-accent);
+    /* 邊框變色 */
+    background-color: var(--background-primary-alt);
+    /* 背景微變 */
+    transform: translateY(-1px);
+    /* 輕微浮起 */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 拖拽時的特效 */
+.sortable-ghost {
+    opacity: 0.4;
+    background-color: var(--interactive-accent);
+}
+
+.sortable-drag {
+    cursor: grabbing;
+    transform: scale(1.02);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* 重新整理按鈕 */
+.ns-refresh-btn {
+    width: 100%;
+    margin-bottom: 10px;
+}
