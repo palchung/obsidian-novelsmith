@@ -17,12 +17,12 @@ export const RE_FOLDER_HEADING = /^# 📄 .*$/gm;
 export const RE_SCENE_TAG = /^######\s*/;
 export const RE_SCENE_EMOJI = /^🎬\s*/;
 // 標題 (ID 部分)
-// export const RE_SCENE_HEADER_HTML = /###### (.*?)( <!--|$)/;
+export const RE_SCENE_HEADER_HTML = /###### (.*?)( <!--|$)/;
 
 // 🔥 新增：讓全系統通用的 ID Regex
 // 格式： 
 export const RE_SCENE_INFO = /^###### 🎬 .*[\r\n]+(> .*[\r\n]*)*/gm;
-// export const RE_SCENE_ID = /<!-- SCENE_ID: (.*?) \|.*?-->/;
+//export const RE_SCENE_ID = /<!-- SCENE_ID: (.*?) \|.*?-->/;
 // 用於匹配標題行 (###### Title )
 export const RE_SCENE_HEADER = /^(###### .*?)( )?$/;
 // 用於匹配已經有 ID 的標題行
