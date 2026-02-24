@@ -41,6 +41,28 @@ export default class NovelSmithPlugin extends Plugin {
             (leaf) => new StructureView(leaf, this)
         );
 
+
+        // =================================================================
+        // 🔥 貼心 UX 1：在左側邊欄 (Ribbon) 加入一個實體按鈕
+        // =================================================================
+        this.addRibbonIcon('book-open', '開啟 NovelSmith 面板', () => {
+            this.activateView();
+        });
+
+        // =================================================================
+        // 🔥 貼心 UX 2：當 Obsidian 畫面載入完成後，自動把面板掛載到右邊！
+        // =================================================================
+        this.app.workspace.onLayoutReady(() => {
+            this.activateView();
+        });
+
+
+
+
+
+
+
+
         this.scrivenerManager = new ScrivenerManager(this.app, this.settings);
         this.historyManager = new HistoryManager(this.app, this.settings);
         this.writingManager = new WritingManager(this.app, this.settings);
@@ -88,6 +110,11 @@ export default class NovelSmithPlugin extends Plugin {
                 }, 1500); // 1500 毫秒 = 1.5 秒
             })
         );
+
+
+
+
+
 
         // =================================================================
         // 註冊指令 (加入結界防護)
@@ -215,6 +242,41 @@ export default class NovelSmithPlugin extends Plugin {
             }
         });
 
+        // =================================================================
+        // 🛠️ 註冊寫作輔助命令 (贅字、正字、對話模式、一鍵定稿)
+        // =================================================================
+        this.addCommand({
+            id: 'toggle-redundant-mode',
+            name: '🔍 贅字模式 (切換)',
+            editorCallback: (editor, view) => {
+                this.writingManager.toggleRedundantMode(view);
+            }
+        });
+
+        this.addCommand({
+            id: 'correct-names',
+            name: '✍️ 正字刑警 (一鍵修正名詞)',
+            editorCallback: (editor, view) => {
+                this.writingManager.correctNames(view);
+            }
+        });
+
+        this.addCommand({
+            id: 'toggle-dialogue-mode',
+            name: '💬 對話模式 (切換)',
+            editorCallback: (editor, view) => {
+                this.writingManager.toggleDialogueMode(view);
+            }
+        });
+
+        this.addCommand({
+            id: 'clean-draft',
+            name: '🧹 一鍵定稿 (清除所有標記)',
+            editorCallback: (editor, view) => {
+                this.writingManager.cleanDraft(view);
+            }
+        });
+
         this.addCommand({
             id: 'auto-wiki',
             name: 'Wiki: Auto Scan & Create (自動百科)',
@@ -232,25 +294,25 @@ export default class NovelSmithPlugin extends Plugin {
         });
 
         // Ribbon Icons
-        this.addRibbonIcon('save', 'Smart Save (智能儲存)', () => {
-            const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-            if (view && this.checkInBookFolder(view.file)) this.executeSmartSave(view);
-        });
+        // this.addRibbonIcon('save', 'Smart Save (智能儲存)', () => {
+        //     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        //     if (view && this.checkInBookFolder(view.file)) this.executeSmartSave(view);
+        // });
 
-        this.addRibbonIcon('book-open', 'Toggle Scrivenings', () => {
-            const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-            if (view && this.checkInBookFolder(view.file)) {
-                if (view.file.parent) {
-                    this.sceneManager.assignIDsToAllFiles(view.file.parent).then(() => {
-                        this.scrivenerManager.toggleScrivenings();
-                    });
-                }
-            }
-        });
+        // this.addRibbonIcon('book-open', 'Toggle Scrivenings', () => {
+        //     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        //     if (view && this.checkInBookFolder(view.file)) {
+        //         if (view.file.parent) {
+        //             this.sceneManager.assignIDsToAllFiles(view.file.parent).then(() => {
+        //                 this.scrivenerManager.toggleScrivenings();
+        //             });
+        //         }
+        //     }
+        // });
 
-        this.addRibbonIcon('layout-list', 'Open Outline', () => {
-            this.activateView();
-        });
+        // this.addRibbonIcon('layout-list', 'Open Outline', () => {
+        //     this.activateView();
+        // });
     }
 
     public checkInBookFolderSilent(file: TFile | null): boolean {

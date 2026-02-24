@@ -22,15 +22,15 @@ export const RE_SCENE_HEADER_HTML = /###### (.*?)( <!--|$)/;
 // 🔥 新增：讓全系統通用的 ID Regex
 // 格式： 
 export const RE_SCENE_INFO = /^###### 🎬 .*[\r\n]+(> .*[\r\n]*)*/gm;
-//export const RE_SCENE_ID = /<!-- SCENE_ID: (.*?) \|.*?-->/;
+export const RE_SCENE_ID = /<!-- SCENE_ID: (.*?) \|.*?-->/;
 // 用於匹配標題行 (###### Title )
 export const RE_SCENE_HEADER = /^(###### .*?)( )?$/;
 // 用於匹配已經有 ID 的標題行
-// export const RE_SCENE_HEADER_ID = /^(###### .*?)( <!-- SCENE_ID: .*? -->)?$/;
+export const RE_SCENE_HEADER_ID = /^(###### .*?)( <!-- SCENE_ID: .*? -->)?$/;
 // String HTML comment
-// export const ST_SCENE_ID_OP = ' <!-- SCENE_ID: ';
-// export const ST_SCENE_ID_CL = ' -->';
-// export const ST_WARNING = '⛔️ ID (勿改)';
+export const ST_SCENE_ID_OP = ' <!-- SCENE_ID: ';
+export const ST_SCENE_ID_CL = ' -->';
+export const ST_WARNING = '⛔️ ID (勿改)';
 export const ST_SCENE_TAG = '######';
 export const ST_FILE_ID_HEADER = "++ FILE_ID";
 

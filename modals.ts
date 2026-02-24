@@ -103,7 +103,8 @@ export class CompileModal extends Modal {
         removeComments: true,
         removeStrikethrough: true,
         mergeBold: true,
-        removeHighlights: true
+        removeHighlights: true,
+        removeInternalLinks: true
     };
 
     onSubmit: (options: CompileOptions) => void;

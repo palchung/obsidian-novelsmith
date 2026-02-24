@@ -42,6 +42,24 @@ export class StructureView extends ItemView {
         this.plugin = plugin;
     }
 
+    // 🔥 新增：精準鎖定當前 Markdown 視窗 (無視側邊欄焦點干擾)
+    private getValidMarkdownView(): MarkdownView | null {
+        const activeFile = this.app.workspace.getActiveFile();
+        if (activeFile) {
+            // 強制遍歷所有視窗，搵出同當前活躍檔案完全吻合嗰一個
+            const leaves = this.app.workspace.getLeavesOfType("markdown");
+            for (const leaf of leaves) {
+                if (leaf.view instanceof MarkdownView && leaf.view.file && leaf.view.file.path === activeFile.path) {
+                    return leaf.view;
+                }
+            }
+        }
+        // 如果真係搵唔到，先至用系統預設方法
+        return this.app.workspace.getActiveViewOfType(MarkdownView);
+    }
+
+
+
     getViewType() { return VIEW_TYPE_STRUCTURE; }
     getDisplayText() { return "NovelSmith 控制台"; }
     getIcon() { return "kanban-square"; }
@@ -81,11 +99,8 @@ export class StructureView extends ItemView {
         const container = this.contentEl.querySelector(".ns-structure-container") as HTMLElement;
         if (!container) { this.isRefreshing = false; return; }
 
-        let view = this.app.workspace.getActiveViewOfType(MarkdownView);
-        if (!view) {
-            const leaves = this.app.workspace.getLeavesOfType("markdown");
-            if (leaves.length > 0) view = leaves[0].view as MarkdownView;
-        }
+        // 🔥 使用精準鎖定雷達
+        const view = this.getValidMarkdownView();
 
         // 🔥 指紋檢查邏輯：如果大綱沒變，直接退出，節省 iPad 電量！
         if (view && this.activeTab === 'outline') {
@@ -329,11 +344,7 @@ export class StructureView extends ItemView {
     }
 
     jumpToLine(lineNumber: number) {
-        let view = this.app.workspace.getActiveViewOfType(MarkdownView);
-        if (!view) {
-            const leaves = this.app.workspace.getLeavesOfType("markdown");
-            if (leaves.length > 0) view = leaves[0].view as MarkdownView;
-        }
+        const view = this.getValidMarkdownView();
         if (view) {
             const editor = view.editor;
             if (lineNumber < 0) lineNumber = 0;
