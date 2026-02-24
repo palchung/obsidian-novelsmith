@@ -2,6 +2,7 @@ import { App, Notice, MarkdownView, TFile } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 // 🔥 引入新視窗
 import { CompileModal, CompileOptions, ChapterSelectionModal } from '../modals';
+import { RE_FILE_ID_HEADING, RE_FOLDER_HEADING, RE_SCENE_INFO } from '../utils';
 
 export class CompilerManager {
     app: App;
@@ -75,10 +76,10 @@ export class CompilerManager {
 
             // B. 移除情節卡片
             if (options.removeSceneInfo) {
-                const regexSceneInfo = /^###### 🎬 .*[\r\n]+(> .*[\r\n]*)*/gm;
+                const regexSceneInfo = RE_SCENE_INFO;
                 content = content.replace(regexSceneInfo, "");
-                content = content.replace(/^###### 草稿[\s\S]*?(?=^###### 初稿)/gm, "");
-                content = content.replace(/^###### 初稿\s*$/gm, "");
+                //content = content.replace(/^###### 草稿[\s\S]*?(?=^###### 初稿)/gm, "");
+                //content = content.replace(/^###### 初稿\s*$/gm, "");
             }
 
             // C. 移除註釋
@@ -101,9 +102,18 @@ export class CompilerManager {
                 content = content.replace(/==/g, "");
             }
 
+
+            // 🔥 新增：移除內部連結 (保留顯示文字)
+            if (options.removeInternalLinks) {
+                content = content.replace(/\[\[(?:[^\]]*\|)?([^\]]+)\]\]/g, "$1");
+            }
+
+
+
+
             // G. 移除 ID 標記 (強制執行，防止洩漏)
-            content = content.replace(/<small>\+\+ FILE_ID: .*? \+\+<\/small>/g, "");
-            content = content.replace(/^# 📄 .*$/gm, "");
+            content = content.replace(RE_FILE_ID_HEADING, "");
+            content = content.replace(RE_FOLDER_HEADING, "");
 
             // H. 壓縮空行
             content = content.replace(/\n{3,}/g, "\n\n");

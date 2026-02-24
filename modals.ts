@@ -93,6 +93,7 @@ export interface CompileOptions {
     removeStrikethrough: boolean; // 移除 ~~ 刪除線 ~~
     mergeBold: boolean;       // 合併 ** 粗體 **
     removeHighlights: boolean;// 移除 == 高亮 ==
+    removeInternalLinks: boolean;
 }
 
 export class CompileModal extends Modal {
@@ -159,6 +160,17 @@ export class CompileModal extends Modal {
             .addToggle(toggle => toggle
                 .setValue(this.options.removeHighlights)
                 .onChange(value => this.options.removeHighlights = value));
+
+        new Setting(contentEl)
+            .setName('移除內部連結符號')
+            .setDesc('將 [[連結|顯示名稱]] 轉換為純文字 (只保留顯示名稱)')
+            .addToggle(toggle => toggle
+                .setValue(this.options.removeInternalLinks)
+                .onChange(val => this.options.removeInternalLinks = val));
+
+
+
+
 
         new Setting(contentEl)
             .addButton(btn => btn

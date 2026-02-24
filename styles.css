@@ -25,33 +25,22 @@ body.mode-dialogue .cm-dialogue-text {
    🙈 結構樣式 (Structure Decorators) - 安全縮小版
    ============================================================ */
 
-/* 1. ID 標籤：縮小、變灰 */
-.cm-small-id {
-    font-size: 0.6em !important;
-    /* 縮細到 60% */
-    color: var(--text-faint) !important;
-    /* 最淡的灰色 */
-    font-family: var(--font-monospace);
-    /* 等寬字體 */
-    opacity: 0.4;
-    /* 增加透明度 */
-    letter-spacing: -0.5px;
-    /* 稍微擠一點 */
+/* 1. 檔案大標題 (# 📄 檔案名)：優雅置中，似實體書章節 */
+.cm-small-header {
+    display: block !important;
+    text-align: center !important;
+    font-size: var(--h2-size) !important;
+    color: var(--text-normal) !important;
+    font-weight: 700;
+    background-color: transparent !important;
+    border-bottom: none !important;
+    padding-top: 25px !important;
+    letter-spacing: 2px;
 }
 
-/* 2. 章節標題：變成分隔線風格的文字 */
-.cm-small-header {
-    font-size: 0.85em !important;
-    color: var(--interactive-accent) !important;
-    /* 使用主題色 */
-    font-weight: bold;
-    opacity: 0.8;
-
-    /* 讓它看起來像個小標籤 */
-    background-color: var(--background-primary-alt);
-    padding: 2px 8px;
-    border-radius: 4px;
-    border-bottom: 1px solid var(--background-modifier-border);
+/* 2. 確保 CodeMirror 裝飾器唔會干擾我哋嘅神聖結界 */
+.cm-small-id {
+    display: none !important;
 }
 
 /* ============================================================
@@ -143,4 +132,153 @@ body.mode-dialogue .cm-dialogue-text {
 .ns-refresh-btn {
     width: 100%;
     margin-bottom: 10px;
+}
+
+/* ============================================================
+   🎛️ 側邊控制面板 (Control Panel UI)
+   ============================================================ */
+
+/* 頂部按鈕區與分頁區的容器 (🔥 終極吸頂版) */
+.ns-control-header {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-bottom: 1px solid var(--background-modifier-border);
+
+    /* 抵消 Obsidian 預設的 15px 邊距，令面板完全貼邊 */
+    margin: -15px -15px 10px -15px;
+    padding: 15px 15px 10px 15px;
+
+    position: sticky;
+    top: -15px;
+    /* 緊緊吸附在最頂端 */
+    background-color: var(--background-primary);
+    z-index: 99;
+    /* 🔥 提高層級，絕對不會被下方滾動的劇情卡片遮住 */
+}
+
+/* 橫向按鈕列 */
+.ns-button-row {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.ns-button-row button {
+    flex: 1;
+    padding: 4px 8px;
+    font-size: 0.85em;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* 分頁標籤列 (Tabs) */
+.ns-tabs-row {
+    display: flex;
+    gap: 5px;
+    margin-top: 5px;
+}
+
+.ns-tab-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    box-shadow: none;
+    border-radius: 0;
+    opacity: 0.5;
+    cursor: pointer;
+    padding: 5px 0;
+    font-weight: normal;
+    transition: all 0.2s ease;
+}
+
+.ns-tab-btn:hover {
+    opacity: 0.8;
+}
+
+.ns-tab-btn.is-active {
+    opacity: 1;
+    border-bottom: 2px solid var(--interactive-accent);
+    font-weight: bold;
+    color: var(--text-normal);
+}
+
+/* ============================================================
+   🕰️ 歷史紀錄分頁 (History Tab)
+   ============================================================ */
+.ns-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 2px;
+}
+
+.ns-history-card {
+    background-color: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    padding: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.ns-history-header {
+    font-weight: bold;
+    font-size: 0.85em;
+    margin-bottom: 8px;
+    color: var(--text-accent);
+}
+
+.ns-history-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.ns-history-actions button {
+    flex: 1;
+    font-size: 0.8em;
+    padding: 2px 5px;
+}
+
+/* ============================================================
+   🏷️ 專屬情節卡片 Callout: [!NSmith]
+   ============================================================ */
+.callout[data-callout="nsmith"] {
+    --callout-color: 100, 150, 255;
+    /* 藍色系，可以隨意更改 rgb 值 */
+    --callout-icon: lucide-film;
+    /* 電影場景 icon */
+    background-color: rgba(var(--callout-color), 0.1);
+    border-left: 4px solid rgb(var(--callout-color));
+}
+
+/* ============================================================
+   🥷 專屬情節卡片 ID 隱形斗篷
+   ============================================================ */
+.ns-id {
+    display: none;
+}
+
+/* 3. 檔案 ID (<span class="ns-file-id">)：由隱形變為「系統防護線」 */
+.ns-file-id {
+    display: inline-block;
+    width: 100%;
+    text-align: center;
+    font-size: 0 !important;
+    /* 完美隱藏原本篤眼篤鼻的 ID 亂碼 */
+    color: transparent !important;
+    user-select: none !important;
+    /* 降低被滑鼠誤選的機率 */
+    pointer-events: none !important;
+    /* 滑鼠點擊會直接穿透 */
+    margin-bottom: 30px;
+}
+
+/* 4. 利用 CSS 偽元素，無中生有變出一條警告橫線！ */
+.ns-file-id::before {
+    content: "━━━━━━━━ ✂️ 系統檔案邊界 ‧ 請勿刪除 ✂️ ━━━━━━━━";
+    font-size: 12px;
+    color: var(--text-faint);
+    letter-spacing: 2px;
+    opacity: 0.6;
 }

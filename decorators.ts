@@ -50,7 +50,7 @@ export const dialogueHighlighter = ViewPlugin.fromClass(class {
 // ============================================================
 
 const structureMatcher = new MatchDecorator({
-    regexp: /(^# 📄 .*$)|(<small>\+\+ FILE_ID: .*? \+\+<\/small>)/gm,
+    regexp: /(^# 📄 .*$)|(<span class="ns-file-id">\+\+ FILE_ID: .*? \+\+<\/span>)/gm,
 
     decoration: (match) => {
         const text = match[0];

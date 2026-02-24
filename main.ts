@@ -1,4 +1,4 @@
-import { MarkdownView, Notice, Plugin, TFile, debounce } from 'obsidian';
+import { MarkdownView, Notice, Plugin, TFile } from 'obsidian';
 import { WorkspaceLeaf } from 'obsidian';
 import { NovelSmithSettings, DEFAULT_SETTINGS, NovelSmithSettingTab } from './settings';
 import { ScrivenerManager } from './managers/ScrivenerManager';
@@ -13,6 +13,7 @@ import { StructureView, VIEW_TYPE_STRUCTURE } from './managers/StructureView';
 
 export default class NovelSmithPlugin extends Plugin {
     settings: NovelSmithSettings;
+
     scrivenerManager: ScrivenerManager;
     historyManager: HistoryManager;
     writingManager: WritingManager;
@@ -21,48 +22,92 @@ export default class NovelSmithPlugin extends Plugin {
     compilerManager: CompilerManager;
     sceneManager: SceneManager;
 
+    // 🔥 防呆系統：記錄上次警告的時間 (冷卻期用)
+    lastDraftWarningTime: number = 0;
+
+    // 🔥 極致省電：防抖計時器
+    private draftCheckTimer: number | null = null;
+
     async onload() {
         console.log('NovelSmith 系統啟動 (Full Suite)');
 
         await this.loadSettings();
+        await this.ensureTemplateFileExists();
 
         this.registerEditorExtension([redundantHighlighter, dialogueHighlighter, structureHighlighter]);
 
         this.registerView(
             VIEW_TYPE_STRUCTURE,
-            (leaf) => new StructureView(leaf)
+            (leaf) => new StructureView(leaf, this)
         );
 
-        // 1. 聘請經理
         this.scrivenerManager = new ScrivenerManager(this.app, this.settings);
         this.historyManager = new HistoryManager(this.app, this.settings);
         this.writingManager = new WritingManager(this.app, this.settings);
-        this.plotManager = new PlotManager(this.app, this.settings);
+        this.plotManager = new PlotManager(this.app, this.settings, this);
         this.wikiManager = new WikiManager(this.app, this.settings);
         this.compilerManager = new CompilerManager(this.app, this.settings);
         this.sceneManager = new SceneManager(this.app, this.settings);
 
-        // 2. 註冊設定頁
         this.addSettingTab(new NovelSmithSettingTab(this.app, this));
 
-        // 自動化監聽：當檔案修改時，自動更新數據庫
-        const debouncedUpdateDatabase = debounce(() => {
-            if (this.app.workspace.getActiveViewOfType(MarkdownView)) {
-                this.sceneManager.generateDatabase();
-            }
-        }, 2000, true);
-
+        // =================================================================
+        // 🔥 極致省電版防呆監聽器：等你停手先檢查
+        // =================================================================
         this.registerEvent(
-            this.app.vault.on('modify', (file) => {
-                if (file instanceof TFile && file.extension === 'md' && !file.name.startsWith("_")) {
-                    debouncedUpdateDatabase();
+            this.app.workspace.on('editor-change', () => {
+                // 如果用家不斷打字，就清除上一次嘅計時器，唔好做嘢
+                if (this.draftCheckTimer !== null) {
+                    window.clearTimeout(this.draftCheckTimer);
                 }
+
+                // 重新設定計時器：等用家停手 1.5 秒後，先至真正執行檢查
+                this.draftCheckTimer = window.setTimeout(() => {
+                    const activeFile = this.app.workspace.getActiveFile();
+                    if (!activeFile) return;
+
+                    if (!this.checkInBookFolderSilent(activeFile)) return;
+
+                    if (activeFile.name === this.settings.draftFilename) return;
+                    if (activeFile.name.startsWith("_")) return;
+                    const templateName = this.settings.templateFilePath.split('/').pop();
+                    if (activeFile.name === templateName) return;
+
+                    const now = Date.now();
+                    if (now - this.lastDraftWarningTime < 5 * 60 * 1000) return;
+
+                    const folder = activeFile.parent;
+                    if (!folder) return;
+                    const draftPath = `${folder.path}/${this.settings.draftFilename}`;
+                    const draftFile = this.app.vault.getAbstractFileByPath(draftPath);
+
+                    if (draftFile) {
+                        new Notice("⚠️ 警告：串聯模式進行中！\n在此處的修改可能會在稍後同步時被覆寫。\n請返回草稿檔修改，或先結束串聯。", 8000);
+                        this.lastDraftWarningTime = now;
+                    }
+                }, 1500); // 1500 毫秒 = 1.5 秒
             })
         );
 
         // =================================================================
-        // 註冊指令
+        // 註冊指令 (加入結界防護)
         // =================================================================
+        this.addCommand({
+            id: 'smart-save-sync',
+            name: 'System: Smart Save & Sync (智能儲存與同步)',
+            icon: 'save',
+            hotkeys: [{ modifiers: ["Mod"], key: "s" }],
+            checkCallback: (checking: boolean) => {
+                const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+                if (view) {
+                    if (!checking && this.checkInBookFolder(view.file)) {
+                        this.executeSmartSave(view);
+                    }
+                    return true;
+                }
+                return false;
+            }
+        });
 
         this.addCommand({
             id: 'open-structure-view',
@@ -77,24 +122,24 @@ export default class NovelSmithPlugin extends Plugin {
             checkCallback: (checking: boolean) => {
                 const view = this.app.workspace.getActiveViewOfType(MarkdownView);
                 if (view) {
-                    if (!checking) this.compilerManager.openCompileModal(view);
+                    if (!checking && this.checkInBookFolder(view.file)) {
+                        this.compilerManager.openCompileModal(view);
+                    }
                     return true;
                 }
                 return false;
             }
         });
 
-        // 串聯模式 (修改：針對整個 Folder 檢查 ID)
         this.addCommand({
             id: 'toggle-scrivenings',
             name: 'Toggle Scrivenings Mode (串聯模式)',
             checkCallback: (checking: boolean) => {
                 const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
                 if (markdownView) {
-                    if (!checking) {
+                    if (!checking && this.checkInBookFolder(markdownView.file)) {
                         const folder = markdownView.file.parent;
                         if (folder) {
-                            // 先全家做一次體檢，確保無人漏 ID，再串聯
                             this.sceneManager.assignIDsToAllFiles(folder).then(() => {
                                 this.scrivenerManager.toggleScrivenings();
                             });
@@ -113,7 +158,9 @@ export default class NovelSmithPlugin extends Plugin {
             checkCallback: (checking: boolean) => {
                 const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
                 if (markdownView) {
-                    if (!checking) this.historyManager.saveVersion(markdownView);
+                    if (!checking && this.checkInBookFolder(markdownView.file)) {
+                        this.historyManager.saveVersion(markdownView);
+                    }
                     return true;
                 }
                 return false;
@@ -127,86 +174,9 @@ export default class NovelSmithPlugin extends Plugin {
             checkCallback: (checking: boolean) => {
                 const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
                 if (markdownView) {
-                    if (!checking) this.historyManager.restoreVersion(markdownView);
-                    return true;
-                }
-                return false;
-            }
-        });
-
-        this.addCommand({
-            id: 'assign-scene-ids',
-            name: 'System: Assign IDs to Scenes (為情節分配身份證)',
-            icon: 'fingerprint',
-            checkCallback: (checking: boolean) => {
-                const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-                if (view) {
-                    if (!checking) this.sceneManager.assignIDs(view);
-                    return true;
-                }
-                return false;
-            }
-        });
-
-        this.addCommand({
-            id: 'generate-scene-database',
-            name: 'System: Update Scene Database (更新場景大表)',
-            icon: 'database',
-            callback: () => {
-                this.sceneManager.generateDatabase();
-            }
-        });
-
-        this.addCommand({
-            id: 'toggle-redundant-mode',
-            name: 'Writing Aid: Toggle Redundant Mode (贅字模式)',
-            icon: 'search',
-            checkCallback: (checking: boolean) => {
-                const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-                if (markdownView) {
-                    if (!checking) this.writingManager.toggleRedundantMode(markdownView);
-                    return true;
-                }
-                return false;
-            }
-        });
-
-        this.addCommand({
-            id: 'toggle-dialogue-mode',
-            name: 'Writing Aid: Toggle Dialogue Mode (對話模式)',
-            icon: 'message-circle',
-            checkCallback: (checking: boolean) => {
-                const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-                if (markdownView) {
-                    if (!checking) this.writingManager.toggleDialogueMode(markdownView);
-                    return true;
-                }
-                return false;
-            }
-        });
-
-        this.addCommand({
-            id: 'correct-names',
-            name: 'Writing Aid: Correct Names (正字刑警)',
-            icon: 'check-circle',
-            checkCallback: (checking: boolean) => {
-                const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-                if (markdownView) {
-                    if (!checking) this.writingManager.correctNames(markdownView);
-                    return true;
-                }
-                return false;
-            }
-        });
-
-        this.addCommand({
-            id: 'clean-draft',
-            name: 'Writing Aid: Clean Draft (一鍵定稿)',
-            icon: 'trash',
-            checkCallback: (checking: boolean) => {
-                const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-                if (markdownView) {
-                    if (!checking) this.writingManager.cleanDraft(markdownView);
+                    if (!checking && this.checkInBookFolder(markdownView.file)) {
+                        this.historyManager.restoreVersion(markdownView);
+                    }
                     return true;
                 }
                 return false;
@@ -220,7 +190,9 @@ export default class NovelSmithPlugin extends Plugin {
             checkCallback: (checking: boolean) => {
                 const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
                 if (markdownView) {
-                    if (!checking) this.plotManager.splitScene(markdownView);
+                    if (!checking && this.checkInBookFolder(markdownView.file)) {
+                        this.plotManager.splitScene(markdownView);
+                    }
                     return true;
                 }
                 return false;
@@ -234,7 +206,9 @@ export default class NovelSmithPlugin extends Plugin {
             checkCallback: (checking: boolean) => {
                 const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
                 if (markdownView) {
-                    if (!checking) this.plotManager.mergeScene(markdownView);
+                    if (!checking && this.checkInBookFolder(markdownView.file)) {
+                        this.plotManager.mergeScene(markdownView);
+                    }
                     return true;
                 }
                 return false;
@@ -248,38 +222,103 @@ export default class NovelSmithPlugin extends Plugin {
             checkCallback: (checking: boolean) => {
                 const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
                 if (markdownView) {
-                    if (!checking) this.wikiManager.scanAndCreateWiki(markdownView);
+                    if (!checking && this.checkInBookFolder(markdownView.file)) {
+                        this.wikiManager.scanAndCreateWiki(markdownView);
+                    }
                     return true;
                 }
                 return false;
             }
         });
 
-        // =================================================================
         // Ribbon Icons
-        // =================================================================
+        this.addRibbonIcon('save', 'Smart Save (智能儲存)', () => {
+            const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+            if (view && this.checkInBookFolder(view.file)) this.executeSmartSave(view);
+        });
 
         this.addRibbonIcon('book-open', 'Toggle Scrivenings', () => {
             const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-            if (view && view.file.parent) {
-                // 也是一樣，先檢查全家，再串聯
-                this.sceneManager.assignIDsToAllFiles(view.file.parent).then(() => {
-                    this.scrivenerManager.toggleScrivenings();
-                });
-            } else {
-                new Notice("❌ 請先打開筆記！");
+            if (view && this.checkInBookFolder(view.file)) {
+                if (view.file.parent) {
+                    this.sceneManager.assignIDsToAllFiles(view.file.parent).then(() => {
+                        this.scrivenerManager.toggleScrivenings();
+                    });
+                }
             }
-        });
-
-        this.addRibbonIcon('save', 'Atomic Save', () => {
-            const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-            if (view) this.historyManager.saveVersion(view);
-            else new Notice("❌ 請先打開筆記！");
         });
 
         this.addRibbonIcon('layout-list', 'Open Outline', () => {
             this.activateView();
         });
+    }
+
+    public checkInBookFolderSilent(file: TFile | null): boolean {
+        if (!file) return false;
+        const bookFolder = this.settings.bookFolderPath;
+        if (!bookFolder) return true;
+        return file.path.startsWith(bookFolder);
+    }
+
+    public checkInBookFolder(file: TFile | null): boolean {
+        if (!file) {
+            new Notice("❌ 請先打開筆記！");
+            return false;
+        }
+
+        const bookFolder = this.settings.bookFolderPath;
+        if (!bookFolder) return true;
+
+        if (file.path.startsWith(bookFolder)) {
+            return true;
+        } else {
+            new Notice(`⛔ 系統拒絕：此檔案不在您的「專屬寫作資料夾」(${bookFolder}) 內，已禁用插件功能以保護檔案。`);
+            return false;
+        }
+    }
+
+    async executeSmartSave(view: MarkdownView) {
+        const activeFile = view.file;
+        if (!activeFile) return;
+        const folder = activeFile.parent;
+        if (!folder) return;
+
+        if (activeFile.name === this.settings.draftFilename) {
+            new Notice("🔄 正在結束串聯並同步...");
+            await this.scrivenerManager.syncBack(activeFile, folder);
+            await this.sceneManager.generateDatabase();
+        } else {
+            await this.sceneManager.executeAssignIDsSilent(view);
+        }
+    }
+
+    // =================================================================
+    // 📄 智能範本生成器 (支援手動觸發與防覆蓋機制)
+    // =================================================================
+    public async ensureTemplateFileExists(forceShowNotice: boolean = false) {
+        const tplPath = this.settings.templateFilePath;
+        if (!tplPath) {
+            if (forceShowNotice) new Notice("❌ 請先設定範本路徑！");
+            return;
+        }
+
+        const file = this.app.vault.getAbstractFileByPath(tplPath);
+        if (!file) {
+            // 🔥 換上全新的 span 隱形標籤
+            const defaultTemplate = `###### 🎬 {{SceneName}} <span class="ns-id">SCENE_ID: {{UUID}}</span>\n> [!NSmith] 情節資訊\n> - Time:: \n> - POV:: \n> - Status:: #Writing\n> - Note:: \n\n這裡開始寫正文...`;
+
+            try {
+                await this.app.vault.create(tplPath, defaultTemplate);
+                console.log("✅ 已自動建立 NovelSmith 專屬範本檔: " + tplPath);
+                if (forceShowNotice) new Notice(`✅ 成功生成範本：${tplPath}`);
+            } catch (e) {
+                console.error("建立範本檔失敗 (請檢查路徑)", e);
+                if (forceShowNotice) new Notice(`❌ 建立範本失敗，請檢查路徑是否合法`);
+            }
+        } else {
+            // 如果檔案已經存在，彈出安全警告，絕對唔覆蓋！
+            if (forceShowNotice) new Notice(`⚠️ 範本已經存在 (${tplPath})，為免覆蓋你的自訂設定，系統停止生成。`);
+        }
     }
 
     async activateView() {
@@ -314,5 +353,4 @@ export default class NovelSmithPlugin extends Plugin {
         this.compilerManager.settings = this.settings;
         this.sceneManager.settings = this.settings;
     }
-
 }

@@ -1,31 +1,83 @@
-import { App, Notice, MarkdownView, EditorPosition } from 'obsidian';
+import { App, Notice, MarkdownView, EditorPosition, TFile } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 import { InputModal, GenericSuggester } from '../modals';
 
 export class PlotManager {
     app: App;
     settings: NovelSmithSettings;
+    plugin: any;
 
-    constructor(app: App, settings: NovelSmithSettings) {
+    constructor(app: App, settings: NovelSmithSettings, plugin: any) {
         this.app = app;
         this.settings = settings;
+        this.plugin = plugin;
     }
 
     updateSettings(newSettings: NovelSmithSettings) {
         this.settings = newSettings;
     }
 
-    // =================================================================
-    // 🔪 情節分拆 (Split Scene) - 自動生成 ID 版
-    // =================================================================
+    private async getTemplateContent(sceneName: string): Promise<string> {
+        const tplPath = this.settings.templateFilePath;
+        let templateText = "";
+        const tplFile = this.app.vault.getAbstractFileByPath(tplPath);
+
+        if (tplFile instanceof TFile) {
+            templateText = await this.app.vault.read(tplFile);
+        } else {
+            // 🔥 換上 span 標籤
+            templateText = `###### 🎬 {{SceneName}} <span class="ns-id">SCENE_ID: {{UUID}}</span>\n> [!NSmith] 情節資訊\n> - Time:: \n> - POV:: \n> - Status:: #Writing\n> - Note:: \n\n`;
+        }
+
+        const uuid = crypto.randomUUID().substring(0, 8);
+
+        return templateText
+            .replace(/{{SceneName}}/g, sceneName)
+            .replace(/{{UUID}}/g, uuid);
+    }
+
+    async insertSceneCard(view: MarkdownView) {
+        new InputModal(this.app, "➕ 插入劇情卡片：請輸入情節名稱", async (newSceneName) => {
+            if (!newSceneName) return;
+
+            const editor = view.editor;
+            const cursor = editor.getCursor();
+            const currentLineText = editor.getLine(cursor.line);
+
+            // 🔥 智能防黏貼魔法：判斷前面需唔需要加換行符號
+            let prefix = "";
+
+            if (currentLineText.substring(0, cursor.ch).trim() !== "") {
+                // 如果游標前面已經有字，強制空兩行 (另起一段)
+                prefix = "\n\n";
+            } else if (cursor.line > 0 && editor.getLine(cursor.line - 1).trim() !== "") {
+                // 如果游標喺行首，但上一行有字，強制空一行
+                prefix = "\n";
+            }
+
+            const newContent = await this.getTemplateContent(newSceneName);
+            const finalContent = prefix + newContent + "\n";
+
+            editor.replaceRange(finalContent, cursor);
+
+            // 重新計算游標位置，飛去新卡片下面
+            const addedLines = finalContent.split("\n").length - 1;
+            const newCursor = { line: cursor.line + addedLines - 1, ch: 0 };
+            editor.setCursor(newCursor);
+            editor.scrollIntoView({ from: newCursor, to: newCursor }, true);
+
+            new Notice(`✅ 已插入劇情卡片：${newSceneName}`);
+
+            await this.plugin.sceneManager.generateDatabase();
+        }).open();
+    }
+
     async splitScene(view: MarkdownView) {
         const editor = view.editor;
         const cursor = editor.getCursor();
         const lineCount = editor.lineCount();
 
-        // 1. 尋找「上一場」的標題 (Parent Header) 以便遺傳 Metadata
         let parentHeaderLine = -1;
-
         for (let i = cursor.line; i >= 0; i--) {
             const line = editor.getLine(i).trim();
             if (line.startsWith("######")) {
@@ -34,7 +86,6 @@ export class PlotManager {
             }
         }
 
-        // 2. 獲取 Metadata (遺傳邏輯)
         let metadataLines: string[] = [];
         if (parentHeaderLine !== -1) {
             for (let i = parentHeaderLine + 1; i < lineCount; i++) {
@@ -44,54 +95,43 @@ export class PlotManager {
             }
         }
 
-        // 3. 彈出輸入框問名
-        new InputModal(this.app, "🔪 分拆新情節：請輸入名稱", (newSceneName) => {
+        new InputModal(this.app, "🔪 分拆新情節：請輸入名稱", async (newSceneName) => {
             if (!newSceneName) return;
-            this.executeSplit(view, cursor, newSceneName, metadataLines);
+
+            let newContent = "";
+            const uuid = crypto.randomUUID().substring(0, 8);
+
+            if (metadataLines.length > 0) {
+                // 🔥 分拆時換上 span 標籤
+                newContent += `###### 🎬 ${newSceneName} <span class="ns-id">SCENE_ID: ${uuid}</span>\n`;
+
+                for (let line of metadataLines) {
+                    if (line.includes("Scene::")) continue;
+                    newContent += `${line}\n`;
+                }
+            } else {
+                newContent = await this.getTemplateContent(newSceneName);
+            }
+
+            // 分拆固定用 \n\n 隔開
+            editor.replaceRange("\n\n" + newContent.trim() + "\n\n", cursor);
+
+            const linesInserted = newContent.trim().split("\n").length;
+            const newCursor = { line: cursor.line + linesInserted + 2, ch: 0 };
+            editor.setCursor(newCursor);
+            editor.scrollIntoView({ from: newCursor, to: newCursor }, true);
+
+            new Notice(`✅ 已從此處分拆出：${newSceneName}`);
+
+            await this.plugin.sceneManager.generateDatabase();
         }).open();
     }
 
-    executeSplit(view: MarkdownView, cursor: EditorPosition, newSceneName: string, metadataLines: string[]) {
-        const editor = view.editor;
-
-        // 4. 生成新內容 (遺傳 DNA)
-        let newMetadataBlock = "";
-
-        if (metadataLines.length > 0) {
-            newMetadataBlock = metadataLines.join("\n").replace(/Scene::.*/, `Scene:: ${newSceneName}`);
-        } else {
-            newMetadataBlock = `> [!quote] 情節資訊\n> - Scene:: ${newSceneName}\n>   - Time:: \n>   - Status:: #Writing\n>   - POV:: \n>   - Players:: \n>   - Note:: `;
-        }
-
-        // 🔥 關鍵修改：立刻生成 ID，無需等待
-        const uuid = crypto.randomUUID().substring(0, 8);
-        const warning = "⛔️ ID (勿改)";
-        // 注意：這裡改用加號拼接，避免反引號問題
-        const idTag = " <!-- SCENE_ID: " + uuid + " | " + warning + " -->";
-
-        const template = `\n###### 🎬 ${newSceneName}${idTag}\n${newMetadataBlock}\n\n`;
-
-        // 5. 執行插入
-        editor.replaceRange(template, cursor);
-
-        // 6. 調整游標位置
-        const linesInserted = template.split("\n").length;
-        const newCursor = { line: cursor.line + linesInserted, ch: 0 };
-        editor.setCursor(newCursor);
-        editor.scrollIntoView({ from: newCursor, to: newCursor }, true);
-
-        new Notice(`✅ 已分拆：${newSceneName} (ID 已生成)`);
-    }
-
-    // =================================================================
-    // 🌀 情節合併 (Merge Scene / 吸星大法)
-    // =================================================================
     async mergeScene(view: MarkdownView) {
         const editor = view.editor;
         const cursor = editor.getCursor();
         const lineCount = editor.lineCount();
 
-        // 1. 鎖定當前主情節 (Target / A)
         let targetHeaderLine = -1;
         let targetHeaderText = "";
 
@@ -109,18 +149,19 @@ export class PlotManager {
             return;
         }
 
-        // 2. 掃描全書，列出所有其他情節 (Source / B)
         const allScenes: { label: string, line: number, raw: string }[] = [];
+        const htmlCommentStart = "<" + "!--";
 
         for (let i = 0; i < lineCount; i++) {
             const line = editor.getLine(i).trim();
             if (line.startsWith("######") && i !== targetHeaderLine) {
-                // 顯示時去掉 ID 標籤，讓選單乾淨點
-                const cleanLabel = line
-                    .replace(/######\s*/, "")
-                    .replace(/^🎬\s*/, "")
-                    .replace(/<!-- SCENE_ID: (.*?) \|.*?-->/, "") // 隱藏 ID
-                    .trim();
+                let cleanLabel = line.replace(/######\s*/, "").replace(/^🎬\s*/, "");
+                if (cleanLabel.includes(htmlCommentStart)) {
+                    cleanLabel = cleanLabel.split(htmlCommentStart)[0];
+                }
+                if (cleanLabel.includes("<span")) cleanLabel = cleanLabel.split("<span")[0];
+                if (cleanLabel.includes("<small>")) cleanLabel = cleanLabel.split("<small>")[0];
+                cleanLabel = cleanLabel.trim();
 
                 allScenes.push({
                     label: cleanLabel,
@@ -135,7 +176,6 @@ export class PlotManager {
             return;
         }
 
-        // 3. 彈出選單讓用戶選擇
         new GenericSuggester(
             this.app,
             allScenes,
@@ -177,14 +217,11 @@ export class PlotManager {
             { line: sourceEndLine, ch: 0 }
         );
 
-        // 步驟 A: 刪除 B
         editor.replaceRange("",
             { line: sourceStartLine, ch: 0 },
             { line: sourceEndLine, ch: 0 }
         );
 
-        // 步驟 B: 重新定位 A (因為行號變了，我們用純標題去搜可能不準)
-        // 但因為我們沒有改 A 的內容，所以用標題搜暫時是安全的
         let newTargetHeaderLine = -1;
         const newLineCount = editor.lineCount();
 
@@ -200,7 +237,6 @@ export class PlotManager {
             return;
         }
 
-        // 步驟 C: 尋找 A 的屁股
         let insertLine = newLineCount;
         for (let i = newTargetHeaderLine + 1; i < newLineCount; i++) {
             const line = editor.getLine(i).trim();
@@ -210,12 +246,13 @@ export class PlotManager {
             }
         }
 
-        // 步驟 D: 插入
         if (textToMerge.trim() !== "") {
             editor.replaceRange("\n\n" + textToMerge, { line: insertLine, ch: 0 });
             const scrollPos = { line: insertLine, ch: 0 };
             editor.scrollIntoView({ from: scrollPos, to: scrollPos }, true);
             new Notice(`✅ 成功吸取內容！`);
+
+            this.plugin.sceneManager.generateDatabase();
         } else {
             new Notice("⚠️ 被選取的情節係空嘅，冇嘢好吸！");
         }

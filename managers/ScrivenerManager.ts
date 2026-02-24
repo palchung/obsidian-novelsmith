@@ -1,6 +1,7 @@
-import { App, Notice, TFile, TFolder, MarkdownView } from 'obsidian';
+import { App, Notice, TFile, TFolder, MarkdownView, moment } from 'obsidian';
 import { parseContent, RE_FILE_ID, DraftCard } from '../utils';
 import { NovelSmithSettings } from '../settings';
+import { ChapterSelectionModal } from '../modals';
 
 export class ScrivenerManager {
     app: App;
@@ -15,9 +16,23 @@ export class ScrivenerManager {
         this.settings = newSettings;
     }
 
-    // =================================================================
-    // 🧠 核心邏輯
-    // =================================================================
+    // 🔥 輔助：創建資料夾 (升級防呆版，過濾多餘斜線)
+    private async ensureFolderExists(folderPath: string) {
+        const cleanPath = folderPath.replace(/^\/+|\/+$/g, ''); // 移除頭尾多餘斜線
+        if (!cleanPath) return;
+
+        const folders = cleanPath.split("/");
+        let currentPath = "";
+
+        for (let i = 0; i < folders.length; i++) {
+            currentPath += (i === 0 ? "" : "/") + folders[i];
+            const folder = this.app.vault.getAbstractFileByPath(currentPath);
+            if (!folder) {
+                await this.app.vault.createFolder(currentPath);
+            }
+        }
+    }
+
     async toggleScrivenings() {
         const activeFile = this.app.workspace.getActiveFile();
         if (!activeFile) { new Notice("❌ 請先打開一個檔案！"); return; }
@@ -29,31 +44,50 @@ export class ScrivenerManager {
             new Notice("⚡️ 準備同步回寫 (Sync)...");
             await this.syncBack(activeFile, currentFolder);
         } else {
-            new Notice("⚡️ 準備串聯編譯 (Compile)...");
-            await this.compileDraft(currentFolder);
+            const draftName = this.settings.draftFilename;
+            const files = currentFolder.children.filter((f) =>
+                f instanceof TFile && f.extension === 'md' && f.name !== draftName &&
+                !f.name.includes("Script") && !f.name.includes("_History") && !f.name.startsWith("_")
+            ) as TFile[];
+
+            files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+            if (files.length === 0) { new Notice("⚠️ 資料夾內沒有可串聯的檔案。"); return; }
+
+            let targetFileName = activeFile.name;
+            let targetSceneRaw = "";
+            const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+            if (view) {
+                const editor = view.editor;
+                const cursor = editor.getCursor();
+                for (let i = cursor.line; i >= 0; i--) {
+                    const line = editor.getLine(i);
+                    if (line.trim().startsWith("######")) {
+                        targetSceneRaw = line.trim();
+                        break;
+                    }
+                }
+            }
+
+            new ChapterSelectionModal(this.app, files, async (selectedFiles) => {
+                new Notice("⚡️ 準備串聯編譯 (Compile)...");
+                await this.compileDraft(currentFolder, selectedFiles, targetFileName, targetSceneRaw);
+            }).open();
         }
     }
 
-    async compileDraft(folder: TFolder) {
+    async compileDraft(folder: TFolder, files: TFile[], targetFileName: string, targetSceneRaw: string) {
         const draftName = this.settings.draftFilename;
-        const files = folder.children.filter((f) =>
-            f instanceof TFile && f.extension === 'md' && f.name !== draftName &&
-            !f.name.includes("Script") && !f.name.includes("_History") && !f.name.startsWith("_")
-        ) as TFile[];
-
-        files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
-
-        if (files.length === 0) { new Notice("⚠️ 資料夾內沒有可串聯的檔案。"); return; }
 
         let contentChunks: string[] = [];
-        contentChunks.push(`---\ncssclasses: draft-mode\n---\n## 📜 串聯潤稿模式：${folder.name}\n`);
+        contentChunks.push(`## 📜 串聯潤稿模式：${folder.name}\n`);
 
         for (const file of files) {
             const content = await this.app.vault.read(file);
             const lines = content.split("\n");
 
             contentChunks.push(`\n\n# 📄 ${file.name}\n`);
-            contentChunks.push(`<small>++ FILE_ID: ${file.name} ++</small>\n`);
+            contentChunks.push(`<span class="ns-file-id">++ FILE_ID: ${file.name} ++</span>\n`);
 
             let isMeta = false;
             let buffer: string[] = [];
@@ -65,7 +99,7 @@ export class ScrivenerManager {
                         contentChunks.push(buffer.join("\n").trim() + "\n\n");
                         buffer = [];
                     }
-                    contentChunks.push(`${l}\n\n`); // 這裡會連同 ID 標籤一起編譯進去
+                    contentChunks.push(`${l}\n\n`);
                     isMeta = true;
                 } else if (isMeta) {
                     if (l.startsWith(">") || l.includes("::") || l === "") continue;
@@ -88,8 +122,39 @@ export class ScrivenerManager {
         }
 
         if (draftFile instanceof TFile) {
-            await this.app.workspace.getLeaf(false).openFile(draftFile);
+            const leaf = this.app.workspace.getLeaf(false);
+            await leaf.openFile(draftFile);
             new Notice(`✅ 編譯完成！共 ${files.length} 章`);
+
+            setTimeout(() => {
+                const newView = this.app.workspace.getActiveViewOfType(MarkdownView);
+                if (newView && newView.file && newView.file.name === draftName) {
+                    const editor = newView.editor;
+                    let targetLine = 0;
+
+                    if (targetSceneRaw) {
+                        for (let i = 0; i < editor.lineCount(); i++) {
+                            if (editor.getLine(i).trim() === targetSceneRaw) {
+                                targetLine = i;
+                                break;
+                            }
+                        }
+                    }
+                    else if (targetFileName) {
+                        for (let i = 0; i < editor.lineCount(); i++) {
+                            if (editor.getLine(i).includes(`++ FILE_ID: ${targetFileName} ++`)) {
+                                targetLine = i;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (targetLine > 0) {
+                        editor.setCursor({ line: targetLine, ch: 0 });
+                        editor.scrollIntoView({ from: { line: targetLine, ch: 0 }, to: { line: targetLine, ch: 0 } }, true);
+                    }
+                }
+            }, 300);
         }
     }
 
@@ -97,32 +162,35 @@ export class ScrivenerManager {
         const draftName = this.settings.draftFilename;
         const draftContent = await this.app.vault.read(draftFile);
 
-        if (!draftContent.includes("<small>++ FILE_ID:")) {
+        if (!draftContent.includes('<span class="ns-file-id">++ FILE_ID:')) {
             new Notice("❌ 嚴重錯誤：找不到任何 FILE_ID 標記！無法同步。", 0);
             return;
         }
 
         new Notice("🚀 同步中… (ID 優先模式)");
 
+        // 記低目前打開緊草稿嘅分頁 (Tab)，等陣同步完用嚟關閉
+        let leafToClose = null;
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (view && view.file && view.file.path === draftFile.path) {
+            leafToClose = view.leaf;
+        }
+
         const allFolderFiles = folder.children.filter(f =>
             f instanceof TFile && f.extension === 'md' && f.name !== draftName && !f.name.startsWith("_")
         ) as TFile[];
 
-        // 1. 建立兩張地圖：一張認 ID (優先)，一張認標題 (備用)
         const fileContentCache = new Map<string, { file: TFile, text: string }>();
-        const globalIdMap = new Map<string, DraftCard>();   // 根據 ID 找舊情節
-        const globalTitleMap = new Map<string, DraftCard>(); // 根據 標題 找舊情節
+        const globalIdMap = new Map<string, DraftCard>();
+        const globalTitleMap = new Map<string, DraftCard>();
 
         await Promise.all(allFolderFiles.map(async (file) => {
             const text = await this.app.vault.read(file);
             fileContentCache.set(file.name, { file: file, text: text });
 
-            // 解析原檔內容
             const data = parseContent(text, true);
             data.cards.forEach(card => {
-                // 登記標題
                 globalTitleMap.set(card.key, card);
-                // 如果有 ID，登記 ID
                 if (card.id) {
                     globalIdMap.set(card.id, card);
                 }
@@ -143,38 +211,46 @@ export class ScrivenerManager {
             if (!cachedData) continue;
 
             const originalData = parseContent(cachedData.text, true);
-            const draftData = parseContent(blockContent, false); // false = 代表這是草稿，需要解析 ID
+            const draftData = parseContent(blockContent, false);
 
             let finalContent = "";
-            // 保留原本的檔頭 (YAML 等)
             if (originalData.headers.trim()) finalContent += originalData.headers.trim() + "\n\n";
 
             for (let draftCard of draftData.cards) {
                 let originalCard: DraftCard | undefined;
 
-                // 🔥 核心修改：優先用 ID 配對
                 if (draftCard.id && globalIdMap.has(draftCard.id)) {
                     originalCard = globalIdMap.get(draftCard.id);
                 }
-                // 找不到 ID，才嘗試用標題配對
                 else if (globalTitleMap.has(draftCard.key)) {
                     originalCard = globalTitleMap.get(draftCard.key);
                 }
 
                 if (originalCard) {
-                    // 找到了！更新舊情節
-                    // 如果 Draft 改了標題，這裡會用 Draft 的 header (draftCard.rawHeader)
-                    // 這樣就實現了「改名同步」！
                     finalContent += `${draftCard.rawHeader}\n${originalCard.meta.join("\n").trim()}\n\n${draftCard.body}\n\n`;
                 } else {
-                    // 完全是新的情節 (New Scene)
                     if (!draftCard.key) continue;
-                    finalContent += `${draftCard.rawHeader}\n`;
+
+                    const uuid = crypto.randomUUID().substring(0, 8);
+                    const idTag = ` <span class="ns-id">SCENE_ID: ${uuid}</span>`;
+
+                    finalContent += `${draftCard.rawHeader.trimEnd()}${idTag}\n`;
+
                     if (draftCard.meta && draftCard.meta.length > 0) {
                         finalContent += `${draftCard.meta.join("\n").trim()}\n\n`;
                     } else {
-                        // 預設 Metadata
-                        finalContent += `> [!quote] 情節資訊\n> - Scene:: ${draftCard.key}\n>   - Time:: \n>   - Status:: #Writing\n\n`;
+                        const tplPath = this.settings.templateFilePath;
+                        const tplFile = this.app.vault.getAbstractFileByPath(tplPath);
+                        let metaBlock = `> [!NSmith] 情節資訊\n> - Scene:: ${draftCard.key}\n> - Status:: #Writing`;
+
+                        if (tplFile instanceof TFile) {
+                            const templateText = await this.app.vault.read(tplFile);
+                            const metaBlockMatch = templateText.match(/> \[!NSmith\][\s\S]*?(?=\n[^>]|$)/);
+                            if (metaBlockMatch) {
+                                metaBlock = metaBlockMatch[0].replace(/{{SceneName}}/g, draftCard.key).trim();
+                            }
+                        }
+                        finalContent += `${metaBlock}\n\n`;
                     }
                     finalContent += `${draftCard.body}\n\n`;
                 }
@@ -188,9 +264,28 @@ export class ScrivenerManager {
         }
 
         await Promise.all(writePromises);
-        await this.app.vault.delete(draftFile);
 
-        // 不需要手動呼叫 updateDatabase，因為 main.ts 的自動監聽器會偵測到檔案修改並自動執行
-        new Notice(`✅ 同步完成！更新了 ${updatedCount} 個檔案。`);
+        // =========================================================
+        // 🔥 執行草稿封存或刪除，然後乾脆俐落咁關閉視窗！
+        // =========================================================
+        if (this.settings.keepDraftOnSync) {
+            const timestamp = moment().format("YYYYMMDD_HHmmss");
+            const archiveFolder = this.settings.keptDraftPath || this.settings.bookFolderPath;
+            await this.ensureFolderExists(archiveFolder);
+
+            const baseName = draftFile.basename;
+            const newPath = `${archiveFolder}/${baseName}_${timestamp}.md`;
+
+            await this.app.fileManager.renameFile(draftFile, newPath);
+            new Notice(`✅ 同步完成！草稿已封存`);
+        } else {
+            await this.app.vault.delete(draftFile);
+            new Notice(`✅ 同步完成！更新了 ${updatedCount} 個檔案。`);
+        }
+
+        // 功成身退，直接關閉目前的分頁，唔再彈出任何嘢！
+        if (leafToClose) {
+            leafToClose.detach();
+        }
     }
 }

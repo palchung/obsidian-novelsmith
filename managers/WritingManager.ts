@@ -1,6 +1,5 @@
-import { App, Notice, MarkdownView, TFile, WorkspaceLeaf } from 'obsidian';
+import { App, Notice, MarkdownView, TFile } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
-// 引入剛剛寫好的工具，用來更新贅字清單
 import { updateRedundantPatterns } from '../decorators';
 
 export class WritingManager {
@@ -16,16 +15,12 @@ export class WritingManager {
         this.settings = newSettings;
     }
 
-    // 輔助：強制刷新編輯器 (讓 Decorator 重新計算)
     private triggerEditorUpdate() {
         this.app.workspace.iterateAllLeaves((leaf) => {
             if (leaf.view instanceof MarkdownView) {
-                // 發送一個微小的假更新，強迫 CodeMirror 重繪
                 // @ts-ignore
                 const cm = leaf.view.editor.cm;
-                if (cm) {
-                    cm.dispatch({ effects: [] }); // 空的 dispatch 足以觸發 update
-                }
+                if (cm) cm.dispatch({ effects: [] });
             }
         });
     }
@@ -43,62 +38,78 @@ export class WritingManager {
         }
     }
 
+    // =================================================================
+    // 📄 智能生成器：贅字清單與正字名單
+    // =================================================================
+    public async ensureRedundantListExists(forceShowNotice: boolean = false) {
+        const configPath = this.settings.redundantListPath;
+        if (!configPath) { if (forceShowNotice) new Notice("❌ 請先設定贅字清單路徑！"); return; }
 
+        let configFile = this.app.vault.getAbstractFileByPath(configPath);
+        if (!configFile) {
+            await this.ensureFolderExists(configPath);
+            try {
+                await this.app.vault.create(configPath, `// 預設贅字清單\n其實, 基本上, 彷彿`);
+                if (forceShowNotice) new Notice(`✅ 成功生成贅字清單：${configPath}`);
+            } catch (e) {
+                if (forceShowNotice) new Notice(`❌ 建立失敗，請檢查路徑`);
+            }
+        } else {
+            if (forceShowNotice) new Notice(`⚠️ 檔案已存在 (${configPath})，停止生成以免覆蓋設定。`);
+        }
+    }
+
+    public async ensureFixListExists(forceShowNotice: boolean = false) {
+        const configPath = this.settings.fixListPath;
+        if (!configPath) { if (forceShowNotice) new Notice("❌ 請先設定正字名單路徑！"); return; }
+
+        let configFile = this.app.vault.getAbstractFileByPath(configPath);
+        if (!configFile) {
+            await this.ensureFolderExists(configPath);
+            try {
+                await this.app.vault.create(configPath, `// 正字名單\n主角名 | 錯字1`);
+                if (forceShowNotice) new Notice(`✅ 成功生成正字名單：${configPath}`);
+            } catch (e) {
+                if (forceShowNotice) new Notice(`❌ 建立失敗，請檢查路徑`);
+            }
+        } else {
+            if (forceShowNotice) new Notice(`⚠️ 檔案已存在 (${configPath})，停止生成以免覆蓋設定。`);
+        }
+    }
 
     // =================================================================
-    // 🔍 贅字模式 (Update for Decorator Fix)
+    // 🔍 贅字模式
     // =================================================================
     async toggleRedundantMode(view: MarkdownView) {
         const isModeOn = document.body.classList.contains('mode-redundant');
 
         if (isModeOn) {
-            // --- 關閉 ---
             document.body.classList.remove('mode-redundant');
-            // 傳送 null，通知 Decorator 停止工作
             updateRedundantPatterns(null);
             this.triggerEditorUpdate();
             new Notice("⚪️ 已關閉：贅字模式");
         } else {
-            // --- 開啟 ---
             document.body.classList.remove('mode-dialogue');
 
+            await this.ensureRedundantListExists(false); // 確保檔案存在
             const configPath = this.settings.redundantListPath;
             let configFile = this.app.vault.getAbstractFileByPath(configPath);
 
-            if (!(configFile instanceof TFile)) {
-                await this.ensureFolderExists(configPath);
-                await this.app.vault.create(configPath, `// 預設贅字清單\n其實, 基本上, 彷彿`);
-                configFile = this.app.vault.getAbstractFileByPath(configPath);
-                new Notice(`🆕 已建立預設清單`);
-            }
-
             if (configFile instanceof TFile) {
                 const configContent = await this.app.vault.read(configFile);
-
-                // 1. 提取所有贅字
                 const badWords = configContent.split(/[,，、\n]+/)
                     .map(w => w.trim())
                     .filter(w => w.length > 0 && !w.startsWith("//"));
 
-                if (badWords.length === 0) { new Notice("⚠️ 清單是空的"); return; }
+                if (badWords.length === 0) { new Notice("⚠️ 有效贅字清單為空"); return; }
 
-                // 2. 🔥【關鍵改動】整合為單一 Regex
                 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
                 badWords.sort((a, b) => b.length - a.length);
-
-                // 🛑 保險：如果 badWords 過濾後係空的，就 Return
-                if (badWords.length === 0) {
-                    new Notice("⚠️ 有效贅字清單為空");
-                    return;
-                }
 
                 const patternString = `(${badWords.map(escapeRegExp).join("|")})`;
                 const combinedRegex = new RegExp(patternString, 'g');
 
-                // 3. 發送給 Decorator
                 updateRedundantPatterns(combinedRegex);
-
                 document.body.classList.add('mode-redundant');
                 this.triggerEditorUpdate();
                 new Notice(`🔍 贅字模式：監控中 (${badWords.length} 詞)`);
@@ -106,9 +117,8 @@ export class WritingManager {
         }
     }
 
-
     // =================================================================
-    // 💬 對話模式 (非破壞性版)
+    // 💬 對話模式
     // =================================================================
     async toggleDialogueMode(view: MarkdownView) {
         const isModeOn = document.body.classList.contains('mode-dialogue');
@@ -118,9 +128,7 @@ export class WritingManager {
             this.triggerEditorUpdate();
             new Notice("⚪️ 已關閉：對話模式");
         } else {
-            // 互斥：關閉贅字
             document.body.classList.remove('mode-redundant');
-
             document.body.classList.add('mode-dialogue');
             this.triggerEditorUpdate();
             new Notice("💬 對話模式：聚焦中");
@@ -128,27 +136,16 @@ export class WritingManager {
     }
 
     // =================================================================
-    // ✍️ 正字刑警 (這個必須是物理修改，因為係要改錯字)
+    // ✍️ 正字刑警
     // =================================================================
     async correctNames(view: MarkdownView) {
-        // (保持原有的 correctNames 代碼不變，因為這功能本身就是要改檔)
-        // ... 請保留之前的代碼 ...
+        await this.ensureFixListExists(false); // 確保檔案存在
         const dataFileName = this.settings.fixListPath;
         let fileObj = this.app.vault.getAbstractFileByPath(dataFileName);
-
-        if (!fileObj) {
-            await this.ensureFolderExists(dataFileName);
-            const defaultContent = `// 正字名單\n主角名 | 錯字1`;
-            fileObj = await this.app.vault.create(dataFileName, defaultContent);
-            new Notice(`🆕 已建立預設名單`);
-        }
 
         if (!(fileObj instanceof TFile)) return;
         const rawList = await this.app.vault.read(fileObj);
 
-        // ... (以下邏輯不變，請保留上次的 correctNames 內容) ...
-        // 為節省篇幅，這部分不重複貼上，請確保沒有刪除它
-        // 如果需要我完整貼出，請告知。
         const fixList: Record<string, string[]> = {};
         const linesList = rawList.trim().split('\n');
         let lastCorrectName = "";
@@ -225,13 +222,11 @@ export class WritingManager {
         }
     }
 
-    // =================================================================
-    // 🧹 一鍵定稿 (Clean Draft) - 物理移除註釋
-    // =================================================================
     async cleanDraft(view: MarkdownView) {
         let content = view.editor.getValue();
         content = content.replace(/%%[\s\S]*?%%/g, "");
         content = content.replace(/~~[\s\S]*?~~/g, "");
+        content = content.replace(/==[\s\S]*?==/g, "");
         content = content.replace(/\*\*(.*?)\*\*/g, "$1");
         view.editor.setValue(content);
         new Notice("🧹 稿件已清理");

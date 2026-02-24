@@ -1,9 +1,15 @@
 {
+  "bookFolderPath": "終焉與破曉/01_草稿",
   "draftFilename": "Draft_Edit.md",
-  "historyBasePath": "終焉與破曉/04_其他/_History",
-  "scenesSubfolder": "Scenes",
+  "keepDraftOnSync": false,
+  "keptDraftPath": "終焉與破曉/01_草稿/_Archived_Drafts",
+  "historyFolderPath": "終焉與破曉/04_其他/_History/Scenes",
   "redundantListPath": "終焉與破曉/04_其他/_贅字清單.md",
   "fixListPath": "終焉與破曉/04_其他/FixList.md",
   "wikiFolderPath": "終焉與破曉/03_參考資料/設定集/人物角色",
+  "exportFolderPath": "Output",
+  "templateFilePath": "終焉與破曉/NovelSmith_Template.md",
+  "historyBasePath": "終焉與破曉/04_其他/_History",
+  "scenesSubfolder": "Scenes",
   "targetWordCount": 100000
 }
