@@ -119,14 +119,24 @@ export class StructureView extends ItemView {
 
         // 🔥 指紋檢查邏輯：如果大綱沒變，直接退出，節省 iPad 電量！
         if (view && this.activeTab === 'outline') {
-            const text = view.editor.getValue();
-            // 抽取所有標題做成指紋
-            const currentHash = text.split("\n").filter(l => l.startsWith("#") || l.startsWith("<small>")).join("|");
-            if (currentHash === this.lastOutlineHash) {
+            const editor = view.editor;
+            const lineCount = editor.lineCount();
+            let hashBuilder = "";
+
+            // 🔥 終極省電優化：放棄 split("\n")，改用 getLine 逐行讀取。
+            // 完全零 Array 記憶體分配，大幅減輕 iPad 垃圾回收 (GC) 負擔！
+            for (let i = 0; i < lineCount; i++) {
+                const line = editor.getLine(i);
+                if (line.startsWith("#") || line.startsWith("<small>")) {
+                    hashBuilder += line + "|";
+                }
+            }
+
+            if (hashBuilder === this.lastOutlineHash) {
                 this.isRefreshing = false;
                 return; // 結構無變，直接收工，零消耗！
             }
-            this.lastOutlineHash = currentHash;
+            this.lastOutlineHash = hashBuilder;
         }
 
         container.empty();

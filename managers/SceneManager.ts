@@ -19,6 +19,9 @@ export class SceneManager {
     private dbTimer: number | null = null;
     private dbInFlight: Promise<void> | null = null;
 
+    // 🔥 終極省電優化：加入增量更新快取，記錄檔案的路徑、最後修改時間與情節數據
+    private fileCache: Map<string, { mtime: number, scenes: SceneData[] }> = new Map();
+
     constructor(app: App, settings: NovelSmithSettings) {
         this.app = app;
         this.settings = settings;
@@ -150,15 +153,29 @@ export class SceneManager {
         const view = this.app.workspace.getActiveViewOfType(MarkdownView);
 
         for (const file of files) {
-            const content = (view && view.file === file) ? view.editor.getValue() : await this.app.vault.read(file);
+            const isEditing = (view && view.file === file);
+            let fileScenes: SceneData[] = [];
 
-            if (content.includes('++ FILE_ID:') || content.includes('## 📜')) continue;
+            // 🔥 增量更新邏輯：如果正在編輯該檔、或者 Cache 沒資料、或者檔案修改時間變了，才重新讀取！
+            if (isEditing || !this.fileCache.has(file.path) || this.fileCache.get(file.path)!.mtime !== file.stat.mtime) {
+                const content = isEditing ? view.editor.getValue() : await this.app.vault.read(file);
 
-            const scenes = this.extractScenesFromFile(content.split("\n"));
+                if (content.includes('++ FILE_ID:') || content.includes('## 📜')) continue;
 
-            if (scenes.length > 0) {
+                fileScenes = this.extractScenesFromFile(content.split("\n"));
+
+                // 將最新結果存入 Cache (正在編輯的臨時狀態不存，依賴下次存檔更新)
+                if (!isEditing) {
+                    this.fileCache.set(file.path, { mtime: file.stat.mtime, scenes: fileScenes });
+                }
+            } else {
+                // 🔥 瞬間重用舊結果，省下幾十次硬碟讀取與運算！
+                fileScenes = this.fileCache.get(file.path)!.scenes;
+            }
+
+            if (fileScenes.length > 0) {
                 dbContent += `## [[${file.basename}]]\n`;
-                for (const scene of scenes) {
+                for (const scene of fileScenes) {
                     const link = `[[${file.basename}#${scene.title}|${scene.title}]]`;
                     dbContent += `- Scene:: ${link}\n  - SceneName:: ${scene.title}\n  - SceneID:: \`${scene.id}\`\n`;
                     for (const metaLine of scene.meta) {
