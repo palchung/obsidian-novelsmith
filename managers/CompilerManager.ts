@@ -46,7 +46,7 @@ export class CompilerManager {
 
         return parentFolder.children
             .filter(f => f instanceof TFile && f.extension === "md")
-            .filter(f => f.name !== this.settings.draftFilename)
+            .filter(f => f.name !== "NSmith_Scrivenering.md")
             .filter(f => !f.name.includes("_Scene_Database") && !f.name.includes("_History") && !f.name.startsWith("Script_"))
             .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })) as TFile[];
     }
@@ -115,6 +115,9 @@ export class CompilerManager {
             content = content.replace(RE_FILE_ID_HEADING, "");
             content = content.replace(RE_FOLDER_HEADING, "");
 
+            // 🔥 致命 Bug 修復：徹底清除情節標題尾隨的隱形 ID 標籤，確保文稿 100% 乾淨出街！
+            content = content.replace(/<span class="ns-id" data-scene-id=".*?"><\/span>/g, "");
+
             // H. 壓縮空行
             content = content.replace(/\n{3,}/g, "\n\n");
 
@@ -127,7 +130,8 @@ export class CompilerManager {
             await this.app.vault.createFolder(exportFolder);
         }
 
-        const timestamp = window.moment().format("YYYYMMDD_HHmm");
+        // 🔥 防撞名升級：時間戳記加入秒數 (HHmmss)
+        const timestamp = window.moment().format("YYYYMMDD_HHmmss");
         const outputFileName = `${parentFolder.name}_Export_${timestamp}.md`;
         const outputPath = `${exportFolder}/${outputFileName}`;
 

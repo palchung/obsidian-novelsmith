@@ -11,7 +11,7 @@
 body.mode-dialogue .cm-content,
 body.mode-dialogue .markdown-preview-view {
     color: var(--text-faint) !important;
-    transition: color 0.3s ease;
+    transition: color 0.1s ease;
 }
 
 body.mode-dialogue .cm-dialogue-text {
@@ -50,18 +50,22 @@ body.mode-dialogue .cm-dialogue-text {
 /* 整個面板的容器 */
 .ns-structure-container {
     padding: 15px 10px;
-    /* 上下加多點空間 (原本是 10px) */
     height: 100%;
     overflow-y: auto;
+    overflow-x: hidden !important;
+    /* 🔥 絕對鎖死：嚴禁左右滑動！ */
 }
 
-/* 1. 章節容器 (像一個個箱子) */
+/* 章節容器 (像一個個箱子) */
 .ns-chapter-box {
     background-color: var(--background-secondary);
     border: 1px solid var(--background-modifier-border);
     border-radius: 8px;
     margin-bottom: 15px;
     padding: 8px;
+    word-wrap: break-word;
+    /* 🔥 確保資訊面板的長文字自動換行，不撐爆畫面 */
+    overflow-wrap: break-word;
 }
 
 /* 章節標題卡片 */
@@ -145,16 +149,14 @@ body.mode-dialogue .cm-dialogue-text {
     gap: 8px;
     border-bottom: 1px solid var(--background-modifier-border);
 
-    /* 抵消 Obsidian 預設的 15px 邊距，令面板完全貼邊 */
-    margin: -15px -15px 10px -15px;
-    padding: 15px 15px 10px 15px;
+    /* 🔥 修正：精準抵消 10px 邊距，一像素也不凸出去！ */
+    margin: -15px -10px 10px -10px;
+    padding: 15px 10px 10px 10px;
 
     position: sticky;
     top: -15px;
-    /* 緊緊吸附在最頂端 */
     background-color: var(--background-primary);
     z-index: 99;
-    /* 🔥 提高層級，絕對不會被下方滾動的劇情卡片遮住 */
 }
 
 /* 橫向按鈕列 */

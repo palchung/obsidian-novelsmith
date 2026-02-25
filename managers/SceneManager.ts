@@ -2,8 +2,8 @@ import { App, Notice, MarkdownView, TFile, TFolder, moment } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 import { SimpleConfirmModal } from '../modals';
 
-// 🔥 優化 1：將正則表達式抽離到外層，避免迴圈內重複編譯，極大節省 CPU
-const RE_EXTRACT_ID = /SCENE_ID:\s*([a-zA-Z0-9-]+)/;
+// 🔥 修正：確保這裡使用最新的 Attribute 屬性版正則表達式！
+const RE_EXTRACT_ID = /(?:SCENE_ID:\s*|data-scene-id=")([a-zA-Z0-9-]+)/;
 
 interface SceneData {
     id: string;
@@ -15,9 +15,24 @@ export class SceneManager {
     app: App;
     settings: NovelSmithSettings;
 
+    // 🔥 效能引擎：防抖計時器
+    private dbTimer: number | null = null;
+    private dbInFlight: Promise<void> | null = null;
+
     constructor(app: App, settings: NovelSmithSettings) {
         this.app = app;
         this.settings = settings;
+    }
+
+    // 🔥 全新：排程更新數據庫 (Debounce)，避免一秒內瘋狂讀寫硬碟
+    public scheduleGenerateDatabase(delayMs = 1500) {
+        if (this.dbTimer) window.clearTimeout(this.dbTimer);
+        this.dbTimer = window.setTimeout(() => {
+            this.dbTimer = null;
+            this.dbInFlight = this.generateDatabase()
+                .catch(e => console.error("NovelSmith DB 更新失敗", e))
+                .finally(() => { this.dbInFlight = null; });
+        }, delayMs);
     }
 
     async assignIDs(view: MarkdownView) {
@@ -32,15 +47,13 @@ export class SceneManager {
         const lineCount = editor.lineCount();
         const newLines: string[] = [];
         let hasChanges = false;
-        const op = "<" + "!--";
-        const cl = "--" + ">";
 
         for (let i = 0; i < lineCount; i++) {
             const line = editor.getLine(i);
             if (line.trim().startsWith("######")) {
                 if (!RE_EXTRACT_ID.test(line)) {
                     const uuid = crypto.randomUUID().substring(0, 8);
-                    const idTag = ` <span class="ns-id">SCENE_ID: ${uuid}</span>`;
+                    const idTag = ` <span class="ns-id" data-scene-id="${uuid}"></span>`;
                     newLines.push(line.trimEnd() + idTag);
                     hasChanges = true;
                 } else {
@@ -52,23 +65,41 @@ export class SceneManager {
         }
 
         if (hasChanges) editor.setValue(newLines.join("\n"));
-        await this.generateDatabase();
+        this.scheduleGenerateDatabase();
     }
 
+
+    // 🔥 輔助：創建資料夾
+    private async ensureFolderExists(folderPath: string) {
+        const cleanPath = folderPath.replace(/^\/+|\/+$/g, '');
+        if (!cleanPath) return;
+        const folders = cleanPath.split("/");
+        let currentPath = "";
+        for (let i = 0; i < folders.length; i++) {
+            currentPath += (i === 0 ? "" : "/") + folders[i];
+            const folder = this.app.vault.getAbstractFileByPath(currentPath);
+            if (!folder) await this.app.vault.createFolder(currentPath);
+        }
+    }
+
+
+
+
+
+
+
     async assignIDsToAllFiles(folder: TFolder) {
-        const draftName = this.settings.draftFilename;
-        const templateName = this.settings.templateFilePath.split('/').pop() || "";
+        const draftName = "NSmith_Scrivenering.md"; // 🔥 常數化
         const files = folder.children.filter(f =>
             f instanceof TFile && f.extension === 'md' && !f.name.startsWith("_") &&
-            f.name !== draftName && f.name !== templateName
+            f.name !== draftName
         ) as TFile[];
 
         let filesChanged = 0;
-        const op = "<" + "!--";
-        const cl = "--" + ">";
-
         for (const file of files) {
             let content = await this.app.vault.read(file);
+            if (content.includes('++ FILE_ID:') || content.includes('## 📜')) continue;
+
             let lines = content.split("\n");
             let fileHasChanges = false;
             let newLines = [];
@@ -77,22 +108,18 @@ export class SceneManager {
                 if (line.trim().startsWith("######")) {
                     if (!RE_EXTRACT_ID.test(line)) {
                         const uuid = crypto.randomUUID().substring(0, 8);
-                        const idTag = ` <span class="ns-id">SCENE_ID: ${uuid}</span>`;
+                        const idTag = ` <span class="ns-id" data-scene-id="${uuid}"></span>`;
                         newLines.push(line.trimEnd() + idTag);
                         fileHasChanges = true;
-                    } else {
-                        newLines.push(line);
-                    }
-                } else {
-                    newLines.push(line);
-                }
+                    } else newLines.push(line);
+                } else newLines.push(line);
             }
             if (fileHasChanges) {
                 await this.app.vault.modify(file, newLines.join("\n"));
                 filesChanged++;
             }
         }
-        if (filesChanged > 0) this.generateDatabase();
+        if (filesChanged > 0) this.scheduleGenerateDatabase();
     }
 
     async generateDatabase() {
@@ -101,11 +128,22 @@ export class SceneManager {
         if (!activeFile.path.startsWith(this.settings.bookFolderPath)) return;
 
         const bookFolder = this.settings.bookFolderPath;
-        const draftName = this.settings.draftFilename;
-        const templatePath = this.settings.templateFilePath;
+        const draftName = "NSmith_Scrivenering.md";
+        const backstagePath = `${bookFolder}/_Backstage`; // 🔥 鎖定後台路徑
+        const exportPath = this.settings.exportFolderPath;
 
         const files = this.app.vault.getMarkdownFiles()
-            .filter(f => f.path.startsWith(bookFolder) && !f.name.startsWith("_") && !f.name.startsWith("Script_") && f.name !== draftName && f.path !== templatePath)
+            .filter(f => {
+                if (!f.path.startsWith(bookFolder)) return false;
+                if (f.name.startsWith("_") || f.name.startsWith("Script_")) return false;
+                if (f.name === draftName) return false;
+
+                // 🔥 終極無敵防護網：直接排除整個 _Backstage 資料夾！
+                if (f.path.startsWith(backstagePath)) return false;
+
+                if (exportPath && f.path.startsWith(exportPath)) return false;
+                return true;
+            })
             .sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true }));
 
         let dbContent = `---\nTry: Dataview_Target\nUpdated: ${moment().format("YYYY-MM-DD HH:mm:ss")}\n---\n\n# 📊 場景數據庫 (系統自動生成)\n> [!warning] 請勿手動修改此檔案\n\n`;
@@ -113,6 +151,9 @@ export class SceneManager {
 
         for (const file of files) {
             const content = (view && view.file === file) ? view.editor.getValue() : await this.app.vault.read(file);
+
+            if (content.includes('++ FILE_ID:') || content.includes('## 📜')) continue;
+
             const scenes = this.extractScenesFromFile(content.split("\n"));
 
             if (scenes.length > 0) {
@@ -134,7 +175,9 @@ export class SceneManager {
             }
         }
 
-        const dbPath = `${bookFolder}/_Scene_Database.md`;
+        // 🔥 將 Database 放進後台
+        await this.ensureFolderExists(backstagePath);
+        const dbPath = `${backstagePath}/_Scene_Database.md`;
         const dbFile = this.app.vault.getAbstractFileByPath(dbPath);
         if (dbFile instanceof TFile) await this.app.vault.modify(dbFile, dbContent);
         else await this.app.vault.create(dbPath, dbContent);
@@ -153,7 +196,6 @@ export class SceneManager {
                 if (idMatch) uuid = idMatch[1].trim();
 
                 let exactTitle = trimLine.replace(/^######\s*/, "");
-
 
                 if (exactTitle.includes("<span")) exactTitle = exactTitle.split("<span")[0];
                 if (exactTitle.includes(htmlCommentStart)) exactTitle = exactTitle.split(htmlCommentStart)[0];

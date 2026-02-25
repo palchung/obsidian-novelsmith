@@ -1,7 +1,7 @@
 {
   "bookFolderPath": "終焉與破曉/01_草稿",
   "draftFilename": "Draft_Edit.md",
-  "keepDraftOnSync": false,
+  "keepDraftOnSync": true,
   "keptDraftPath": "終焉與破曉/01_草稿/_Archived_Drafts",
   "historyFolderPath": "終焉與破曉/04_其他/_History/Scenes",
   "redundantListPath": "終焉與破曉/04_其他/_贅字清單.md",

@@ -38,13 +38,17 @@ export class WritingManager {
         }
     }
 
+    // 修改路徑為常數：
+    private getAidsFolderPath() {
+        return `${this.settings.bookFolderPath}/_Backstage/Aids`;
+    }
+
     // =================================================================
     // 📄 智能生成器：贅字清單與正字名單
     // =================================================================
     public async ensureRedundantListExists(forceShowNotice: boolean = false) {
-        const configPath = this.settings.redundantListPath;
-        if (!configPath) { if (forceShowNotice) new Notice("❌ 請先設定贅字清單路徑！"); return; }
-
+        const configPath = `${this.getAidsFolderPath()}/_贅字清單.md`;
+        // ... 下方將 this.settings.redundantListPath 替換成 configPath
         let configFile = this.app.vault.getAbstractFileByPath(configPath);
         if (!configFile) {
             await this.ensureFolderExists(configPath);
@@ -55,14 +59,13 @@ export class WritingManager {
                 if (forceShowNotice) new Notice(`❌ 建立失敗，請檢查路徑`);
             }
         } else {
-            if (forceShowNotice) new Notice(`⚠️ 檔案已存在 (${configPath})，停止生成以免覆蓋設定。`);
+            if (forceShowNotice) new Notice(`⚠️ 檔案已存在 (${configPath})，停止生成。`);
         }
     }
 
     public async ensureFixListExists(forceShowNotice: boolean = false) {
-        const configPath = this.settings.fixListPath;
-        if (!configPath) { if (forceShowNotice) new Notice("❌ 請先設定正字名單路徑！"); return; }
-
+        const configPath = `${this.getAidsFolderPath()}/FixList.md`;
+        // ... 同樣替換邏輯，將 this.settings.fixListPath 替換成 configPath
         let configFile = this.app.vault.getAbstractFileByPath(configPath);
         if (!configFile) {
             await this.ensureFolderExists(configPath);
@@ -73,7 +76,7 @@ export class WritingManager {
                 if (forceShowNotice) new Notice(`❌ 建立失敗，請檢查路徑`);
             }
         } else {
-            if (forceShowNotice) new Notice(`⚠️ 檔案已存在 (${configPath})，停止生成以免覆蓋設定。`);
+            if (forceShowNotice) new Notice(`⚠️ 檔案已存在 (${configPath})，停止生成。`);
         }
     }
 
@@ -92,7 +95,7 @@ export class WritingManager {
             document.body.classList.remove('mode-dialogue');
 
             await this.ensureRedundantListExists(false); // 確保檔案存在
-            const configPath = this.settings.redundantListPath;
+            const configPath = `${this.getAidsFolderPath()}/_贅字清單.md`;
             let configFile = this.app.vault.getAbstractFileByPath(configPath);
 
             if (configFile instanceof TFile) {
@@ -140,7 +143,7 @@ export class WritingManager {
     // =================================================================
     async correctNames(view: MarkdownView) {
         await this.ensureFixListExists(false); // 確保檔案存在
-        const dataFileName = this.settings.fixListPath;
+        const dataFileName = `${this.getAidsFolderPath()}/FixList.md`;
         let fileObj = this.app.vault.getAbstractFileByPath(dataFileName);
 
         if (!(fileObj instanceof TFile)) return;
@@ -172,7 +175,10 @@ export class WritingManager {
                 fixList[correctName] = wrongNames;
             }
         }
-        let allReplacements: { wrong: string, correct: string }[] = [];
+
+
+
+        let allReplacements: { wrong: string, correct: string, regex?: RegExp }[] = [];
         for (const [correctName, wrongNames] of Object.entries(fixList)) {
             wrongNames.forEach(wrong => {
                 if (wrong !== correctName) {
@@ -181,36 +187,54 @@ export class WritingManager {
             });
         }
         allReplacements.sort((a, b) => b.wrong.length - a.wrong.length);
+
+        // 🔥 效能大躍進：預先編譯所有 Regex！(將建立次數由幾萬次降到幾十次)
+        const compiledReplacements = allReplacements.map(item => {
+            const escapedWrong = item.wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            let pattern = escapedWrong;
+            // 處理正確名稱包含了錯誤名稱的情況 (例如：錯: 小明 -> 正: 王小明)
+            if (item.correct.startsWith(item.wrong)) {
+                const suffix = item.correct.slice(item.wrong.length);
+                if (suffix) {
+                    const escapedSuffix = suffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    pattern += `(?!${escapedSuffix})`;
+                }
+            }
+            return {
+                ...item,
+                regex: new RegExp(pattern, 'g') // 預先造好引擎
+            };
+        });
+
         let content = view.editor.getValue();
         let totalCount = 0;
         let changesLog: string[] = [];
         const lines = content.split("\n");
+
         const processedLines = lines.map(line => {
-            if (line.includes("<small>++ FILE_ID")) return line;
+            // 略過系統標籤與屬性行
+            if (line.includes("<small>++ FILE_ID") || line.includes("++ FILE_ID:")) return line;
             if (line.trim().startsWith(">") && line.includes("::")) return line;
+
             let newLine = line;
-            allReplacements.forEach(item => {
-                const escapedWrong = item.wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                let pattern = escapedWrong;
-                if (item.correct.startsWith(item.wrong)) {
-                    const suffix = item.correct.slice(item.wrong.length);
-                    if (suffix) {
-                        const escapedSuffix = suffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                        pattern += `(?!${escapedSuffix})`;
-                    }
-                }
-                const regex = new RegExp(pattern, 'g');
-                if (regex.test(newLine)) {
-                    const matches = newLine.match(regex);
+
+            // 🔥 直接使用預先編譯好的 Regex 引擎，極速替換！
+            compiledReplacements.forEach(item => {
+                if (item.regex && item.regex.test(newLine)) {
+                    // 為了確保 test 後能正確 match，重置 lastIndex (雖然 map 入面通常無影響，但加上較穩妥)
+                    item.regex.lastIndex = 0;
+                    const matches = newLine.match(item.regex);
                     if (matches) totalCount += matches.length;
+
                     if (!changesLog.some(log => log.includes(`"${item.wrong}" -> "${item.correct}"`))) {
                         changesLog.push(`"${item.wrong}" -> "${item.correct}"`);
                     }
-                    newLine = newLine.replace(regex, item.correct);
+                    newLine = newLine.replace(item.regex, item.correct);
                 }
             });
             return newLine;
         });
+
         if (totalCount > 0) {
             const finalContent = processedLines.join("\n");
             if (finalContent !== content) {
@@ -220,15 +244,5 @@ export class WritingManager {
         } else {
             new Notice("🎉 完美！沒有發現錯別字。");
         }
-    }
-
-    async cleanDraft(view: MarkdownView) {
-        let content = view.editor.getValue();
-        content = content.replace(/%%[\s\S]*?%%/g, "");
-        content = content.replace(/~~[\s\S]*?~~/g, "");
-        content = content.replace(/==[\s\S]*?==/g, "");
-        content = content.replace(/\*\*(.*?)\*\*/g, "$1");
-        view.editor.setValue(content);
-        new Notice("🧹 稿件已清理");
     }
 }

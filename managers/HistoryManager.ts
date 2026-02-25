@@ -35,7 +35,7 @@ export class HistoryManager {
 
         if (headerLineIndex === -1) return null;
 
-        const idMatch = headerContent.match(/SCENE_ID:\s*([a-zA-Z0-9-]+)/);
+        const idMatch = headerContent.match(/(?:SCENE_ID:\s*|data-scene-id=")([a-zA-Z0-9-]+)/);
         if (idMatch) sceneId = idMatch[1].trim();
 
         let cleanName = headerContent.replace(/^######\s*/, "").replace(/^🎬\s*/, "");
@@ -95,7 +95,7 @@ export class HistoryManager {
 
     async executeSave(id: string, title: string, content: string, verName: string) {
         // 🔥 修改：直接使用合併後的路徑
-        const historyFolder = this.settings.historyFolderPath;
+        const historyFolder = `${this.settings.bookFolderPath}/_Backstage/History`;
         const targetFilePath = `${historyFolder}/${id}.md`;
 
         await this.ensureFolderExists(historyFolder);
@@ -104,7 +104,11 @@ export class HistoryManager {
         const timestamp = moment().format("YYYY-MM-DD HH:mm");
 
         if (!(historyFile instanceof TFile)) {
-            const fileHeader = `---\naliases: [${title}]\ncreated: ${timestamp}\nscene_id: ${id}\n---\n# 📜 歷史紀錄：${title}\n> [!info] 系統提示\n> 此檔案以 ID 命名，即使原稿改名，紀錄依然存在。\n\n`;
+            // 🔥 YAML 炸彈拆除：安全處理標題中的雙引號，並改用更標準的列表格式
+            const safeTitle = title.replace(/"/g, '\\"');
+
+            const fileHeader = `---\naliases:\n  - "${safeTitle}"\ncreated: ${timestamp}\nscene_id: ${id}\n---\n# 📜 歷史紀錄：${title}\n> [!info] 系統提示\n> 此檔案以 ID 命名，即使原稿改名，紀錄依然存在。\n\n`;
+
             historyFile = await this.app.vault.create(targetFilePath, fileHeader);
         }
 
@@ -119,7 +123,7 @@ export class HistoryManager {
 
     public async getSceneVersions(sceneId: string) {
         // 🔥 修改：直接使用合併後的路徑
-        const historyPath = `${this.settings.historyFolderPath}/${sceneId}.md`;
+        const historyPath = `${this.settings.bookFolderPath}/_Backstage/History/${sceneId}.md`;
         const historyFile = this.app.vault.getAbstractFileByPath(historyPath);
 
         if (!(historyFile instanceof TFile)) return [];
@@ -158,7 +162,7 @@ export class HistoryManager {
 
     public async showPreview(title: string, verLabel: string, content: string) {
         // 🔥 修改：直接使用合併後的路徑
-        const previewPath = `${this.settings.historyFolderPath}/版本預覽_Temp.md`;
+        const previewPath = `${this.settings.bookFolderPath}/_Backstage/History/版本預覽_Temp.md`;
         let previewFile = this.app.vault.getAbstractFileByPath(previewPath);
 
         const previewText = `# 👀 預覽：${title}\n> 📅 版本：${verLabel}\n\n---\n\n${content}`;

@@ -32,7 +32,7 @@ export default class NovelSmithPlugin extends Plugin {
         console.log('NovelSmith 系統啟動 (Full Suite)');
 
         await this.loadSettings();
-        await this.ensureTemplateFileExists();
+
 
         this.registerEditorExtension([redundantHighlighter, dialogueHighlighter, structureHighlighter]);
 
@@ -90,7 +90,7 @@ export default class NovelSmithPlugin extends Plugin {
 
                     if (!this.checkInBookFolderSilent(activeFile)) return;
 
-                    if (activeFile.name === this.settings.draftFilename) return;
+                    if (activeFile.name === "NSmith_Scrivenering.md") return;
                     if (activeFile.name.startsWith("_")) return;
                     const templateName = this.settings.templateFilePath.split('/').pop();
                     if (activeFile.name === templateName) return;
@@ -100,7 +100,7 @@ export default class NovelSmithPlugin extends Plugin {
 
                     const folder = activeFile.parent;
                     if (!folder) return;
-                    const draftPath = `${folder.path}/${this.settings.draftFilename}`;
+                    const draftPath = `${folder.path}/${"NSmith_Scrivenering.md"}`;
                     const draftFile = this.app.vault.getAbstractFileByPath(draftPath);
 
                     if (draftFile) {
@@ -117,7 +117,7 @@ export default class NovelSmithPlugin extends Plugin {
 
 
         // =================================================================
-        // 註冊指令 (加入結界防護)
+        // 註冊指令 (加入結界防護與邏輯統一)
         // =================================================================
         this.addCommand({
             id: 'smart-save-sync',
@@ -128,6 +128,12 @@ export default class NovelSmithPlugin extends Plugin {
                 const view = this.app.workspace.getActiveViewOfType(MarkdownView);
                 if (view) {
                     if (!checking && this.checkInBookFolder(view.file)) {
+                        const content = view.editor.getValue();
+                        // 🔥 終極防護網：如果係「封存草稿」，只作普通儲存，絕對不派發 ID！
+                        if (view.file.name !== "NSmith_Scrivenering.md" && (content.includes('++ FILE_ID:') || content.includes('## 📜'))) {
+                            new Notice("💾 封存草稿已儲存 (為保護檔案，系統不會在此重新分配 ID)。");
+                            return true;
+                        }
                         this.executeSmartSave(view);
                     }
                     return true;
@@ -165,11 +171,25 @@ export default class NovelSmithPlugin extends Plugin {
                 const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
                 if (markdownView) {
                     if (!checking && this.checkInBookFolder(markdownView.file)) {
-                        const folder = markdownView.file.parent;
-                        if (folder) {
-                            this.sceneManager.assignIDsToAllFiles(folder).then(() => {
-                                this.scrivenerManager.toggleScrivenings();
-                            });
+                        const file = markdownView.file;
+                        const content = markdownView.editor.getValue();
+
+                        // 🔥 邏輯統一：如果身處「當前臨時草稿」，直接交俾 Smart Save 處理 (同步 + 更新 DB)
+                        if (file.name === "NSmith_Scrivenering.md") {
+                            this.executeSmartSave(markdownView);
+                        }
+                        // 🔥 防護網升級：只認最核心字眼，新舊草稿通殺！
+                        else if (content.includes('++ FILE_ID:') || content.includes('## 📜')) {
+                            new Notice("⛔ 系統拒絕：這是一份串聯草稿檔（或封存草稿），不能在此處啟動串聯模式以免發生無限迴圈！");
+                        }
+                        // 正常章節檔案，安全啟動串聯模式
+                        else {
+                            const folder = file.parent;
+                            if (folder) {
+                                this.sceneManager.assignIDsToAllFiles(folder).then(() => {
+                                    this.scrivenerManager.toggleScrivenings();
+                                });
+                            }
                         }
                     }
                     return true;
@@ -319,6 +339,10 @@ export default class NovelSmithPlugin extends Plugin {
         if (!file) return false;
         const bookFolder = this.settings.bookFolderPath;
         if (!bookFolder) return true;
+
+        // 🔥 絕對結界：靜默攔截所有後台操作
+        if (file.path.includes("/_Backstage/")) return false;
+
         return file.path.startsWith(bookFolder);
     }
 
@@ -330,6 +354,12 @@ export default class NovelSmithPlugin extends Plugin {
 
         const bookFolder = this.settings.bookFolderPath;
         if (!bookFolder) return true;
+
+        // 🔥 絕對結界：如果路徑包含 _Backstage，一律落閘放狗！
+        if (file.path.includes("/_Backstage/")) {
+            new Notice(`⛔ 系統拒絕：這裡是被鎖定的系統後台 (_Backstage)，為保護檔案，已禁用所有寫作功能！`);
+            return false;
+        }
 
         if (file.path.startsWith(bookFolder)) {
             return true;
@@ -345,40 +375,51 @@ export default class NovelSmithPlugin extends Plugin {
         const folder = activeFile.parent;
         if (!folder) return;
 
-        if (activeFile.name === this.settings.draftFilename) {
+        if (activeFile.name === "NSmith_Scrivenering.md") {
             new Notice("🔄 正在結束串聯並同步...");
             await this.scrivenerManager.syncBack(activeFile, folder);
-            await this.sceneManager.generateDatabase();
+            this.sceneManager.scheduleGenerateDatabase();
         } else {
             await this.sceneManager.executeAssignIDsSilent(view);
         }
     }
 
     // =================================================================
-    // 📄 智能範本生成器 (支援手動觸發與防覆蓋機制)
+    // 📄 智能範本生成器 (支援手動觸發、防覆蓋與新手引導)
     // =================================================================
-    public async ensureTemplateFileExists(forceShowNotice: boolean = false) {
-        const tplPath = this.settings.templateFilePath;
-        if (!tplPath) {
-            if (forceShowNotice) new Notice("❌ 請先設定範本路徑！");
-            return;
+    public async ensureTemplateFileExists(forceShowNotice: boolean = false, openAfterCreate: boolean = false) {
+        const tplPath = `${this.settings.bookFolderPath}/_Backstage/Templates/NovelSmith_Template.md`;
+
+        // 確保資料夾存在
+        const folderPath = `${this.settings.bookFolderPath}/_Backstage/Templates`;
+        const folder = this.app.vault.getAbstractFileByPath(folderPath);
+        if (!folder) {
+            try {
+                const backstage = this.app.vault.getAbstractFileByPath(`${this.settings.bookFolderPath}/_Backstage`);
+                if (!backstage) await this.app.vault.createFolder(`${this.settings.bookFolderPath}/_Backstage`);
+                await this.app.vault.createFolder(folderPath);
+            } catch (e) { /* ignore if exists */ }
         }
 
         const file = this.app.vault.getAbstractFileByPath(tplPath);
         if (!file) {
-            // 🔥 換上全新的 span 隱形標籤
-            const defaultTemplate = `###### 🎬 {{SceneName}} <span class="ns-id">SCENE_ID: {{UUID}}</span>\n> [!NSmith] 情節資訊\n> - Time:: \n> - POV:: \n> - Status:: #Writing\n> - Note:: \n\n這裡開始寫正文...`;
-
+            const defaultTemplate = `###### 🎬 {{SceneName}} <span class="ns-id" data-scene-id="{{UUID}}"></span>\n> [!NSmith] 情節資訊\n> - Time:: \n> - POV:: \n> - Status:: #Writing\n> - Note:: \n\n這裡開始寫正文...`;
             try {
-                await this.app.vault.create(tplPath, defaultTemplate);
-                console.log("✅ 已自動建立 NovelSmith 專屬範本檔: " + tplPath);
-                if (forceShowNotice) new Notice(`✅ 成功生成範本：${tplPath}`);
+                const newFile = await this.app.vault.create(tplPath, defaultTemplate);
+
+                // 🔥 新增：新手引導模式！第一次生成時自動打開畀用家改
+                if (openAfterCreate && newFile instanceof TFile) {
+                    const leaf = this.app.workspace.getLeaf('split', 'vertical');
+                    await leaf.openFile(newFile);
+                    new Notice("🎉 這是你的專屬劇情卡片範本！\n你可以現在修改它 (例如加減屬性)，設定好之後，再次點擊「插入卡片」就會使用這個新格式喔！", 10000);
+                } else if (forceShowNotice) {
+                    new Notice(`✅ 成功生成範本：${tplPath}`);
+                }
             } catch (e) {
                 console.error("建立範本檔失敗 (請檢查路徑)", e);
                 if (forceShowNotice) new Notice(`❌ 建立範本失敗，請檢查路徑是否合法`);
             }
         } else {
-            // 如果檔案已經存在，彈出安全警告，絕對唔覆蓋！
             if (forceShowNotice) new Notice(`⚠️ 範本已經存在 (${tplPath})，為免覆蓋你的自訂設定，系統停止生成。`);
         }
     }

@@ -18,7 +18,7 @@ export const RE_SCENE_TAG = /^######\s*/;
 export const RE_SCENE_EMOJI = /^🎬\s*/;
 // 標題 (ID 部分)
 export const RE_SCENE_HEADER_HTML = /###### (.*?)( <!--|$)/;
-
+export const RE_EXTRACT_ID = /(?:SCENE_ID:\s*|data-scene-id=")([a-zA-Z0-9-]+)/;
 // 🔥 新增：讓全系統通用的 ID Regex
 // 格式： 
 export const RE_SCENE_INFO = /^###### 🎬 .*[\r\n]+(> .*[\r\n]*)*/gm;
@@ -73,18 +73,21 @@ export const parseContent = (text: string, isOriginal: boolean = false): ParseRe
             let cleanBody = currentBodyLines.join("\n").trim();
 
             if (!isOriginal) {
-                cleanBody = cleanBody.replace(RE_HIGHLIGHT, "").replace(RE_SEPARATOR, "").trim();
+                cleanBody = cleanBody.replace(RE_HIGHLIGHT, "").replace(RE_SEPARATOR, "");
                 let tempLines = cleanBody.split("\n");
                 while (tempLines.length > 0) {
                     const l = tempLines[0].trim();
-                    if (l.startsWith(">") || l === "") tempLines.shift();
+                    if (l.startsWith(">")) tempLines.shift();
                     else break;
                 }
-                cleanBody = tempLines.join("\n").trim();
+                cleanBody = tempLines.join("\n").trimEnd();
+            } else {
+                // 🔥 原稿也改用 trimEnd()
+                cleanBody = cleanBody.trimEnd();
             }
 
             // 🔥 嘗試提取 ID
-            const idMatch = currentHeaderRaw.match(RE_SCENE_ID);
+            const idMatch = currentHeaderRaw.match(RE_EXTRACT_ID);
             const id = idMatch ? idMatch[1].trim() : undefined;
 
             cards.push({
@@ -115,7 +118,7 @@ export const parseContent = (text: string, isOriginal: boolean = false): ParseRe
             isCollectingMeta = true;
         } else if (hasHitFirstCard) {
             if (isCollectingMeta) {
-                if (trimLine.startsWith(">") || trimLine.includes("::") || trimLine === "") {
+                if (trimLine.startsWith(">")) {
                     currentMeta.push(line);
                 } else {
                     isCollectingMeta = false;

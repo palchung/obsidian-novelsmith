@@ -18,18 +18,19 @@ export class PlotManager {
     }
 
     private async getTemplateContent(sceneName: string): Promise<string> {
-        const tplPath = this.settings.templateFilePath;
+        const tplPath = `${this.settings.bookFolderPath}/_Backstage/Templates/NovelSmith_Template.md`;
         let templateText = "";
         const tplFile = this.app.vault.getAbstractFileByPath(tplPath);
+        const uuid = crypto.randomUUID().substring(0, 8);
 
         if (tplFile instanceof TFile) {
             templateText = await this.app.vault.read(tplFile);
         } else {
             // 🔥 換上 span 標籤
-            templateText = `###### 🎬 {{SceneName}} <span class="ns-id">SCENE_ID: {{UUID}}</span>\n> [!NSmith] 情節資訊\n> - Time:: \n> - POV:: \n> - Status:: #Writing\n> - Note:: \n\n`;
+            templateText = `###### 🎬 {{SceneName}} <span class="ns-id" data-scene-id="${uuid}"></span> [!NSmith] 情節資訊\n> - Time:: \n> - POV:: \n> - Status:: #Writing\n> - Note:: \n\n`;
         }
 
-        const uuid = crypto.randomUUID().substring(0, 8);
+
 
         return templateText
             .replace(/{{SceneName}}/g, sceneName)
@@ -37,6 +38,13 @@ export class PlotManager {
     }
 
     async insertSceneCard(view: MarkdownView) {
+        // 🔥 新增：第一次使用防呆與引導
+        const tplPath = `${this.settings.bookFolderPath}/_Backstage/Templates/NovelSmith_Template.md`;
+        if (!this.app.vault.getAbstractFileByPath(tplPath)) {
+            await this.plugin.ensureTemplateFileExists(false, true); // true = 觸發開檔與新手提示
+            return; // 終止插入流程，等用家改好範本先
+        }
+
         new InputModal(this.app, "➕ 插入劇情卡片：請輸入情節名稱", async (newSceneName) => {
             if (!newSceneName) return;
 
@@ -68,11 +76,17 @@ export class PlotManager {
 
             new Notice(`✅ 已插入劇情卡片：${newSceneName}`);
 
-            await this.plugin.sceneManager.generateDatabase();
+            this.plugin.sceneManager.scheduleGenerateDatabase();
         }).open();
     }
 
     async splitScene(view: MarkdownView) {
+        // 🔥 新增：第一次使用防呆與引導
+        const tplPath = `${this.settings.bookFolderPath}/_Backstage/Templates/NovelSmith_Template.md`;
+        if (!this.app.vault.getAbstractFileByPath(tplPath)) {
+            await this.plugin.ensureTemplateFileExists(false, true);
+            return;
+        }
         const editor = view.editor;
         const cursor = editor.getCursor();
         const lineCount = editor.lineCount();
@@ -103,7 +117,7 @@ export class PlotManager {
 
             if (metadataLines.length > 0) {
                 // 🔥 分拆時換上 span 標籤
-                newContent += `###### 🎬 ${newSceneName} <span class="ns-id">SCENE_ID: ${uuid}</span>\n`;
+                newContent += `###### 🎬 ${newSceneName} <span class="ns-id" data-scene-id="${uuid}"></span>\n`;
 
                 for (let line of metadataLines) {
                     if (line.includes("Scene::")) continue;
@@ -123,7 +137,7 @@ export class PlotManager {
 
             new Notice(`✅ 已從此處分拆出：${newSceneName}`);
 
-            await this.plugin.sceneManager.generateDatabase();
+            this.plugin.sceneManager.scheduleGenerateDatabase();
         }).open();
     }
 
@@ -252,7 +266,7 @@ export class PlotManager {
             editor.scrollIntoView({ from: scrollPos, to: scrollPos }, true);
             new Notice(`✅ 成功吸取內容！`);
 
-            this.plugin.sceneManager.generateDatabase();
+            this.plugin.sceneManager.scheduleGenerateDatabase();
         } else {
             new Notice("⚠️ 被選取的情節係空嘅，冇嘢好吸！");
         }

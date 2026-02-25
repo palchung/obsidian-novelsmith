@@ -34,7 +34,7 @@ export const redundantHighlighter = ViewPlugin.fromClass(class {
 }, { decorations: v => v.decorations });
 
 const dialogueDecoration = Decoration.mark({ class: 'cm-dialogue-text' });
-const dialogueMatcher = new MatchDecorator({ regexp: /(「[^」]*」)/g, decoration: (match) => dialogueDecoration });
+const dialogueMatcher = new MatchDecorator({ regexp: /「[^」]*」|『[^』]*』|“[^”]*”|"[^"]*"/g, decoration: (match) => dialogueDecoration });
 export const dialogueHighlighter = ViewPlugin.fromClass(class {
     decorations: DecorationSet;
     constructor(view: EditorView) { this.decorations = dialogueMatcher.createDeco(view); }

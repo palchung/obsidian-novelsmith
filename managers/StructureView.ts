@@ -1,10 +1,11 @@
 import { ItemView, WorkspaceLeaf, MarkdownView, Notice } from 'obsidian';
 import Sortable from 'sortablejs';
 import NovelSmithPlugin from '../main';
+import { SimpleConfirmModal } from '../modals';
 
 export const VIEW_TYPE_STRUCTURE = "novelsmith-structure-view";
 
-const RE_EXTRACT_ID = /SCENE_ID:\s*([a-zA-Z0-9-]+)/;
+const RE_EXTRACT_ID = /(?:SCENE_ID:\s*|data-scene-id=")([a-zA-Z0-9-]+)/;
 
 interface SceneNode {
     id: string;
@@ -30,10 +31,20 @@ export class StructureView extends ItemView {
     private docYaml: string = "";
     private isRefreshing: boolean = false;
 
+
+    // 🔥 效能優化：防止 Refresh 途中吞咗用家最新嘅打字
+    private pendingRefresh: boolean = false;
+
+    // 🔥 效能優化：使用 WeakMap 儲存龐大字串，釋放 DOM 記憶體！
+    private sceneContentMap = new WeakMap<HTMLElement, string>();
+    private chapterPreambleMap = new WeakMap<HTMLElement, string>();
+
+
+
     // 🔥 優化 2：記錄上一次大綱的「指紋」，避免打字時無謂重繪 UI
     private lastOutlineHash: string = "";
 
-    private activeTab: 'outline' | 'history' = 'outline';
+    private activeTab: 'outline' | 'history' | 'info' = 'outline';
     private selectedSceneId: string | null = null;
     private selectedSceneTitle: string | null = null;
 
@@ -76,10 +87,10 @@ export class StructureView extends ItemView {
             if (this.activeTab === 'outline') setTimeout(() => this.parseAndRender(), 500);
         }));
         this.registerDomEvent(document, 'mouseup', () => {
-            if (this.activeTab === 'history') setTimeout(() => this.parseAndRender(), 100);
+            if (this.activeTab === 'history' || this.activeTab === 'info') setTimeout(() => this.parseAndRender(), 100);
         });
         this.registerDomEvent(document, 'keyup', (e: KeyboardEvent) => {
-            if (this.activeTab === 'history' && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+            if ((this.activeTab === 'history' || this.activeTab === 'info') && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
                 setTimeout(() => this.parseAndRender(), 100);
             }
         });
@@ -93,7 +104,11 @@ export class StructureView extends ItemView {
     }
 
     async parseAndRender() {
-        if (this.isRefreshing) return;
+        if (this.isRefreshing) {
+            // 🔥 如果 Refresh 緊，記低有人 call 過，等陣補做，唔好直接 return 吞咗佢！
+            this.pendingRefresh = true;
+            return;
+        }
         this.isRefreshing = true;
 
         const container = this.contentEl.querySelector(".ns-structure-container") as HTMLElement;
@@ -127,9 +142,18 @@ export class StructureView extends ItemView {
         }
 
         if (this.activeTab === 'outline') await this.renderOutline(contentDiv, view);
+        else if (this.activeTab === 'info') await this.renderInfo(contentDiv, view);
         else await this.renderHistory(contentDiv, view);
 
         this.isRefreshing = false;
+
+        // 🔥 做完之後，檢查頭先有冇人排隊，有就即刻補做一次！
+        if (this.pendingRefresh) {
+            this.pendingRefresh = false;
+            this.parseAndRender();
+        }
+
+
     }
 
     renderHeader(container: HTMLElement, view: MarkdownView | null) {
@@ -137,50 +161,129 @@ export class StructureView extends ItemView {
         const topBtnRow = header.createDiv({ cls: "ns-button-row" });
         topBtnRow.style.marginBottom = "5px";
 
-        const btnScrivenings = topBtnRow.createEl("button", { text: "📚 串聯模式" });
+        // 🔥 判斷當前是否為草稿模式
+        const isDraftMode = view && view.file && view.file.name === "NSmith_Scrivenering.md";
+
+        // 🔥 智能切換按鈕文字：草稿模式顯示「同步並結束」，正常顯示「串聯模式」
+        const btnScrivenings = topBtnRow.createEl("button", {
+            text: isDraftMode ? "💾 同步並結束" : "📚 串聯模式"
+        });
+
         btnScrivenings.style.backgroundColor = "var(--interactive-accent)";
         btnScrivenings.style.color = "var(--text-on-accent)";
         btnScrivenings.onclick = () => {
             if (view && this.plugin.checkInBookFolder(view.file)) {
-                const folder = view.file.parent;
-                if (folder) {
-                    this.plugin.sceneManager.assignIDsToAllFiles(folder).then(() => {
-                        this.plugin.scrivenerManager.toggleScrivenings();
-                    });
+                const file = view.file;
+                const content = view.editor.getValue();
+
+                // 🔥 底層邏輯完全不變，系統本身已經識得自動分流！
+                if (file.name === "NSmith_Scrivenering.md") {
+                    this.plugin.executeSmartSave(view);
+                }
+                else if (content.includes('++ FILE_ID:') || content.includes('## 📜')) {
+                    new Notice("⛔ 系統拒絕：這是一份封存草稿檔，不能在此處啟動串聯模式以免發生無限迴圈！");
+                }
+                else {
+                    const folder = file.parent;
+                    if (folder) {
+                        this.plugin.sceneManager.assignIDsToAllFiles(folder).then(() => {
+                            this.plugin.scrivenerManager.toggleScrivenings();
+                        });
+                    }
                 }
             }
         };
 
-        const btnCompile = topBtnRow.createEl("button", { text: "📤 匯出文稿" });
-        btnCompile.onclick = () => {
-            if (view && this.plugin.checkInBookFolder(view.file)) this.plugin.compilerManager.openCompileModal(view);
-        };
+        // =========================================================
+        // 🔥 智能情境按鈕：草稿模式顯示「捨棄」，正常模式顯示「匯出」
+        // =========================================================
+        if (view && view.file && view.file.name === "NSmith_Scrivenering.md") {
+            const btnDiscard = topBtnRow.createEl("button", { text: "🗑️ 捨棄草稿" });
+            btnDiscard.style.backgroundColor = "var(--background-modifier-error)";
+            btnDiscard.style.color = "white";
+            btnDiscard.onclick = () => {
+                new SimpleConfirmModal(
+                    this.plugin.app,
+                    "🚨 確定要放棄這份草稿嗎？\n\n這將會關閉並刪除此臨時檔案，您剛才在草稿裡打的所有字都不會同步回原稿！",
+                    async () => {
+                        await this.plugin.scrivenerManager.discardDraft(view.file!);
+                    }
+                ).open();
+            };
+        } else {
+            const btnCompile = topBtnRow.createEl("button", { text: "📤 匯出文稿" });
+            btnCompile.onclick = () => {
+                if (view && this.plugin.checkInBookFolder(view.file)) this.plugin.compilerManager.openCompileModal(view);
+            };
+        }
+
+
+
+
 
         const btnRow = header.createDiv({ cls: "ns-button-row" });
+
+        // 🔥 輔助函數：檢查是否為封存草稿 (防呆用)
+        const isArchivedDraft = (file: any, content: string) => {
+            return file.name !== "NSmith_Scrivenering.md" &&
+                (content.includes('++ FILE_ID:') || content.includes('## 📜'));
+        };
+
         const btnInsert = btnRow.createEl("button", { text: "➕ 插入卡片" });
         btnInsert.onclick = () => {
-            if (view && this.plugin.checkInBookFolder(view.file)) this.plugin.plotManager.insertSceneCard(view);
+            if (view && this.plugin.checkInBookFolder(view.file)) {
+                if (isArchivedDraft(view.file, view.editor.getValue())) {
+                    new Notice("⛔ 這是一份封存草稿，請返回原本的章節筆記中插入卡片。");
+                    return;
+                }
+                this.plugin.plotManager.insertSceneCard(view);
+            }
         };
 
         const btnSave = btnRow.createEl("button", { text: "💾 同步" });
         btnSave.onclick = () => {
-            if (view && this.plugin.checkInBookFolder(view.file)) this.plugin.executeSmartSave(view);
+            if (view && this.plugin.checkInBookFolder(view.file)) {
+                // 🔥 同步 main.ts 的防護網：封存草稿不可派發 ID
+                if (isArchivedDraft(view.file, view.editor.getValue())) {
+                    new Notice("💾 封存草稿已儲存 (為保護檔案，系統不會在此重新分配 ID)。");
+                } else {
+                    this.plugin.executeSmartSave(view);
+                }
+            }
         };
 
         const btnSplit = btnRow.createEl("button", { text: "✂️ 分拆" });
         btnSplit.onclick = () => {
-            if (view && this.plugin.checkInBookFolder(view.file)) this.plugin.plotManager.splitScene(view);
+            if (view && this.plugin.checkInBookFolder(view.file)) {
+                if (isArchivedDraft(view.file, view.editor.getValue())) {
+                    new Notice("⛔ 這是一份封存草稿，請勿在此分拆情節。");
+                    return;
+                }
+                this.plugin.plotManager.splitScene(view);
+            }
         };
 
         const btnMerge = btnRow.createEl("button", { text: "🧲 吸星" });
         btnMerge.onclick = () => {
-            if (view && this.plugin.checkInBookFolder(view.file)) this.plugin.plotManager.mergeScene(view);
+            if (view && this.plugin.checkInBookFolder(view.file)) {
+                if (isArchivedDraft(view.file, view.editor.getValue())) {
+                    new Notice("⛔ 這是一份封存草稿，請勿在此合併情節。");
+                    return;
+                }
+                this.plugin.plotManager.mergeScene(view);
+            }
         };
 
         const tabsRow = header.createDiv({ cls: "ns-tabs-row" });
+
         let tabClassOutline = "ns-tab-btn" + (this.activeTab === 'outline' ? " is-active" : "");
         const tabOutline = tabsRow.createEl("button", { text: "📑 大綱", cls: tabClassOutline });
         tabOutline.onclick = () => { this.activeTab = 'outline'; this.lastOutlineHash = ""; this.parseAndRender(); };
+
+        // 🔥 新增：資訊檢視器按鈕
+        let tabClassInfo = "ns-tab-btn" + (this.activeTab === 'info' ? " is-active" : "");
+        const tabInfo = tabsRow.createEl("button", { text: "ℹ️ 資訊", cls: tabClassInfo });
+        tabInfo.onclick = () => { this.activeTab = 'info'; this.parseAndRender(); };
 
         let tabClassHistory = "ns-tab-btn" + (this.activeTab === 'history' ? " is-active" : "");
         const tabHistory = tabsRow.createEl("button", { text: "🕰️ 歷史", cls: tabClassHistory });
@@ -192,7 +295,7 @@ export class StructureView extends ItemView {
         if (!text.trim()) { container.setText("📄 這份筆記是空的"); return; }
 
         const fileNameEl = container.createEl("h3");
-        if (view.file && view.file.name === this.plugin.settings.draftFilename) {
+        if (view.file && view.file.name === "NSmith_Scrivenering.md") {
             fileNameEl.innerText = "📚 串聯模式草稿";
             fileNameEl.style.color = "var(--interactive-accent)";
         } else if (view.file) {
@@ -215,7 +318,7 @@ export class StructureView extends ItemView {
 
             const chapterBox = container.createDiv({ cls: "ns-chapter-box" });
             chapterBox.dataset.name = chapter.name;
-            chapterBox.dataset.preamble = chapter.preamble;
+            this.chapterPreambleMap.set(chapterBox, chapter.preamble);
 
             if (chapter.name !== "root") {
                 const chCard = chapterBox.createDiv({ cls: "ns-chapter-card" });
@@ -229,7 +332,8 @@ export class StructureView extends ItemView {
             chapter.scenes.forEach((scene) => {
                 const scCard = sceneList.createDiv({ cls: "ns-scene-card" });
                 scCard.innerText = `🎬 ${scene.name}`;
-                scCard.dataset.content = scene.content;
+                // 🔥 捨棄 dataset，改用 WeakMap 儲存龐大正文！
+                this.sceneContentMap.set(scCard, scene.content);
 
                 if (this.selectedSceneId === scene.id) {
                     scCard.style.borderLeft = "4px solid var(--interactive-accent)";
@@ -327,13 +431,119 @@ export class StructureView extends ItemView {
         }
     }
 
+    async renderInfo(container: HTMLElement, view: MarkdownView) {
+        const editor = view.editor;
+        const cursor = editor.getCursor();
+        let foundTitle = null;
+        let startLine = -1;
+
+        // 1. 向上尋找最近的情節標題
+        for (let i = cursor.line; i >= 0; i--) {
+            const line = editor.getLine(i);
+            if (line.trim().startsWith("######")) {
+                let cleanName = line.replace(/^[#\s]+|^🎬\s*/g, "");
+                const htmlCommentStart = "<" + "!--";
+                if (cleanName.includes(htmlCommentStart)) cleanName = cleanName.split(htmlCommentStart)[0];
+                if (cleanName.includes("<span")) cleanName = cleanName.split("<span")[0];
+                if (cleanName.includes("<small>")) cleanName = cleanName.split("<small>")[0];
+                foundTitle = cleanName.trim();
+                startLine = i;
+                break;
+            }
+        }
+
+        if (!foundTitle || startLine === -1) {
+            const hint = container.createDiv({ cls: "ns-history-card" });
+            hint.style.textAlign = "center"; hint.style.opacity = "0.6";
+            hint.innerText = "👈 請將游標放在編輯器內的任何一個情節中，以檢視其資訊。";
+            return;
+        }
+
+        const titleEl = container.createEl("h4");
+        titleEl.innerText = `🎬 ${foundTitle}`;
+        titleEl.style.color = "var(--text-accent)";
+        titleEl.style.marginBottom = "12px";
+        titleEl.style.borderBottom = "1px solid var(--background-modifier-border)";
+        titleEl.style.paddingBottom = "8px";
+
+        // 2. 向下收集 Callout 屬性與筆記
+        let metaLines: string[] = [];
+        let lineCount = editor.lineCount();
+        for (let i = startLine + 1; i < lineCount; i++) {
+            const line = editor.getLine(i).trim();
+            // 遇到下個標題就停
+            if (line.startsWith("######") || line.includes("++ FILE_ID")) break;
+
+            if (line.startsWith(">")) {
+                let cleanLine = line.substring(1).trim();
+                // 過濾掉 Callout 宣告語法，保持畫面乾淨
+                if (cleanLine.startsWith("[!NSmith]") || cleanLine.startsWith("[!info]")) continue;
+                metaLines.push(cleanLine);
+            } else if (line === "" && metaLines.length > 0) {
+                metaLines.push(""); // 容許空行
+            } else if (line !== "" && metaLines.length > 0) {
+                break; // 遇到正文，停止收集
+            }
+        }
+
+        if (metaLines.length === 0 || metaLines.every(l => l === "")) {
+            const hint = container.createDiv({ cls: "ns-history-card" });
+            hint.style.textAlign = "center"; hint.style.opacity = "0.6";
+            hint.innerText = "這個情節沒有任何屬性或筆記。";
+            return;
+        }
+
+        // 3. 優雅地渲染出資訊面板
+        const infoBox = container.createDiv({ cls: "ns-chapter-box" });
+        infoBox.style.backgroundColor = "var(--background-primary)";
+
+        metaLines.forEach(line => {
+            if (line.trim() === "") {
+                infoBox.createDiv({ text: " " }).style.height = "10px";
+                return;
+            }
+            // 將 `Key:: Value` 排版得靚靚仔仔
+            if (line.startsWith("- ") && line.includes("::")) {
+                const parts = line.substring(2).split("::");
+                const key = parts[0].trim();
+                const value = parts.slice(1).join("::").trim();
+
+                const row = infoBox.createDiv();
+                row.style.marginBottom = "8px";
+                row.style.lineHeight = "1.5";
+
+                const keyEl = row.createSpan();
+                keyEl.innerText = `${key} : `;
+                keyEl.style.fontWeight = "bold";
+                keyEl.style.color = "var(--text-muted)";
+
+                const valEl = row.createSpan();
+                valEl.innerText = value || " (未填寫)";
+                if (!value) valEl.style.opacity = "0.5";
+            } else {
+                // 普通筆記內容
+                const row = infoBox.createDiv();
+                row.innerText = line.replace(/^- /, "");
+                row.style.marginBottom = "6px";
+                row.style.lineHeight = "1.5";
+            }
+        });
+    }
+
+
+
+
+
     handleRestore(view: MarkdownView, targetId: string, newContent: string) {
         const editor = view.editor;
         const lineCount = editor.lineCount();
         let startLine = -1; let endLine = lineCount;
 
         for (let i = 0; i < lineCount; i++) {
-            if (editor.getLine(i).includes(`SCENE_ID: ${targetId}`)) { startLine = i; break; }
+            if (editor.getLine(i).includes(targetId) && editor.getLine(i).trim().startsWith("######")) {
+                startLine = i;
+                break;
+            }
         }
         if (startLine === -1) { new Notice("❌ 在當前檔案找不到此情節。"); return; }
         for (let i = startLine + 1; i < lineCount; i++) {
@@ -362,30 +572,32 @@ export class StructureView extends ItemView {
     async saveChanges(container: HTMLElement, view: MarkdownView) {
         if (!view) return;
         new Notice("💾 排版更新中...");
-        let newFullText = this.docYaml;
+
+        // 🔥 效能優化：改用陣列收集字串，最後一次過 join，速度極快！
+        const chunks: string[] = [];
+        if (this.docYaml.trim()) chunks.push(this.docYaml.trim());
         const chapterBoxes = container.querySelectorAll(".ns-chapter-box");
 
         chapterBoxes.forEach((box) => {
             const el = box as HTMLElement;
             const chName = el.dataset.name;
-            const chPreamble = el.dataset.preamble || "";
+            const chPreamble = this.chapterPreambleMap.get(el) || "";
 
             if (chName && chName !== "root") {
-                if (newFullText.trim() !== "") newFullText += "\n\n";
-                newFullText += `# 📄 ${chName}\n<span class="ns-file-id">++ FILE_ID: ${chName} ++</span>\n`;
+                chunks.push(`# 📄 ${chName}\n<span class="ns-file-id">++ FILE_ID: ${chName} ++</span>`);
             }
-            if (chPreamble) newFullText += chPreamble;
+            if (chPreamble.trim()) chunks.push(chPreamble.trim());
 
             const scenes = el.querySelectorAll(".ns-scene-card");
             scenes.forEach((sc) => {
-                const content = (sc as HTMLElement).dataset.content;
-                if (content) {
-                    if (!newFullText.endsWith("\n\n")) newFullText += "\n\n";
-                    newFullText += content.trim();
+                const content = this.sceneContentMap.get(sc as HTMLElement);
+                if (content && content.trim()) {
+                    chunks.push(content.trimEnd());
                 }
             });
         });
-        view.editor.setValue(newFullText.trim());
+
+        view.editor.setValue(chunks.join("\n\n") + "\n");
     }
 
     parseDocument(text: string): ChapterNode[] {
