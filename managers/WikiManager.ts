@@ -1,5 +1,6 @@
 import { App, Notice, MarkdownView, TFile } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
+import { ensureFolderExists } from '../utils';
 
 export class WikiManager {
     app: App;
@@ -14,17 +15,6 @@ export class WikiManager {
         this.settings = newSettings;
     }
 
-    private async ensureFolderExists(path: string) {
-        const folders = path.split("/");
-        let currentPath = "";
-        for (let i = 0; i < folders.length; i++) {
-            currentPath += (i === 0 ? "" : "/") + folders[i];
-            const folder = this.app.vault.getAbstractFileByPath(currentPath);
-            if (!folder) {
-                await this.app.vault.createFolder(currentPath);
-            }
-        }
-    }
 
     // =================================================================
     // 🧠 自動百科 (Auto Wiki)
@@ -36,7 +26,7 @@ export class WikiManager {
         const targetFolder = this.settings.wikiFolderPath;
 
         // 1. 確保目標資料夾存在
-        await this.ensureFolderExists(targetFolder);
+        await ensureFolderExists(this.app, targetFolder);
 
         // 2. 讀取內容
         const content = view.editor.getValue();

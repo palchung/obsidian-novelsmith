@@ -3,9 +3,8 @@ import { App, Notice, TFile, TFolder, MarkdownView, moment } from 'obsidian';
 import { parseContent, RE_FILE_ID, DraftCard } from '../utils';
 import { NovelSmithSettings } from '../settings';
 import { ChapterSelectionModal } from '../modals';
+import { DRAFT_FILENAME, TEMPLATES_DIR, DRAFTS_DIR, ensureFolderExists } from '../utils';
 
-// 🔥 常數化檔名
-const DRAFT_FILENAME = "NSmith_Scrivenering.md";
 
 export class ScrivenerManager {
     app: App;
@@ -20,19 +19,6 @@ export class ScrivenerManager {
         this.settings = newSettings;
     }
 
-    private async ensureFolderExists(folderPath: string) {
-        const cleanPath = folderPath.replace(/^\/+|\/+$/g, '');
-        if (!cleanPath) return;
-
-        const folders = cleanPath.split("/");
-        let currentPath = "";
-
-        for (let i = 0; i < folders.length; i++) {
-            currentPath += (i === 0 ? "" : "/") + folders[i];
-            const folder = this.app.vault.getAbstractFileByPath(currentPath);
-            if (!folder) await this.app.vault.createFolder(currentPath);
-        }
-    }
 
     async toggleScrivenings() {
         const activeFile = this.app.workspace.getActiveFile();
@@ -166,6 +152,14 @@ export class ScrivenerManager {
             data.cards.forEach(card => { if (card.id) globalIdMap.set(card.id, card); });
         }));
 
+        // 🔥 效能大躍進：在進入迴圈前「預先讀取」範本，避免迴圈內瘋狂讀取硬碟！
+        let cachedTemplateText: string | null = null;
+        const backstageTplPath = `${this.settings.bookFolderPath}/${TEMPLATES_DIR}/NovelSmith_Template.md`;
+        const tplFile = this.app.vault.getAbstractFileByPath(backstageTplPath);
+        if (tplFile instanceof TFile) {
+            cachedTemplateText = await this.app.vault.read(tplFile);
+        }
+
         const fileBlocks = draftContent.split(RE_FILE_ID);
         let updatedCount = 0;
         const writePromises: Promise<void>[] = [];
@@ -184,8 +178,10 @@ export class ScrivenerManager {
             const localTitleMap = new Map<string, DraftCard>();
             originalData.cards.forEach(card => localTitleMap.set(card.key, card));
 
-            let finalContent = "";
-            if (originalData.headers.trim()) finalContent += originalData.headers.trim() + "\n\n";
+            // 🔥 大師級優化：改用陣列收集字串，徹底杜絕 += 造成的記憶體不斷重新分配！
+            const chunks: string[] = [];
+
+            if (originalData.headers.trim()) chunks.push(originalData.headers.trim() + "\n\n");
 
             for (let draftCard of draftData.cards) {
                 let originalCard: DraftCard | undefined;
@@ -193,37 +189,36 @@ export class ScrivenerManager {
                 else if (localTitleMap.has(draftCard.key)) originalCard = localTitleMap.get(draftCard.key);
 
                 if (originalCard) {
-                    finalContent += `${draftCard.rawHeader}\n${originalCard.meta.join("\n").trim()}\n\n${draftCard.body}\n\n`;
+                    chunks.push(`${draftCard.rawHeader}\n${originalCard.meta.join("\n").trim()}\n\n${draftCard.body}\n\n`);
                 } else {
                     if (!draftCard.key) continue;
                     let uuid = draftCard.id;
                     if (!uuid) uuid = crypto.randomUUID().substring(0, 8);
                     const idTag = ` <span class="ns-id" data-scene-id="${uuid}"></span>`;
 
-
                     let cleanRawHeader = draftCard.rawHeader.replace(/<span.*?<\/span>/g, "").trimEnd();
-                    finalContent += `${cleanRawHeader}${idTag}\n`;
+                    chunks.push(`${cleanRawHeader}${idTag}\n`);
 
-
-                    if (draftCard.meta && draftCard.meta.length > 0) finalContent += `${draftCard.meta.join("\n").trim()}\n\n`;
-                    else {
-                        // 🔥 讀取 Backstage 的 Template
-                        const backstageTplPath = [this.settings.bookFolderPath, "_Backstage", "Templates", "NovelSmith_Template.md"].filter(p => p).join("/");
-                        const tplFile = this.app.vault.getAbstractFileByPath(backstageTplPath);
+                    if (draftCard.meta && draftCard.meta.length > 0) {
+                        chunks.push(`${draftCard.meta.join("\n").trim()}\n\n`);
+                    } else {
+                        // 使用剛才預先讀好的快取，瞬間生成
                         let metaBlock = `> [!NSmith] 情節資訊\n> - Scene:: ${draftCard.key}\n> - Status:: #Writing`;
-
-                        if (tplFile instanceof TFile) {
-                            const templateText = await this.app.vault.read(tplFile);
-                            const metaBlockMatch = templateText.match(/> \[!NSmith\][\s\S]*?(?=\n[^>]|$)/);
+                        if (cachedTemplateText) {
+                            const metaBlockMatch = cachedTemplateText.match(/> \[!NSmith\][\s\S]*?(?=\n[^>]|$)/);
                             if (metaBlockMatch) metaBlock = metaBlockMatch[0].replace(/{{SceneName}}/g, draftCard.key).trim();
                         }
-                        finalContent += `${metaBlock}\n\n`;
+                        chunks.push(`${metaBlock}\n\n`);
                     }
-                    finalContent += `${draftCard.body}\n\n`;
+                    chunks.push(`${draftCard.body}\n\n`);
                 }
             }
 
-            finalContent = finalContent.trim();
+            // 🔥 迴圈結束後，一次過 join 成為字串，效能提升百倍！
+            let finalContent = chunks.join("").trim();
+
+
+
             if (finalContent !== cachedData.text.trim()) {
                 writePromises.push(this.app.vault.modify(cachedData.file, finalContent));
                 updatedCount++;
@@ -236,8 +231,8 @@ export class ScrivenerManager {
         // =========================================================
         if (this.settings.keepDraftOnSync) {
             const timestamp = moment().format("YYYYMMDD_HHmmss");
-            const backstageDrafts = [this.settings.bookFolderPath, "_Backstage", "Drafts"].filter(p => p).join("/");
-            await this.ensureFolderExists(backstageDrafts);
+            const backstageDrafts = `${this.settings.bookFolderPath}/${DRAFTS_DIR}`;
+            await ensureFolderExists(this.app, backstageDrafts);
 
             const baseName = draftFile.basename;
             // 🔥 新命名規則：20260225_1742_NSmith_Scrivenering.md

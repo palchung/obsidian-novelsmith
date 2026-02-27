@@ -1,6 +1,8 @@
 import { App, Notice, MarkdownView, TFile } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 import { updateRedundantPatterns } from '../decorators';
+import { AIDS_DIR, ensureFolderExists } from '../utils';
+import { CleanDraftModal } from '../modals';
 
 export class WritingManager {
     app: App;
@@ -25,22 +27,10 @@ export class WritingManager {
         });
     }
 
-    private async ensureFolderExists(path: string) {
-        const lastSlashIndex = path.lastIndexOf("/");
-        if (lastSlashIndex === -1) return;
-        const folderPath = path.substring(0, lastSlashIndex);
-        const folders = folderPath.split("/");
-        let currentPath = "";
-        for (let i = 0; i < folders.length; i++) {
-            currentPath += (i === 0 ? "" : "/") + folders[i];
-            const folder = this.app.vault.getAbstractFileByPath(currentPath);
-            if (!folder) await this.app.vault.createFolder(currentPath);
-        }
-    }
 
     // 修改路徑為常數：
     private getAidsFolderPath() {
-        return `${this.settings.bookFolderPath}/_Backstage/Aids`;
+        return `${this.settings.bookFolderPath}/${AIDS_DIR}`;
     }
 
     // =================================================================
@@ -51,7 +41,7 @@ export class WritingManager {
         // ... 下方將 this.settings.redundantListPath 替換成 configPath
         let configFile = this.app.vault.getAbstractFileByPath(configPath);
         if (!configFile) {
-            await this.ensureFolderExists(configPath);
+            await ensureFolderExists(this.app, configPath);
             try {
                 await this.app.vault.create(configPath, `// 預設贅字清單\n其實, 基本上, 彷彿`);
                 if (forceShowNotice) new Notice(`✅ 成功生成贅字清單：${configPath}`);
@@ -68,7 +58,7 @@ export class WritingManager {
         // ... 同樣替換邏輯，將 this.settings.fixListPath 替換成 configPath
         let configFile = this.app.vault.getAbstractFileByPath(configPath);
         if (!configFile) {
-            await this.ensureFolderExists(configPath);
+            await ensureFolderExists(this.app, configPath);
             try {
                 await this.app.vault.create(configPath, `// 正字名單\n主角名 | 錯字1`);
                 if (forceShowNotice) new Notice(`✅ 成功生成正字名單：${configPath}`);
@@ -218,18 +208,18 @@ export class WritingManager {
 
             let newLine = line;
 
-            // 🔥 直接使用預先編譯好的 Regex 引擎，極速替換！
+            // 🔥 大師級優化：利用 replace callback，將 test、match、replace 三個步驟合而為一！
+            // Regex 引擎只需跑 1 次，效能極致發揮！
             compiledReplacements.forEach(item => {
-                if (item.regex && item.regex.test(newLine)) {
-                    // 為了確保 test 後能正確 match，重置 lastIndex (雖然 map 入面通常無影響，但加上較穩妥)
-                    item.regex.lastIndex = 0;
-                    const matches = newLine.match(item.regex);
-                    if (matches) totalCount += matches.length;
-
-                    if (!changesLog.some(log => log.includes(`"${item.wrong}" -> "${item.correct}"`))) {
-                        changesLog.push(`"${item.wrong}" -> "${item.correct}"`);
-                    }
-                    newLine = newLine.replace(item.regex, item.correct);
+                if (item.regex) {
+                    item.regex.lastIndex = 0; // 保險起見重置指標
+                    newLine = newLine.replace(item.regex, () => {
+                        totalCount++; // 順便計數
+                        if (!changesLog.some(log => log.includes(`"${item.wrong}" -> "${item.correct}"`))) {
+                            changesLog.push(`"${item.wrong}" -> "${item.correct}"`); // 順便寫 Log
+                        }
+                        return item.correct; // 返回正確字眼進行替換
+                    });
                 }
             });
             return newLine;
@@ -245,4 +235,30 @@ export class WritingManager {
             new Notice("🎉 完美！沒有發現錯別字。");
         }
     }
+
+    // =================================================================
+    // 🧹 一鍵定稿 (升級版：支援選項與內部連結)
+    // =================================================================
+    async cleanDraft(view: MarkdownView) {
+        new CleanDraftModal(this.app, (options) => {
+            let content = view.editor.getValue();
+            const originalContent = content;
+
+            // 根據用家的選擇執行清除
+            if (options.removeComments) content = content.replace(/%%[\s\S]*?%%/g, "");
+            if (options.removeStrikethrough) content = content.replace(/~~[\s\S]*?~~/g, "");
+            if (options.removeHighlights) content = content.replace(/==/g, "");
+
+            // 🔥 新增：移除內部連結 (保留顯示文字，例如 [[Alias|Display]] 變成 Display)
+            if (options.removeInternalLinks) content = content.replace(/\[\[(?:[^\]]*\|)?([^\]]+)\]\]/g, "$1");
+
+            if (content !== originalContent) {
+                view.editor.setValue(content);
+                new Notice("🧹 一鍵定稿完成！選定的標記已清除。");
+            } else {
+                new Notice("👌 沒有發現需要清除的標記。");
+            }
+        }).open();
+    }
 }
+

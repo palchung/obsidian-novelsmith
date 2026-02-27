@@ -1,4 +1,4 @@
-import { TFile } from 'obsidian';
+import { TFile, App } from 'obsidian';
 
 // ============================================================
 // 🛠️ 工具箱：負責處理字串與解析
@@ -34,6 +34,35 @@ export const ST_WARNING = '⛔️ ID (勿改)';
 export const ST_SCENE_TAG = '######';
 export const ST_FILE_ID_HEADER = "++ FILE_ID";
 
+// ============================================================
+// 📂 系統常數 (System Constants) - 統一管理，杜絕魔法字串
+// ============================================================
+export const DRAFT_FILENAME = "NSmith_Scrivenering.md";
+export const BACKSTAGE_DIR = "_Backstage";
+export const TEMPLATES_DIR = `${BACKSTAGE_DIR}/Templates`;
+export const DRAFTS_DIR = `${BACKSTAGE_DIR}/Drafts`;
+export const HISTORY_DIR = `${BACKSTAGE_DIR}/History`;
+export const AIDS_DIR = `${BACKSTAGE_DIR}/Aids`;
+export const SCENE_DB_FILE = "_Scene_Database.md";
+
+// ============================================================
+// 🛠️ 共用工具函數 (Shared Utilities)
+// ============================================================
+export const ensureFolderExists = async (app: App, folderPath: string) => {
+    const cleanPath = folderPath.replace(/^\/+|\/+$/g, '');
+    if (!cleanPath) return;
+
+    const folders = cleanPath.split("/");
+    let currentPath = "";
+
+    for (let i = 0; i < folders.length; i++) {
+        currentPath += (i === 0 ? "" : "/") + folders[i];
+        const folder = app.vault.getAbstractFileByPath(currentPath);
+        if (!folder) {
+            try { await app.vault.createFolder(currentPath); } catch (e) { /* ignore */ }
+        }
+    }
+};
 
 // 2. 資料結構介面 (Interface)
 export interface DraftCard {

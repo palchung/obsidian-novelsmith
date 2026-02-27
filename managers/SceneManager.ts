@@ -1,9 +1,8 @@
 import { App, Notice, MarkdownView, TFile, TFolder, moment } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 import { SimpleConfirmModal } from '../modals';
+import { RE_EXTRACT_ID, DRAFT_FILENAME, BACKSTAGE_DIR, SCENE_DB_FILE, ensureFolderExists } from '../utils';
 
-// 🔥 修正：確保這裡使用最新的 Attribute 屬性版正則表達式！
-const RE_EXTRACT_ID = /(?:SCENE_ID:\s*|data-scene-id=")([a-zA-Z0-9-]+)/;
 
 interface SceneData {
     id: string;
@@ -72,30 +71,13 @@ export class SceneManager {
     }
 
 
-    // 🔥 輔助：創建資料夾
-    private async ensureFolderExists(folderPath: string) {
-        const cleanPath = folderPath.replace(/^\/+|\/+$/g, '');
-        if (!cleanPath) return;
-        const folders = cleanPath.split("/");
-        let currentPath = "";
-        for (let i = 0; i < folders.length; i++) {
-            currentPath += (i === 0 ? "" : "/") + folders[i];
-            const folder = this.app.vault.getAbstractFileByPath(currentPath);
-            if (!folder) await this.app.vault.createFolder(currentPath);
-        }
-    }
-
-
-
-
-
 
 
     async assignIDsToAllFiles(folder: TFolder) {
-        const draftName = "NSmith_Scrivenering.md"; // 🔥 常數化
+
         const files = folder.children.filter(f =>
             f instanceof TFile && f.extension === 'md' && !f.name.startsWith("_") &&
-            f.name !== draftName
+            f.name !== DRAFT_FILENAME
         ) as TFile[];
 
         let filesChanged = 0;
@@ -131,15 +113,15 @@ export class SceneManager {
         if (!activeFile.path.startsWith(this.settings.bookFolderPath)) return;
 
         const bookFolder = this.settings.bookFolderPath;
-        const draftName = "NSmith_Scrivenering.md";
-        const backstagePath = `${bookFolder}/_Backstage`; // 🔥 鎖定後台路徑
+
+        const backstagePath = `${bookFolder}/${BACKSTAGE_DIR}`; // 🔥 鎖定後台路徑
         const exportPath = this.settings.exportFolderPath;
 
         const files = this.app.vault.getMarkdownFiles()
             .filter(f => {
                 if (!f.path.startsWith(bookFolder)) return false;
                 if (f.name.startsWith("_") || f.name.startsWith("Script_")) return false;
-                if (f.name === draftName) return false;
+                if (f.name === DRAFT_FILENAME) return false;
 
                 // 🔥 終極無敵防護網：直接排除整個 _Backstage 資料夾！
                 if (f.path.startsWith(backstagePath)) return false;
@@ -193,8 +175,8 @@ export class SceneManager {
         }
 
         // 🔥 將 Database 放進後台
-        await this.ensureFolderExists(backstagePath);
-        const dbPath = `${backstagePath}/_Scene_Database.md`;
+        await ensureFolderExists(this.app, backstagePath);
+        const dbPath = `${backstagePath}/${SCENE_DB_FILE}`;
         const dbFile = this.app.vault.getAbstractFileByPath(dbPath);
         if (dbFile instanceof TFile) await this.app.vault.modify(dbFile, dbContent);
         else await this.app.vault.create(dbPath, dbContent);

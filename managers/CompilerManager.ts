@@ -2,7 +2,7 @@ import { App, Notice, MarkdownView, TFile } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 // 🔥 引入新視窗
 import { CompileModal, CompileOptions, ChapterSelectionModal } from '../modals';
-import { RE_FILE_ID_HEADING, RE_FOLDER_HEADING, RE_SCENE_INFO } from '../utils';
+import { DRAFT_FILENAME, RE_FILE_ID_HEADING, RE_FOLDER_HEADING, RE_SCENE_INFO } from '../utils';
 
 export class CompilerManager {
     app: App;
@@ -46,7 +46,7 @@ export class CompilerManager {
 
         return parentFolder.children
             .filter(f => f instanceof TFile && f.extension === "md")
-            .filter(f => f.name !== "NSmith_Scrivenering.md")
+            .filter(f => f.name !== DRAFT_FILENAME)
             .filter(f => !f.name.includes("_Scene_Database") && !f.name.includes("_History") && !f.name.startsWith("Script_"))
             .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })) as TFile[];
     }

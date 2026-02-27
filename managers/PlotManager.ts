@@ -1,13 +1,15 @@
 import { App, Notice, MarkdownView, EditorPosition, TFile } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 import { InputModal, GenericSuggester } from '../modals';
+import { TEMPLATES_DIR } from '../utils';
+import NovelSmithPlugin from '../main';
 
 export class PlotManager {
     app: App;
     settings: NovelSmithSettings;
-    plugin: any;
+    plugin: NovelSmithPlugin;
 
-    constructor(app: App, settings: NovelSmithSettings, plugin: any) {
+    constructor(app: App, settings: NovelSmithSettings, plugin: NovelSmithPlugin) {
         this.app = app;
         this.settings = settings;
         this.plugin = plugin;
@@ -18,7 +20,7 @@ export class PlotManager {
     }
 
     private async getTemplateContent(sceneName: string): Promise<string> {
-        const tplPath = `${this.settings.bookFolderPath}/_Backstage/Templates/NovelSmith_Template.md`;
+        const tplPath = `${this.settings.bookFolderPath}/${TEMPLATES_DIR}/NovelSmith_Template.md`;
         let templateText = "";
         const tplFile = this.app.vault.getAbstractFileByPath(tplPath);
         const uuid = crypto.randomUUID().substring(0, 8);
@@ -39,7 +41,7 @@ export class PlotManager {
 
     async insertSceneCard(view: MarkdownView) {
         // 🔥 新增：第一次使用防呆與引導
-        const tplPath = `${this.settings.bookFolderPath}/_Backstage/Templates/NovelSmith_Template.md`;
+        const tplPath = `${this.settings.bookFolderPath}/${TEMPLATES_DIR}/NovelSmith_Template.md`;
         if (!this.app.vault.getAbstractFileByPath(tplPath)) {
             await this.plugin.ensureTemplateFileExists(false, true); // true = 觸發開檔與新手提示
             return; // 終止插入流程，等用家改好範本先
@@ -82,7 +84,7 @@ export class PlotManager {
 
     async splitScene(view: MarkdownView) {
         // 🔥 新增：第一次使用防呆與引導
-        const tplPath = `${this.settings.bookFolderPath}/_Backstage/Templates/NovelSmith_Template.md`;
+        const tplPath = `${this.settings.bookFolderPath}/${TEMPLATES_DIR}/NovelSmith_Template.md`;
         if (!this.app.vault.getAbstractFileByPath(tplPath)) {
             await this.plugin.ensureTemplateFileExists(false, true);
             return;

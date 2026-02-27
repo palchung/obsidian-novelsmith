@@ -1,7 +1,8 @@
-import { ItemView, WorkspaceLeaf, MarkdownView, Notice } from 'obsidian';
+import { ItemView, WorkspaceLeaf, MarkdownView, Notice, Menu } from 'obsidian';
 import Sortable from 'sortablejs';
 import NovelSmithPlugin from '../main';
 import { SimpleConfirmModal } from '../modals';
+import { DRAFT_FILENAME } from '../utils';
 
 export const VIEW_TYPE_STRUCTURE = "novelsmith-structure-view";
 
@@ -172,7 +173,7 @@ export class StructureView extends ItemView {
         topBtnRow.style.marginBottom = "5px";
 
         // 🔥 判斷當前是否為草稿模式
-        const isDraftMode = view && view.file && view.file.name === "NSmith_Scrivenering.md";
+        const isDraftMode = view && view.file && view.file.name === DRAFT_FILENAME;
 
         // 🔥 智能切換按鈕文字：草稿模式顯示「同步並結束」，正常顯示「串聯模式」
         const btnScrivenings = topBtnRow.createEl("button", {
@@ -187,7 +188,7 @@ export class StructureView extends ItemView {
                 const content = view.editor.getValue();
 
                 // 🔥 底層邏輯完全不變，系統本身已經識得自動分流！
-                if (file.name === "NSmith_Scrivenering.md") {
+                if (file.name === DRAFT_FILENAME) {
                     this.plugin.executeSmartSave(view);
                 }
                 else if (content.includes('++ FILE_ID:') || content.includes('## 📜')) {
@@ -207,7 +208,7 @@ export class StructureView extends ItemView {
         // =========================================================
         // 🔥 智能情境按鈕：草稿模式顯示「捨棄」，正常模式顯示「匯出」
         // =========================================================
-        if (view && view.file && view.file.name === "NSmith_Scrivenering.md") {
+        if (view && view.file && view.file.name === DRAFT_FILENAME) {
             const btnDiscard = topBtnRow.createEl("button", { text: "🗑️ 捨棄草稿" });
             btnDiscard.style.backgroundColor = "var(--background-modifier-error)";
             btnDiscard.style.color = "white";
@@ -230,12 +231,15 @@ export class StructureView extends ItemView {
 
 
 
-
+        // =========================================================
+        // 🔥 排版優化：核心按鈕列 (插入、同步)
+        // =========================================================
         const btnRow = header.createDiv({ cls: "ns-button-row" });
+        btnRow.style.marginBottom = "5px"; // 加少少空隙分開兩行
 
-        // 🔥 輔助函數：檢查是否為封存草稿 (防呆用)
+        // 輔助函數：檢查是否為封存草稿 (防呆用)
         const isArchivedDraft = (file: any, content: string) => {
-            return file.name !== "NSmith_Scrivenering.md" &&
+            return file.name !== DRAFT_FILENAME &&
                 (content.includes('++ FILE_ID:') || content.includes('## 📜'));
         };
 
@@ -253,7 +257,6 @@ export class StructureView extends ItemView {
         const btnSave = btnRow.createEl("button", { text: "💾 同步" });
         btnSave.onclick = () => {
             if (view && this.plugin.checkInBookFolder(view.file)) {
-                // 🔥 同步 main.ts 的防護網：封存草稿不可派發 ID
                 if (isArchivedDraft(view.file, view.editor.getValue())) {
                     new Notice("💾 封存草稿已儲存 (為保護檔案，系統不會在此重新分配 ID)。");
                 } else {
@@ -262,7 +265,12 @@ export class StructureView extends ItemView {
             }
         };
 
-        const btnSplit = btnRow.createEl("button", { text: "✂️ 分拆" });
+        // =========================================================
+        // 🔥 排版優化：進階與工具按鈕列 (分拆、吸星、工具)
+        // =========================================================
+        const btnRow2 = header.createDiv({ cls: "ns-button-row" });
+
+        const btnSplit = btnRow2.createEl("button", { text: "✂️ 分拆" });
         btnSplit.onclick = () => {
             if (view && this.plugin.checkInBookFolder(view.file)) {
                 if (isArchivedDraft(view.file, view.editor.getValue())) {
@@ -273,7 +281,7 @@ export class StructureView extends ItemView {
             }
         };
 
-        const btnMerge = btnRow.createEl("button", { text: "🧲 吸星" });
+        const btnMerge = btnRow2.createEl("button", { text: "🧲 吸星" });
         btnMerge.onclick = () => {
             if (view && this.plugin.checkInBookFolder(view.file)) {
                 if (isArchivedDraft(view.file, view.editor.getValue())) {
@@ -283,6 +291,58 @@ export class StructureView extends ItemView {
                 this.plugin.plotManager.mergeScene(view);
             }
         };
+
+        const btnTools = btnRow2.createEl("button", { text: "🛠️ 工具" });
+        btnTools.onclick = (e: MouseEvent) => {
+            const currentView = this.getValidMarkdownView();
+            if (!currentView || !this.plugin.checkInBookFolder(currentView.file)) return;
+
+            // 建立 Obsidian 原生下拉選單
+            const menu = new Menu();
+
+            menu.addItem((item) => {
+                item.setTitle("✍️ 正字刑警")
+                    .setIcon("pencil")
+                    .onClick(() => { this.plugin.writingManager.correctNames(currentView); });
+            });
+
+            menu.addItem((item) => {
+                item.setTitle("🧹 一鍵定稿")
+                    .setIcon("eraser")
+                    .onClick(() => { this.plugin.writingManager.cleanDraft(currentView); });
+            });
+
+            menu.addSeparator();
+
+            menu.addItem((item) => {
+                item.setTitle("💬 對話模式")
+                    .setIcon("message-circle")
+                    .onClick(() => { this.plugin.writingManager.toggleDialogueMode(currentView); });
+            });
+
+            menu.addItem((item) => {
+                item.setTitle("🔍 贅字模式")
+                    .setIcon("search")
+                    .onClick(() => { this.plugin.writingManager.toggleRedundantMode(currentView); });
+            });
+
+            menu.addSeparator();
+
+            menu.addItem((item) => {
+                item.setTitle("🧠 自動百科")
+                    .setIcon("book")
+                    .onClick(() => { this.plugin.wikiManager.scanAndCreateWiki(currentView); });
+            });
+
+            // 喺滑鼠點擊嘅位置彈出選單
+            menu.showAtMouseEvent(e);
+        };
+
+
+
+
+
+
 
         const tabsRow = header.createDiv({ cls: "ns-tabs-row" });
 
@@ -305,7 +365,7 @@ export class StructureView extends ItemView {
         if (!text.trim()) { container.setText("📄 這份筆記是空的"); return; }
 
         const fileNameEl = container.createEl("h3");
-        if (view.file && view.file.name === "NSmith_Scrivenering.md") {
+        if (view.file && view.file.name === DRAFT_FILENAME) {
             fileNameEl.innerText = "📚 串聯模式草稿";
             fileNameEl.style.color = "var(--interactive-accent)";
         } else if (view.file) {

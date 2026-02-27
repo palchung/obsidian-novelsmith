@@ -310,3 +310,51 @@ export class SimpleConfirmModal extends Modal {
         this.contentEl.empty();
     }
 }
+
+
+export interface CleanDraftOptions {
+    removeComments: boolean;
+    removeStrikethrough: boolean;
+    removeHighlights: boolean;
+    removeInternalLinks: boolean;
+}
+
+export class CleanDraftModal extends Modal {
+    options: CleanDraftOptions = {
+        removeComments: true,
+        removeStrikethrough: true,
+        removeHighlights: true,
+        removeInternalLinks: true
+    };
+    onSubmit: (options: CleanDraftOptions) => void;
+
+    constructor(app: App, onSubmit: (options: CleanDraftOptions) => void) {
+        super(app);
+        this.onSubmit = onSubmit;
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.empty();
+        contentEl.createEl("h2", { text: "🧹 一鍵定稿" });
+        contentEl.createEl("p", { text: "請選擇要從當前文章中清除的標記 (預設全選)：", cls: "setting-item-description" });
+
+        new Setting(contentEl).setName("移除註釋 (%%...%%)").addToggle(t => t.setValue(this.options.removeComments).onChange(v => this.options.removeComments = v));
+        new Setting(contentEl).setName("移除刪除線 (~~...~~)").addToggle(t => t.setValue(this.options.removeStrikethrough).onChange(v => this.options.removeStrikethrough = v));
+        new Setting(contentEl).setName("移除高亮 (==...==)").addToggle(t => t.setValue(this.options.removeHighlights).onChange(v => this.options.removeHighlights = v));
+        new Setting(contentEl).setName("移除內部連結 ([[...]])").setDesc("保留顯示文字，僅移除雙括號").addToggle(t => t.setValue(this.options.removeInternalLinks).onChange(v => this.options.removeInternalLinks = v));
+
+        new Setting(contentEl)
+            .addButton(btn => btn
+                .setButtonText("確定清除")
+                .setCta()
+                .onClick(() => {
+                    this.close();
+                    this.onSubmit(this.options);
+                }));
+    }
+
+    onClose() {
+        this.contentEl.empty();
+    }
+}

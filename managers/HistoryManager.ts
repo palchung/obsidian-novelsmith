@@ -1,6 +1,7 @@
 import { App, Notice, TFile, MarkdownView, moment } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 import { InputModal, GenericSuggester } from '../modals';
+import { HISTORY_DIR, ensureFolderExists } from '../utils';
 
 export class HistoryManager {
     app: App;
@@ -95,10 +96,10 @@ export class HistoryManager {
 
     async executeSave(id: string, title: string, content: string, verName: string) {
         // 🔥 修改：直接使用合併後的路徑
-        const historyFolder = `${this.settings.bookFolderPath}/_Backstage/History`;
+        const historyFolder = `${this.settings.bookFolderPath}/${HISTORY_DIR}`;
         const targetFilePath = `${historyFolder}/${id}.md`;
 
-        await this.ensureFolderExists(historyFolder);
+        await ensureFolderExists(this.app, historyFolder);
 
         let historyFile = this.app.vault.getAbstractFileByPath(targetFilePath);
         const timestamp = moment().format("YYYY-MM-DD HH:mm");
@@ -123,7 +124,7 @@ export class HistoryManager {
 
     public async getSceneVersions(sceneId: string) {
         // 🔥 修改：直接使用合併後的路徑
-        const historyPath = `${this.settings.bookFolderPath}/_Backstage/History/${sceneId}.md`;
+        const historyPath = `${this.settings.bookFolderPath}/${HISTORY_DIR}/${sceneId}.md`;
         const historyFile = this.app.vault.getAbstractFileByPath(historyPath);
 
         if (!(historyFile instanceof TFile)) return [];
@@ -162,7 +163,7 @@ export class HistoryManager {
 
     public async showPreview(title: string, verLabel: string, content: string) {
         // 🔥 修改：直接使用合併後的路徑
-        const previewPath = `${this.settings.bookFolderPath}/_Backstage/History/版本預覽_Temp.md`;
+        const previewPath = `${this.settings.bookFolderPath}/${HISTORY_DIR}/版本預覽_Temp.md`;
         let previewFile = this.app.vault.getAbstractFileByPath(previewPath);
 
         const previewText = `# 👀 預覽：${title}\n> 📅 版本：${verLabel}\n\n---\n\n${content}`;
@@ -204,13 +205,5 @@ export class HistoryManager {
         }).open();
     }
 
-    private async ensureFolderExists(path: string) {
-        const folders = path.split("/");
-        let currentPath = "";
-        for (let i = 0; i < folders.length; i++) {
-            currentPath += (i === 0 ? "" : "/") + folders[i];
-            const folder = this.app.vault.getAbstractFileByPath(currentPath);
-            if (!folder) await this.app.vault.createFolder(currentPath);
-        }
-    }
+
 }

@@ -10,6 +10,7 @@ import { CompilerManager } from './managers/CompilerManager';
 import { SceneManager } from './managers/SceneManager';
 import { redundantHighlighter, dialogueHighlighter, structureHighlighter } from './decorators';
 import { StructureView, VIEW_TYPE_STRUCTURE } from './managers/StructureView';
+import { DRAFT_FILENAME, BACKSTAGE_DIR, TEMPLATES_DIR, ensureFolderExists } from './utils';
 
 export default class NovelSmithPlugin extends Plugin {
     settings: NovelSmithSettings;
@@ -90,17 +91,17 @@ export default class NovelSmithPlugin extends Plugin {
 
                     if (!this.checkInBookFolderSilent(activeFile)) return;
 
-                    if (activeFile.name === "NSmith_Scrivenering.md") return;
+                    if (activeFile.name === DRAFT_FILENAME) return;
                     if (activeFile.name.startsWith("_")) return;
-                    const templateName = this.settings.templateFilePath.split('/').pop();
-                    if (activeFile.name === templateName) return;
+                    // const templateName = this.settings.templateFilePath.split('/').pop();
+                    if (activeFile.name === "NovelSmith_Template.md") return;
 
                     const now = Date.now();
                     if (now - this.lastDraftWarningTime < 5 * 60 * 1000) return;
 
                     const folder = activeFile.parent;
                     if (!folder) return;
-                    const draftPath = `${folder.path}/${"NSmith_Scrivenering.md"}`;
+                    const draftPath = `${folder.path}/${DRAFT_FILENAME}`;
                     const draftFile = this.app.vault.getAbstractFileByPath(draftPath);
 
                     if (draftFile) {
@@ -130,7 +131,7 @@ export default class NovelSmithPlugin extends Plugin {
                     if (!checking && this.checkInBookFolder(view.file)) {
                         const content = view.editor.getValue();
                         // 🔥 終極防護網：如果係「封存草稿」，只作普通儲存，絕對不派發 ID！
-                        if (view.file.name !== "NSmith_Scrivenering.md" && (content.includes('++ FILE_ID:') || content.includes('## 📜'))) {
+                        if (view.file.name !== DRAFT_FILENAME && (content.includes('++ FILE_ID:') || content.includes('## 📜'))) {
                             new Notice("💾 封存草稿已儲存 (為保護檔案，系統不會在此重新分配 ID)。");
                             return true;
                         }
@@ -175,7 +176,7 @@ export default class NovelSmithPlugin extends Plugin {
                         const content = markdownView.editor.getValue();
 
                         // 🔥 邏輯統一：如果身處「當前臨時草稿」，直接交俾 Smart Save 處理 (同步 + 更新 DB)
-                        if (file.name === "NSmith_Scrivenering.md") {
+                        if (file.name === DRAFT_FILENAME) {
                             this.executeSmartSave(markdownView);
                         }
                         // 🔥 防護網升級：只認最核心字眼，新舊草稿通殺！
@@ -341,7 +342,7 @@ export default class NovelSmithPlugin extends Plugin {
         if (!bookFolder) return true;
 
         // 🔥 絕對結界：靜默攔截所有後台操作
-        if (file.path.includes("/_Backstage/")) return false;
+        if (file.path.includes(`/${BACKSTAGE_DIR}/`)) return false;
 
         return file.path.startsWith(bookFolder);
     }
@@ -356,7 +357,7 @@ export default class NovelSmithPlugin extends Plugin {
         if (!bookFolder) return true;
 
         // 🔥 絕對結界：如果路徑包含 _Backstage，一律落閘放狗！
-        if (file.path.includes("/_Backstage/")) {
+        if (file.path.includes(`/${BACKSTAGE_DIR}/`)) {
             new Notice(`⛔ 系統拒絕：這裡是被鎖定的系統後台 (_Backstage)，為保護檔案，已禁用所有寫作功能！`);
             return false;
         }
@@ -375,7 +376,7 @@ export default class NovelSmithPlugin extends Plugin {
         const folder = activeFile.parent;
         if (!folder) return;
 
-        if (activeFile.name === "NSmith_Scrivenering.md") {
+        if (activeFile.name === DRAFT_FILENAME) {
             new Notice("🔄 正在結束串聯並同步...");
             await this.scrivenerManager.syncBack(activeFile, folder);
             this.sceneManager.scheduleGenerateDatabase();
@@ -388,18 +389,13 @@ export default class NovelSmithPlugin extends Plugin {
     // 📄 智能範本生成器 (支援手動觸發、防覆蓋與新手引導)
     // =================================================================
     public async ensureTemplateFileExists(forceShowNotice: boolean = false, openAfterCreate: boolean = false) {
-        const tplPath = `${this.settings.bookFolderPath}/_Backstage/Templates/NovelSmith_Template.md`;
 
-        // 確保資料夾存在
-        const folderPath = `${this.settings.bookFolderPath}/_Backstage/Templates`;
-        const folder = this.app.vault.getAbstractFileByPath(folderPath);
-        if (!folder) {
-            try {
-                const backstage = this.app.vault.getAbstractFileByPath(`${this.settings.bookFolderPath}/_Backstage`);
-                if (!backstage) await this.app.vault.createFolder(`${this.settings.bookFolderPath}/_Backstage`);
-                await this.app.vault.createFolder(folderPath);
-            } catch (e) { /* ignore if exists */ }
-        }
+        // 🔥 效能與架構升級：使用中央常數與共用函數，極度簡潔！
+        const folderPath = `${this.settings.bookFolderPath}/${TEMPLATES_DIR}`;
+        const tplPath = `${folderPath}/NovelSmith_Template.md`;
+
+        await ensureFolderExists(this.app, folderPath);
+
 
         const file = this.app.vault.getAbstractFileByPath(tplPath);
         if (!file) {
