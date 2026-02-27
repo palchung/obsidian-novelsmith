@@ -80,10 +80,8 @@ export interface ParseResult {
 
 // 3. 標題清洗函數 (移除 Markdown 符號及 ID 標籤)
 export const normalizeHeader = (header: string): string => {
-    // 先移除 ID 標籤
-    let clean = header.replace(RE_SCENE_ID, "");
-    // 再移除 # 和空格
-    return clean.replace(RE_HEADER_CLEAN, "").trim();
+    // 🔥 直接重用我們剛寫好的終極清洗函數，確保全系統邏輯 100% 一致！
+    return cleanSceneTitle(header);
 };
 
 // 4. 核心解析器 (Parser)
@@ -162,4 +160,47 @@ export const parseContent = (text: string, isOriginal: boolean = false): ParseRe
     }
     flushCard();
     return { headers: fileHeaders.join("\n"), cards: cards };
+};
+
+// ============================================================
+// 🔥 大師級重構：共用標題清理與 ID 抽取函數
+// ============================================================
+export function extractSceneId(header: string): string | null {
+    const match = header.match(RE_EXTRACT_ID);
+    return match ? match[1].trim() : null;
+}
+
+export function cleanSceneTitle(header: string): string {
+    let clean = header.replace(/^######\s*/, "").replace(/^🎬\s*/, "");
+    const htmlCommentStart = "<" + "!--";
+    if (clean.includes(htmlCommentStart)) clean = clean.split(htmlCommentStart)[0];
+    if (clean.includes("<span")) clean = clean.split("<span")[0];
+    if (clean.includes("<small>")) clean = clean.split("<small>")[0];
+    return clean.trim();
+}
+
+// ============================================================
+// 🎨 大師級架構：全系統共用調色盤字典 (Single Source of Truth)
+// ============================================================
+
+export const RE_EXTRACT_COLOR = /data-color="([a-zA-Z0-9-]+)"/;
+
+export const SCENE_COLORS = [
+    { id: "default", icon: "⚪️", name: "預設 (無色)", cssClass: "ns-color-grey" },
+    { id: "red", icon: "🔴", name: "紅色 (衝突/反派)", cssClass: "ns-color-red" },
+    { id: "orange", icon: "🟠", name: "橙色 (日常/懸疑)", cssClass: "ns-color-orange" },
+    { id: "green", icon: "🟢", name: "綠色 (成長/配角)", cssClass: "ns-color-green" },
+    { id: "blue", icon: "🔵", name: "藍色 (冷靜/主角)", cssClass: "ns-color-blue" },
+    { id: "purple", icon: "🟣", name: "紫色 (神秘/魔法)", cssClass: "ns-color-purple" },
+    //{ id: "grey", icon: "🟤", name: "灰色 (回憶/過渡)", cssClass: "ns-color-grey" }
+];
+
+export const getColorById = (colorId: string | null | undefined) => {
+    if (!colorId) return SCENE_COLORS[0];
+    return SCENE_COLORS.find(c => c.id === colorId) || SCENE_COLORS[0];
+};
+
+export const extractSceneColor = (header: string): string => {
+    const match = header.match(RE_EXTRACT_COLOR);
+    return match ? match[1].trim() : "default";
 };

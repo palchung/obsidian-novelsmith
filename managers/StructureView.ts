@@ -2,7 +2,7 @@ import { ItemView, WorkspaceLeaf, MarkdownView, Notice, Menu } from 'obsidian';
 import Sortable from 'sortablejs';
 import NovelSmithPlugin from '../main';
 import { SimpleConfirmModal } from '../modals';
-import { DRAFT_FILENAME } from '../utils';
+import { extractSceneId, cleanSceneTitle, DRAFT_FILENAME, extractSceneColor, getColorById, SCENE_COLORS } from '../utils';
 import { t } from '../locales';
 
 export const VIEW_TYPE_STRUCTURE = "novelsmith-structure-view";
@@ -16,6 +16,7 @@ interface SceneNode {
     content: string;
     lineNumber: number;
     type: 'scene';
+    colorId: string;
 }
 
 interface ChapterNode {
@@ -45,6 +46,9 @@ export class StructureView extends ItemView {
 
     // 🔥 優化 2：記錄上一次大綱的「指紋」，避免打字時無謂重繪 UI
     private lastOutlineHash: string = "";
+
+    // 🔥 新增：防止選單「穿透點擊 (Ghost Click)」的無敵護盾
+    private isMenuClicking: boolean = false;
 
     private activeTab: 'outline' | 'history' | 'info' = 'outline';
     private selectedSceneId: string | null = null;
@@ -402,16 +406,60 @@ export class StructureView extends ItemView {
 
             chapter.scenes.forEach((scene) => {
                 const scCard = sceneList.createDiv({ cls: "ns-scene-card" });
-                scCard.innerText = `🎬 ${scene.name}`;
+
+                // 🔥 1. 套用 CSS 顏色濾鏡！
+                const colorObj = getColorById(scene.colorId);
+                if (colorObj.cssClass) scCard.addClass(colorObj.cssClass);
+
+                scCard.style.display = "flex";
+                scCard.style.justifyContent = "space-between";
+                scCard.style.alignItems = "center";
+
+                const titleSpan = scCard.createSpan({ text: `🎬 ${scene.name}` });
+
+                // 🔥 2. 加入「🎨 快速轉色」按鈕
+                const colorBtn = scCard.createDiv({ text: "🎨" });
+                colorBtn.style.cursor = "pointer";
+                colorBtn.style.opacity = "0.3";
+                colorBtn.style.fontSize = "12px";
+                colorBtn.addEventListener("mouseover", () => colorBtn.style.opacity = "1");
+                colorBtn.addEventListener("mouseout", () => colorBtn.style.opacity = "0.3");
+
+                colorBtn.addEventListener("click", (e) => {
+                    e.stopPropagation(); // 防止觸發跳轉
+                    const menu = new Menu();
+                    SCENE_COLORS.forEach(c => {
+                        menu.addItem((item) => {
+                            item.setTitle(c.name)
+                                .setIcon("lucide-palette")
+                                .onClick(() => {
+                                    // 🔥 1. 瞬間啟動無敵護盾
+                                    this.isMenuClicking = true;
+                                    this.changeSceneColor(view, scene.lineNumber, c.id)
+                                    // 🔥 2. 200毫秒後自動解除護盾 (足夠擋住殘留的 click 事件)
+                                    setTimeout(() => this.isMenuClicking = false, 200);
+                                });
+                        });
+                    });
+                    menu.showAtMouseEvent(e);
+                });
+
                 // 🔥 捨棄 dataset，改用 WeakMap 儲存龐大正文！
                 this.sceneContentMap.set(scCard, scene.content);
 
                 if (this.selectedSceneId === scene.id) {
-                    scCard.style.borderLeft = "4px solid var(--interactive-accent)";
-                    scCard.style.backgroundColor = "var(--background-primary-alt)";
+                    // 如果被選中，邊框加粗，底色加深少少
+                    scCard.style.borderLeftWidth = "4px";
+                    scCard.style.filter = "brightness(0.9)";
                 }
 
                 scCard.addEventListener("click", (e) => {
+                    // 🔥 如果護盾生效中，直接沒收呢個點擊事件！
+                    if (this.isMenuClicking) {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        return;
+                    }
                     e.stopPropagation(); e.preventDefault();
                     this.selectedSceneId = scene.id || null;
                     this.selectedSceneTitle = scene.name;
@@ -440,15 +488,12 @@ export class StructureView extends ItemView {
             for (let i = cursor.line; i >= 0; i--) {
                 const line = editor.getLine(i);
                 if (line.trim().startsWith("######")) {
-                    const idMatch = line.match(RE_EXTRACT_ID);
-                    if (idMatch) foundId = idMatch[1].trim();
 
-                    let cleanName = line.replace(/^[#\s]+|^🎬\s*/g, "");
-                    const htmlCommentStart = "<" + "!--";
-                    if (cleanName.includes(htmlCommentStart)) cleanName = cleanName.split(htmlCommentStart)[0];
-                    if (cleanName.includes("<span")) cleanName = cleanName.split("<span")[0];
-                    if (cleanName.includes("<small>")) cleanName = cleanName.split("<small>")[0];
-                    foundTitle = cleanName.trim();
+
+                    foundId = extractSceneId(line);
+                    foundTitle = cleanSceneTitle(line);
+
+
                     break;
                 }
             }
@@ -512,12 +557,11 @@ export class StructureView extends ItemView {
         for (let i = cursor.line; i >= 0; i--) {
             const line = editor.getLine(i);
             if (line.trim().startsWith("######")) {
-                let cleanName = line.replace(/^[#\s]+|^🎬\s*/g, "");
-                const htmlCommentStart = "<" + "!--";
-                if (cleanName.includes(htmlCommentStart)) cleanName = cleanName.split(htmlCommentStart)[0];
-                if (cleanName.includes("<span")) cleanName = cleanName.split("<span")[0];
-                if (cleanName.includes("<small>")) cleanName = cleanName.split("<small>")[0];
-                foundTitle = cleanName.trim();
+
+
+                foundTitle = cleanSceneTitle(line);
+
+
                 startLine = i;
                 break;
             }
@@ -548,7 +592,7 @@ export class StructureView extends ItemView {
             if (line.startsWith(">")) {
                 let cleanLine = line.substring(1).trim();
                 // 過濾掉 Callout 宣告語法，保持畫面乾淨
-                if (cleanLine.startsWith("[!NSmith]") || cleanLine.startsWith("[!info]")) continue;
+                if (cleanLine.startsWith("[!NSmith") || cleanLine.startsWith("[!info]")) continue;
                 metaLines.push(cleanLine);
             } else if (line === "" && metaLines.length > 0) {
                 metaLines.push(""); // 容許空行
@@ -632,9 +676,9 @@ export class StructureView extends ItemView {
             const maxLine = editor.lineCount() - 1;
             if (lineNumber > maxLine) lineNumber = maxLine;
 
-            editor.setCursor({ line: lineNumber, ch: 0 });
+            //editor.setCursor({ line: lineNumber, ch: 0 });
             editor.scrollIntoView({ from: { line: lineNumber, ch: 0 }, to: { line: lineNumber, ch: 0 } }, true);
-            editor.focus();
+            //editor.focus();
         } else {
             new Notice("⚠️ 找不到目標筆記，請先點擊一下編輯區。");
         }
@@ -670,6 +714,45 @@ export class StructureView extends ItemView {
 
         view.editor.setValue(chunks.join("\n\n") + "\n");
     }
+
+
+    // ==========================================
+    // 🔥 瞬間轉換卡片顏色魔法 (標題 + Callout 連動)
+    // ==========================================
+    changeSceneColor(view: MarkdownView, lineNumber: number, newColorId: string) {
+        const editor = view.editor;
+        const lineText = editor.getLine(lineNumber);
+
+        // 1. 替換標題中的 data-color
+        let newLine = "";
+        if (lineText.includes('data-color="')) {
+            newLine = lineText.replace(/data-color="[^"]*"/, `data-color="${newColorId}"`);
+        } else if (lineText.includes('data-scene-id="')) {
+            newLine = lineText.replace(/"><\/span>/, `" data-color="${newColorId}"><\/span>`);
+        } else {
+            new Notice("⚠️ 找不到卡片 ID，無法更改顏色！請先為其分配 ID。");
+            return;
+        }
+        editor.setLine(lineNumber, newLine);
+
+        // 🔥 2. 自動替換下一行的 Callout 顏色！
+        // 向下掃描 1-2 行，尋找 > [!NSmith...]
+        for (let i = lineNumber + 1; i <= lineNumber + 2 && i < editor.lineCount(); i++) {
+            const nextLine = editor.getLine(i);
+            if (nextLine.startsWith("> [!NSmith")) {
+                const calloutType = newColorId === "default" ? "NSmith" : `NSmith-${newColorId}`;
+                // 精準替換，唔理佢原本係 NSmith 定 NSmith-red
+                const updatedCallout = nextLine.replace(/> \[!NSmith[^\]]*\]/, `> [!${calloutType}]`);
+                editor.setLine(i, updatedCallout);
+                break; // 搵到並改完就走
+            }
+        }
+
+        new Notice(`🎨 顏色已更新！`);
+        this.lastOutlineHash = ""; // 強制刷新大綱
+        this.plugin.sceneManager.scheduleGenerateDatabase();
+    }
+
 
     parseDocument(text: string): ChapterNode[] {
         const lines = text.split("\n");
@@ -713,16 +796,13 @@ export class StructureView extends ItemView {
 
             if (trimLine.startsWith("######")) {
                 flushScene();
-                let uuid = "";
-                const idMatch = trimLine.match(RE_EXTRACT_ID);
-                if (idMatch) uuid = idMatch[1].trim();
 
-                let cleanName = trimLine.replace(/^[#\s]+|^🎬\s*/g, "");
-                if (cleanName.includes(htmlCommentStart)) cleanName = cleanName.split(htmlCommentStart)[0];
-                if (cleanName.includes("<span")) cleanName = cleanName.split("<span")[0];
-                if (cleanName.includes("<small>")) cleanName = cleanName.split("<small>")[0];
 
-                currentScene = { id: uuid, rawHeader: trimLine, name: cleanName.trim(), content: line + "\n", lineNumber: i, type: 'scene' };
+                let uuid = extractSceneId(trimLine) || "";
+                let cleanName = cleanSceneTitle(trimLine);
+                let colorId = extractSceneColor(trimLine);
+
+                currentScene = { id: uuid, rawHeader: trimLine, name: cleanName.trim(), content: line + "\n", lineNumber: i, type: 'scene', colorId: colorId };
                 buffer = []; continue;
             }
             if (trimLine.includes('<span class="ns-file-id">++ FILE_ID')) continue;

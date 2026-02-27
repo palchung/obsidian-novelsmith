@@ -1,6 +1,6 @@
 import { App, Notice, MarkdownView, EditorPosition, TFile } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
-import { InputModal, GenericSuggester } from '../modals';
+import { InputModal, GenericSuggester, SceneCreateModal } from '../modals';
 import { TEMPLATES_DIR } from '../utils';
 import NovelSmithPlugin from '../main';
 
@@ -19,17 +19,23 @@ export class PlotManager {
         this.settings = newSettings;
     }
 
-    private async getTemplateContent(sceneName: string): Promise<string> {
+    private async getTemplateContent(sceneName: string, colorId: string = "default"): Promise<string> {
         const tplPath = `${this.settings.bookFolderPath}/${TEMPLATES_DIR}/NovelSmith_Template.md`;
         let templateText = "";
         const tplFile = this.app.vault.getAbstractFileByPath(tplPath);
         const uuid = crypto.randomUUID().substring(0, 8);
 
+        const calloutType = colorId === "default" ? "NSmith" : `NSmith-${colorId}`;
+
         if (tplFile instanceof TFile) {
             templateText = await this.app.vault.read(tplFile);
+            // 🔥 魔術替換：喺原本嘅 UUID 後面靜靜雞攝入 data-color
+            templateText = templateText.replace(/data-scene-id="{{UUID}}">/, `data-scene-id="{{UUID}}" data-color="${colorId}">`);
+            // 如果係自訂範本，嘗試將 [!NSmith] 換成對應顏色
+            templateText = templateText.replace(/> \[!NSmith\]/, `> [!${calloutType}]`);
         } else {
-            // 🔥 換上 span 標籤
-            templateText = `###### 🎬 {{SceneName}} <span class="ns-id" data-scene-id="${uuid}"></span> [!NSmith] 情節資訊\n> - Time:: \n> - POV:: \n> - Status:: #Writing\n> - Note:: \n\n`;
+            // 🔥 換上動態 Callout 類型
+            templateText = `###### 🎬 {{SceneName}} <span class="ns-id" data-scene-id="${uuid}" data-color="${colorId}"></span>\n> [!${calloutType}] 情節資訊\n> - Time:: \n> - POV:: \n> - Status:: #Writing\n> - Note:: \n\n`;
         }
 
 
@@ -47,37 +53,33 @@ export class PlotManager {
             return; // 終止插入流程，等用家改好範本先
         }
 
-        new InputModal(this.app, "➕ 插入劇情卡片：請輸入情節名稱", async (newSceneName) => {
+        // 🔥 升級版：使用豪華卡片建立器
+        new SceneCreateModal(this.app, "➕ 插入劇情卡片", "", async (newSceneName, colorId) => {
             if (!newSceneName) return;
 
             const editor = view.editor;
             const cursor = editor.getCursor();
             const currentLineText = editor.getLine(cursor.line);
 
-            // 🔥 智能防黏貼魔法：判斷前面需唔需要加換行符號
             let prefix = "";
-
             if (currentLineText.substring(0, cursor.ch).trim() !== "") {
-                // 如果游標前面已經有字，強制空兩行 (另起一段)
                 prefix = "\n\n";
             } else if (cursor.line > 0 && editor.getLine(cursor.line - 1).trim() !== "") {
-                // 如果游標喺行首，但上一行有字，強制空一行
                 prefix = "\n";
             }
 
-            const newContent = await this.getTemplateContent(newSceneName);
+            // 🔥 將 colorId 傳入去
+            const newContent = await this.getTemplateContent(newSceneName, colorId);
             const finalContent = prefix + newContent + "\n";
 
             editor.replaceRange(finalContent, cursor);
 
-            // 重新計算游標位置，飛去新卡片下面
             const addedLines = finalContent.split("\n").length - 1;
             const newCursor = { line: cursor.line + addedLines - 1, ch: 0 };
             editor.setCursor(newCursor);
             editor.scrollIntoView({ from: newCursor, to: newCursor }, true);
 
             new Notice(`✅ 已插入劇情卡片：${newSceneName}`);
-
             this.plugin.sceneManager.scheduleGenerateDatabase();
         }).open();
     }
@@ -111,25 +113,25 @@ export class PlotManager {
             }
         }
 
-        new InputModal(this.app, "🔪 分拆新情節：請輸入名稱", async (newSceneName) => {
+        // 🔥 升級版：分拆時都可以揀色！
+        new SceneCreateModal(this.app, "🔪 分拆新情節", "", async (newSceneName, colorId) => {
             if (!newSceneName) return;
 
             let newContent = "";
             const uuid = crypto.randomUUID().substring(0, 8);
 
             if (metadataLines.length > 0) {
-                // 🔥 分拆時換上 span 標籤
-                newContent += `###### 🎬 ${newSceneName} <span class="ns-id" data-scene-id="${uuid}"></span>\n`;
+                // 🔥 分拆時加入 data-color
+                newContent += `###### 🎬 ${newSceneName} <span class="ns-id" data-scene-id="${uuid}" data-color="${colorId}"></span>\n`;
 
                 for (let line of metadataLines) {
                     if (line.includes("Scene::")) continue;
                     newContent += `${line}\n`;
                 }
             } else {
-                newContent = await this.getTemplateContent(newSceneName);
+                newContent = await this.getTemplateContent(newSceneName, colorId);
             }
 
-            // 分拆固定用 \n\n 隔開
             editor.replaceRange("\n\n" + newContent.trim() + "\n\n", cursor);
 
             const linesInserted = newContent.trim().split("\n").length;
@@ -138,7 +140,6 @@ export class PlotManager {
             editor.scrollIntoView({ from: newCursor, to: newCursor }, true);
 
             new Notice(`✅ 已從此處分拆出：${newSceneName}`);
-
             this.plugin.sceneManager.scheduleGenerateDatabase();
         }).open();
     }

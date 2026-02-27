@@ -108,6 +108,22 @@ export class CompilerManager {
                 content = content.replace(/\[\[(?:[^\]]*\|)?([^\]]+)\]\]/g, "$1");
             }
 
+
+            // ==========================================
+            // 🔥 新增：智能 Hashtag 處理邏輯
+            // 該正則確保只會匹配標籤 (例如 #Draft)，絕對不會匹配標題 (例如 # 標題)
+            // ==========================================
+            if (options.hashtagAction === 'remove-all') {
+                // 完全刪除 (替換為原本前面的空格)
+                content = content.replace(/(^|\s)#[a-zA-Z0-9_\-\u4e00-\u9fa5]+/g, "$1");
+            } else if (options.hashtagAction === 'remove-hash') {
+                // 僅刪除 # 符號，保留後面的文字 ($1 是前面的空格，$2 是標籤文字)
+                content = content.replace(/(^|\s)#([a-zA-Z0-9_\-\u4e00-\u9fa5]+)/g, "$1$2");
+            }
+
+
+
+
             // G. 移除 ID 標記 (強制執行，防止洩漏)
             content = content.replace(RE_FILE_ID_HEADING, "");
             content = content.replace(RE_FOLDER_HEADING, "");

@@ -1,7 +1,7 @@
 import { App, Notice, TFile, MarkdownView, moment } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 import { InputModal, GenericSuggester } from '../modals';
-import { HISTORY_DIR, ensureFolderExists } from '../utils';
+import { HISTORY_DIR, ensureFolderExists, extractSceneId, cleanSceneTitle } from '../utils';
 
 export class HistoryManager {
     app: App;
@@ -36,16 +36,8 @@ export class HistoryManager {
 
         if (headerLineIndex === -1) return null;
 
-        const idMatch = headerContent.match(/(?:SCENE_ID:\s*|data-scene-id=")([a-zA-Z0-9-]+)/);
-        if (idMatch) sceneId = idMatch[1].trim();
-
-        let cleanName = headerContent.replace(/^######\s*/, "").replace(/^🎬\s*/, "");
-        const oldComment = "<" + "!--";
-        if (cleanName.includes(oldComment)) cleanName = cleanName.split(oldComment)[0];
-        if (cleanName.includes("<span")) cleanName = cleanName.split("<span")[0];
-        if (cleanName.includes("<small>")) cleanName = cleanName.split("<small>")[0];
-
-        sceneTitle = cleanName.trim();
+        sceneId = extractSceneId(headerContent);
+        sceneTitle = cleanSceneTitle(headerContent);
 
         let endLineIndex = lineCount;
         for (let i = headerLineIndex + 1; i < lineCount; i++) {

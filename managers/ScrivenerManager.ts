@@ -188,11 +188,13 @@ export class ScrivenerManager {
 
         const fileContentCache = new Map<string, { file: TFile, text: string }>();
         const globalIdMap = new Map<string, DraftCard>();
+        const parsedOriginalCache = new Map<string, any>();
 
         await Promise.all(allFolderFiles.map(async (file) => {
             const text = await this.app.vault.read(file);
             fileContentCache.set(file.name, { file: file, text: text });
             const data = parseContent(text, true);
+            parsedOriginalCache.set(file.name, data);
             data.cards.forEach(card => { if (card.id) globalIdMap.set(card.id, card); });
         }));
 
@@ -216,7 +218,10 @@ export class ScrivenerManager {
             const cachedData = fileContentCache.get(fileName);
             if (!cachedData) continue;
 
-            const originalData = parseContent(cachedData.text, true);
+            const originalData = parsedOriginalCache.get(fileName);
+            if (!originalData) continue; // 防呆保護
+
+
             const draftData = parseContent(blockContent, false);
 
             const localTitleMap = new Map<string, DraftCard>();

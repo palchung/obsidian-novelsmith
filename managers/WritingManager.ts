@@ -101,8 +101,19 @@ export class WritingManager {
                 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 badWords.sort((a, b) => b.length - a.length);
 
-                const patternString = `(${badWords.map(escapeRegExp).join("|")})`;
-                const combinedRegex = new RegExp(patternString, 'g');
+                // 🔥 大師級修復：中英雙語兼容的 Regex 構建器
+                const patternString = badWords.map(w => {
+                    const escaped = escapeRegExp(w);
+                    // 判斷：如果這個詞的頭尾都是英文字母或數字，就加上 \b (單詞邊界)
+                    const isEnglishWord = /^[a-zA-Z0-9].*[a-zA-Z0-9]$|^[a-zA-Z0-9]$/.test(w);
+                    if (isEnglishWord) {
+                        return `\\b${escaped}\\b`;
+                    }
+                    return escaped; // 中文或其他符號保持原樣
+                }).join("|");
+
+                const combinedRegex = new RegExp(`(${patternString})`, 'g');
+
 
                 updateRedundantPatterns(combinedRegex);
                 document.body.classList.add('mode-redundant');

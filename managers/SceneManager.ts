@@ -1,13 +1,14 @@
 import { App, Notice, MarkdownView, TFile, TFolder, moment } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 import { SimpleConfirmModal } from '../modals';
-import { RE_EXTRACT_ID, DRAFT_FILENAME, BACKSTAGE_DIR, SCENE_DB_FILE, ensureFolderExists } from '../utils';
+import { extractSceneColor, getColorById, extractSceneId, cleanSceneTitle, RE_EXTRACT_ID, DRAFT_FILENAME, BACKSTAGE_DIR, SCENE_DB_FILE, ensureFolderExists } from '../utils';
 
 
 interface SceneData {
     id: string;
     title: string;
     meta: string[];
+    colorId: string;
 }
 
 export class SceneManager {
@@ -159,16 +160,33 @@ export class SceneManager {
                 dbContent += `## [[${file.basename}]]\n`;
                 for (const scene of fileScenes) {
                     const link = `[[${file.basename}#${scene.title}|${scene.title}]]`;
-                    dbContent += `- Scene:: ${link}\n  - SceneName:: ${scene.title}\n  - SceneID:: \`${scene.id}\`\n`;
+
+                    // 🔥 終極改動：將所有屬性集中喺同一行，使用 [Key:: Value] 格式
+                    let sceneLine = `- [Scene:: ${link}] [SceneName:: ${scene.title}] [SceneID:: \`${scene.id}\`]`;
+
+                    if (scene.colorId !== "default") {
+                        const colorObj = getColorById(scene.colorId);
+                        sceneLine += ` [Color:: ${colorObj.icon} ${colorObj.name}]`;
+                    }
+
                     for (const metaLine of scene.meta) {
                         let cleanMeta = metaLine.replace(/^> ?/, "").trim();
+                        // 略過 Callout 宣告同埋重複嘅 Scene 屬性
                         if (cleanMeta.startsWith("[!") || cleanMeta.includes("Scene::")) continue;
+
                         if (cleanMeta.includes("::")) {
-                            if (!cleanMeta.startsWith("-")) cleanMeta = "- " + cleanMeta;
-                            dbContent += `  ${cleanMeta}\n`;
+                            // 移除開頭嘅 "- "，然後將 Key 同 Value 分開
+                            const cleanPair = cleanMeta.replace(/^- ?/, "").trim();
+                            const parts = cleanPair.split("::");
+                            if (parts.length >= 2) {
+                                const key = parts[0].trim();
+                                const val = parts.slice(1).join("::").trim();
+                                // 用中括號包住附加喺同一行
+                                sceneLine += ` [${key}:: ${val}]`;
+                            }
                         }
                     }
-                    dbContent += "\n";
+                    dbContent += sceneLine + "\n";
                 }
                 dbContent += "---\n";
             }
@@ -190,17 +208,12 @@ export class SceneManager {
         for (const line of lines) {
             const trimLine = line.trim();
             if (trimLine.startsWith("######")) {
-                let uuid = "";
-                const idMatch = trimLine.match(RE_EXTRACT_ID);
-                if (idMatch) uuid = idMatch[1].trim();
+                let uuid = extractSceneId(trimLine) || "";
+                let exactTitle = cleanSceneTitle(trimLine);
+                let colorId = extractSceneColor(trimLine); // 🔥 讀取隱藏顏色
 
-                let exactTitle = trimLine.replace(/^######\s*/, "");
-
-                if (exactTitle.includes("<span")) exactTitle = exactTitle.split("<span")[0];
-                if (exactTitle.includes(htmlCommentStart)) exactTitle = exactTitle.split(htmlCommentStart)[0];
-                if (exactTitle.includes("<small>")) exactTitle = exactTitle.split("<small>")[0];
-
-                currentScene = { id: uuid, title: exactTitle.trim(), meta: [] };
+                // 🔥 將 colorId 放入物件
+                currentScene = { id: uuid, title: exactTitle, meta: [], colorId: colorId };
                 scenes.push(currentScene);
             } else if (currentScene && trimLine.startsWith(">")) {
                 currentScene.meta.push(trimLine);

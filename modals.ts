@@ -1,5 +1,6 @@
 import { App, FuzzySuggestModal, Modal, Setting, TFile, Notice } from 'obsidian';
 import { t } from './locales';
+import { SCENE_COLORS } from './utils'; // 確保路徑正確
 
 // ============================================================
 // 1. 通用的輸入框 Modal (保留：給原子存檔用)
@@ -96,6 +97,7 @@ export interface CompileOptions {
     removeHighlights: boolean;// 移除 == 高亮 ==
     removeInternalLinks: boolean;
     insertFileNameAsHeading: boolean;
+    hashtagAction: 'none' | 'remove-all' | 'remove-hash';
 }
 
 export class CompileModal extends Modal {
@@ -107,7 +109,8 @@ export class CompileModal extends Modal {
         mergeBold: true,
         removeHighlights: true,
         removeInternalLinks: true,
-        insertFileNameAsHeading: true
+        insertFileNameAsHeading: true,
+        hashtagAction: 'none'
     };
 
     onSubmit: (options: CompileOptions) => void;
@@ -181,7 +184,17 @@ export class CompileModal extends Modal {
                 .setValue(this.options.removeInternalLinks)
                 .onChange(val => this.options.removeInternalLinks = val));
 
-
+        // 喺加入 removeInternalLinks 的 Setting 下面，加入這段：
+        new Setting(contentEl)
+            .setName("標籤處理 (Hashtags)")
+            .setDesc("處理文稿中的 #標籤 (系統能精準識別，絕不會誤刪 # 標題)")
+            .addDropdown(drop => drop
+                .addOption('none', '保留原樣')
+                .addOption('remove-hash', '僅刪除 # 符號 (例如 #Draft 變成 Draft)')
+                .addOption('remove-all', '完全刪除該標籤與文字')
+                .setValue(this.options.hashtagAction)
+                .onChange(value => this.options.hashtagAction = value as any)
+            );
 
 
 
@@ -364,6 +377,94 @@ export class CleanDraftModal extends Modal {
                     this.close();
                     this.onSubmit(this.options);
                 }));
+    }
+
+    onClose() {
+        this.contentEl.empty();
+    }
+}
+
+// ============================================================
+// 🎨 豪華版劇情卡片建立器 (支援選色)
+// ============================================================
+export class SceneCreateModal extends Modal {
+    titleText: string;
+    defaultName: string;
+    onSubmit: (result: string, colorId: string) => void;
+    inputEl!: HTMLInputElement;
+    selectedColorId: string = "default";
+
+    constructor(app: App, titleText: string, defaultName: string = "", onSubmit: (result: string, colorId: string) => void) {
+        super(app);
+        this.titleText = titleText;
+        this.defaultName = defaultName;
+        this.onSubmit = onSubmit;
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.createEl("h2", { text: this.titleText });
+
+        new Setting(contentEl)
+            .setName("情節名稱")
+            .addText(text => {
+                text.setValue(this.defaultName);
+                text.onChange(value => { this.defaultName = value; });
+                this.inputEl = text.inputEl;
+                text.inputEl.addEventListener("keydown", (e) => {
+                    if (e.key === "Enter") this.submit();
+                });
+            });
+
+        const colorSetting = new Setting(contentEl)
+            .setName("標籤顏色")
+            .setDesc("為這個情節選擇一個代表色 (可選)");
+
+        // 建立顏色丸仔容器
+        const colorContainer = colorSetting.controlEl.createDiv({ cls: "ns-color-picker-container" });
+        colorContainer.style.display = "flex";
+        colorContainer.style.gap = "8px";
+
+        SCENE_COLORS.forEach(color => {
+            const btn = colorContainer.createEl("button", { text: color.icon, title: color.name });
+            btn.style.width = "32px";
+            btn.style.height = "32px";
+            btn.style.padding = "0";
+            btn.style.borderRadius = "50%";
+            btn.style.border = this.selectedColorId === color.id ? "2px solid var(--interactive-accent)" : "2px solid transparent";
+            btn.style.backgroundColor = "transparent";
+            btn.style.cursor = "pointer";
+            btn.style.fontSize = "16px";
+            btn.style.display = "flex";
+            btn.style.alignItems = "center";
+            btn.style.justifyContent = "center";
+
+            btn.onclick = () => {
+                this.selectedColorId = color.id;
+                // 重置所有邊框，高亮被選中嘅顏色
+                Array.from(colorContainer.children).forEach((child: HTMLElement) => {
+                    child.style.border = "2px solid transparent";
+                });
+                btn.style.border = "2px solid var(--interactive-accent)";
+            };
+        });
+
+        new Setting(contentEl)
+            .addButton(btn => btn
+                .setButtonText("確定")
+                .setCta()
+                .onClick(() => this.submit()));
+
+        setTimeout(() => this.inputEl.focus(), 100);
+    }
+
+    submit() {
+        if (!this.defaultName.trim()) {
+            new Notice("請輸入情節名稱！");
+            return;
+        }
+        this.close();
+        this.onSubmit(this.defaultName, this.selectedColorId);
     }
 
     onClose() {

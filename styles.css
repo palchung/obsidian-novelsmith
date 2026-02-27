@@ -284,3 +284,96 @@ body.mode-dialogue .cm-dialogue-text {
     letter-spacing: 2px;
     opacity: 0.6;
 }
+
+/* ============================================================
+   🎨 NovelSmith 劇情卡片顏色系統 (支援深淺色模式自動適應)
+   ============================================================ */
+
+/* 預設邊框顏色，等佢未揀色嗰陣都靚仔 */
+.ns-scene-card {
+    border-left: 4px solid transparent;
+    transition: all 0.2s ease-in-out;
+}
+
+/* 當滑鼠指住卡片時微微加深，提升手感 */
+.ns-scene-card:hover {
+    filter: brightness(0.95);
+}
+
+.theme-dark .ns-scene-card:hover {
+    filter: brightness(1.15);
+}
+
+/* 6 隻主色嘅透明水彩背景 + 實色左邊框 */
+.ns-scene-card.ns-color-red {
+    background-color: rgba(var(--color-red-rgb), 0.15) !important;
+    border-left-color: var(--color-red) !important;
+}
+
+.ns-scene-card.ns-color-orange {
+    background-color: rgba(var(--color-orange-rgb), 0.15) !important;
+    border-left-color: var(--color-orange) !important;
+}
+
+.ns-scene-card.ns-color-green {
+    background-color: rgba(var(--color-green-rgb), 0.15) !important;
+    border-left-color: var(--color-green) !important;
+}
+
+.ns-scene-card.ns-color-blue {
+    background-color: rgba(var(--color-blue-rgb), 0.15) !important;
+    border-left-color: var(--color-blue) !important;
+}
+
+.ns-scene-card.ns-color-purple {
+    background-color: rgba(var(--color-purple-rgb), 0.15) !important;
+    border-left-color: var(--color-purple) !important;
+}
+
+.ns-scene-card.ns-color-grey {
+    /* 灰色用 Obsidian 預設嘅基礎色，最為融和 */
+    background-color: rgba(var(--color-base-60-rgb), 0.15) !important;
+    border-left-color: var(--text-muted) !important;
+}
+
+/* ============================================================
+   🎨 劇情卡片 Callout 連動顏色 (支援深淺色模式)
+   ============================================================ */
+
+/* 預設 (舊有卡片兼容) */
+.callout[data-callout="nsmith"],
+.callout[data-callout="nsmith-default"] {
+    --callout-color: var(--color-base-60-rgb);
+    --callout-icon: lucide-clapperboard;
+}
+
+/* 七彩變身 */
+.callout[data-callout="nsmith-red"] {
+    --callout-color: var(--color-red-rgb);
+    --callout-icon: lucide-clapperboard;
+}
+
+.callout[data-callout="nsmith-orange"] {
+    --callout-color: var(--color-orange-rgb);
+    --callout-icon: lucide-clapperboard;
+}
+
+.callout[data-callout="nsmith-green"] {
+    --callout-color: var(--color-green-rgb);
+    --callout-icon: lucide-clapperboard;
+}
+
+.callout[data-callout="nsmith-blue"] {
+    --callout-color: var(--color-blue-rgb);
+    --callout-icon: lucide-clapperboard;
+}
+
+.callout[data-callout="nsmith-purple"] {
+    --callout-color: var(--color-purple-rgb);
+    --callout-icon: lucide-clapperboard;
+}
+
+.callout[data-callout="nsmith-grey"] {
+    --callout-color: var(--color-base-60-rgb);
+    --callout-icon: lucide-clapperboard;
+}
