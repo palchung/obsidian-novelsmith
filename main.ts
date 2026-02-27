@@ -422,12 +422,18 @@ export default class NovelSmithPlugin extends Plugin {
 
     async activateView() {
         const { workspace } = this.app;
-        let leaf: WorkspaceLeaf | null = null;
         const leaves = workspace.getLeavesOfType(VIEW_TYPE_STRUCTURE);
 
-        if (leaves.length > 0) {
-            leaf = leaves[0];
-        } else {
+        // 🔥 防禦升級 1：如果發現有多過一個面板 (因同步或熱更新引起)，剷除多餘嘅分身！
+        if (leaves.length > 1) {
+            for (let i = 1; i < leaves.length; i++) {
+                leaves[i].detach();
+            }
+        }
+
+        let leaf: WorkspaceLeaf | null = leaves.length > 0 ? leaves[0] : null;
+
+        if (!leaf) {
             leaf = workspace.getRightLeaf(false);
             if (leaf) await leaf.setViewState({ type: VIEW_TYPE_STRUCTURE, active: true });
         }
@@ -436,6 +442,8 @@ export default class NovelSmithPlugin extends Plugin {
 
     onunload() {
         console.log('NovelSmith 休息中');
+        // 🔥 防禦升級 2：當插件關閉或更新時，必須徹底拆除面板，防止變成幽靈面板無限繁殖！
+        this.app.workspace.detachLeavesOfType(VIEW_TYPE_STRUCTURE);
     }
 
     async loadSettings() {
