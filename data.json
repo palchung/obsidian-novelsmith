@@ -1,8 +1,8 @@
 {
   "bookFolderPath": "NovelSmith_Demo_Vault",
   "keepDraftOnSync": false,
-  "wikiFolderPath": "NovelSmith_Demo_Vault/wiki",
-  "exportFolderPath": "Output",
+  "wikiFolderPath": "NovelSmith_Demo_Vault/02_📚 World Bible",
+  "exportFolderPath": "NovelSmith_Demo_Vault/04_📤 Published Output",
   "draftFilename": "Draft_Edit.md",
   "keptDraftPath": "終焉與破曉/01_草稿/_Archived_Drafts",
   "historyFolderPath": "終焉與破曉/04_其他/_History/Scenes",

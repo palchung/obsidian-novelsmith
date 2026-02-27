@@ -37,11 +37,12 @@ export class WritingManager {
     // 📄 智能生成器：贅字清單與正字名單
     // =================================================================
     public async ensureRedundantListExists(forceShowNotice: boolean = false) {
-        const configPath = `${this.getAidsFolderPath()}/_贅字清單.md`;
+        const configPath = `${this.getAidsFolderPath()}/RedundantList.md`;
         // ... 下方將 this.settings.redundantListPath 替換成 configPath
         let configFile = this.app.vault.getAbstractFileByPath(configPath);
         if (!configFile) {
-            await ensureFolderExists(this.app, configPath);
+            // 🔥 錯誤修復：只傳入資料夾路徑，不要傳入包含 .md 的完整路徑！
+            await ensureFolderExists(this.app, this.getAidsFolderPath());
             try {
                 await this.app.vault.create(configPath, `// 預設贅字清單\n其實, 基本上, 彷彿`);
                 if (forceShowNotice) new Notice(`✅ 成功生成贅字清單：${configPath}`);
@@ -58,7 +59,8 @@ export class WritingManager {
         // ... 同樣替換邏輯，將 this.settings.fixListPath 替換成 configPath
         let configFile = this.app.vault.getAbstractFileByPath(configPath);
         if (!configFile) {
-            await ensureFolderExists(this.app, configPath);
+            // 🔥 錯誤修復：只傳入資料夾路徑，不要傳入包含 .md 的完整路徑！
+            await ensureFolderExists(this.app, this.getAidsFolderPath());
             try {
                 await this.app.vault.create(configPath, `// 正字名單\n主角名 | 錯字1`);
                 if (forceShowNotice) new Notice(`✅ 成功生成正字名單：${configPath}`);
@@ -85,7 +87,7 @@ export class WritingManager {
             document.body.classList.remove('mode-dialogue');
 
             await this.ensureRedundantListExists(false); // 確保檔案存在
-            const configPath = `${this.getAidsFolderPath()}/_贅字清單.md`;
+            const configPath = `${this.getAidsFolderPath()}/RedundantList.md`;
             let configFile = this.app.vault.getAbstractFileByPath(configPath);
 
             if (configFile instanceof TFile) {

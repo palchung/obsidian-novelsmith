@@ -54,6 +54,7 @@ const en: Record<keyof typeof zhTW, string> = {
     warn_cant_scriv_here: "⛔ Access Denied: You cannot initiate Scrivenings Mode inside a Scrivenings draft (to prevent infinite loops)!",
     confirm_discard_draft: "🚨 Are you sure you want to discard this draft?\n\nThis will close and delete this temporary file. All changes made here will NOT be synced back to the original files!",
     warn_existing_draft_overwrite: "🚨 CRITICAL WARNING: Unsynced Draft Found!\n\nA Scrivenings draft already exists in this folder. If you restart Scrivenings Mode now, 【ALL UNSYNCED CHANGES】 in the old draft will be overwritten and lost forever!\n\nAre you sure you want to force an overwrite?\n(It is highly recommended to click 'Cancel', open the draft, and click '💾 Sync & Close' first)",
+    warn_no_valid_manuscript: "⛔ Access Denied: No scene cards (######) found in this folder.\nScrivenings Mode can only be launched in folders containing valid manuscript files!",
 
     // ==========================================
     // 📌 System Protection (Main/Utils)
@@ -125,6 +126,8 @@ const en: Record<keyof typeof zhTW, string> = {
     compile_empty: "⚠️ No valid chapters found in this folder.",
     compile_progress: "⚡️ Compiling {0} chapters...",
     compile_success: "✅ Compile complete!\n📂 {0}",
+    modal_compile_opt_heading: "Insert file name as H2 heading",
+    modal_compile_opt_heading_desc: "Automatically insert '## File Name' at the beginning of each chapter.",
 
     // ==========================================
     // ⚙️ System & Initialization

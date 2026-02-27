@@ -52,6 +52,7 @@ export default {
     warn_cant_scriv_here: "⛔ 系統拒絕：這是一份串聯草稿檔（或封存草稿），不能在此處啟動串聯模式以免發生無限迴圈！",
     confirm_discard_draft: "🚨 確定要放棄這份草稿嗎？\n\n這將會關閉並刪除此臨時檔案，您剛才在草稿裡打的所有字都不會同步回原稿！",
     warn_existing_draft_overwrite: "🚨 嚴重警告：發現未同步的串聯草稿！\n\n此資料夾內已經有一個串聯草稿存在。如果您現在重新啟動串聯模式，舊草稿中【所有未同步的修改】將會被徹底覆寫並永久遺失！\n\n確定要強行覆寫嗎？\n(強烈建議先按「取消」，打開該草稿並點擊「💾 同步並結束」)",
+    warn_no_valid_manuscript: "⛔ 系統拒絕：此資料夾內的筆記沒有任何劇情卡片 (######)。\n串聯模式只能在包含小說文稿的資料夾中啟動！",
 
     // ==========================================
     // 📌 系統保護結界 (Main/Utils)
@@ -123,6 +124,8 @@ export default {
     compile_empty: "⚠️ 資料夾內沒有可編譯的章節。",
     compile_progress: "⚡️ 正在編譯 {0} 個章節...",
     compile_success: "✅ 編譯完成！\n📂 {0}",
+    modal_compile_opt_heading: "將檔名轉換為 H2 章節標題",
+    modal_compile_opt_heading_desc: "在每個檔案的開頭自動插入 ## 檔案名稱",
 
     // ==========================================
     // ⚙️ 系統與設定 (Settings & Initialization)

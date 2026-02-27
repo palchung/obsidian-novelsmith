@@ -1,4 +1,5 @@
 import { App, FuzzySuggestModal, Modal, Setting, TFile, Notice } from 'obsidian';
+import { t } from './locales';
 
 // ============================================================
 // 1. 通用的輸入框 Modal (保留：給原子存檔用)
@@ -94,6 +95,7 @@ export interface CompileOptions {
     mergeBold: boolean;       // 合併 ** 粗體 **
     removeHighlights: boolean;// 移除 == 高亮 ==
     removeInternalLinks: boolean;
+    insertFileNameAsHeading: boolean;
 }
 
 export class CompileModal extends Modal {
@@ -104,7 +106,8 @@ export class CompileModal extends Modal {
         removeStrikethrough: true,
         mergeBold: true,
         removeHighlights: true,
-        removeInternalLinks: true
+        removeInternalLinks: true,
+        insertFileNameAsHeading: true
     };
 
     onSubmit: (options: CompileOptions) => void;
@@ -119,6 +122,15 @@ export class CompileModal extends Modal {
         contentEl.empty();
         contentEl.createEl('h2', { text: '📤 匯出編譯設定' });
         contentEl.createEl('p', { text: '請選擇要清理的內容，這些操作只會影響輸出檔，不會修改原稿。', cls: 'setting-item-description' });
+
+
+        new Setting(contentEl)
+            .setName(t("modal_compile_opt_heading") || "將檔名轉換為 H2 章節標題")
+            .setDesc(t("modal_compile_opt_heading_desc") || "在每個檔案的開頭自動插入 ## 檔案名稱")
+            .addToggle(t => t
+                .setValue(this.options.insertFileNameAsHeading)
+                .onChange(v => this.options.insertFileNameAsHeading = v));
+
 
         new Setting(contentEl)
             .setName('移除 YAML Frontmatter')

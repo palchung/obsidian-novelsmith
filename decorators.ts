@@ -35,12 +35,16 @@ export const redundantHighlighter = ViewPlugin.fromClass(class {
 
 const dialogueDecoration = Decoration.mark({ class: 'cm-dialogue-text' });
 const dialogueMatcher = new MatchDecorator({ regexp: /「[^」]*」|『[^』]*』|“[^”]*”|"[^"]*"/g, decoration: (match) => dialogueDecoration });
+
 export const dialogueHighlighter = ViewPlugin.fromClass(class {
     decorations: DecorationSet;
-    constructor(view: EditorView) { this.decorations = dialogueMatcher.createDeco(view); }
+    constructor(view: EditorView) {
+        this.decorations = dialogueMatcher.createDeco(view);
+    }
     update(update: ViewUpdate) {
-        if (document.body.classList.contains('mode-dialogue')) this.decorations = dialogueMatcher.updateDeco(update, this.decorations);
-        else this.decorations = Decoration.none;
+        // 🔥 終極修復：永遠讓編輯器追蹤對話標記，不要設為 Decoration.none！
+        // 這樣只要 CSS (body.mode-dialogue) 一生效，畫面就會瞬間變化，不需要等用家打字觸發！
+        this.decorations = dialogueMatcher.updateDeco(update, this.decorations);
     }
 }, { decorations: v => v.decorations });
 

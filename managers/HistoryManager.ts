@@ -163,7 +163,7 @@ export class HistoryManager {
 
     public async showPreview(title: string, verLabel: string, content: string) {
         // 🔥 修改：直接使用合併後的路徑
-        const previewPath = `${this.settings.bookFolderPath}/${HISTORY_DIR}/版本預覽_Temp.md`;
+        const previewPath = `${this.settings.bookFolderPath}/${HISTORY_DIR}/preview_Temp.md`;
         let previewFile = this.app.vault.getAbstractFileByPath(previewPath);
 
         const previewText = `# 👀 預覽：${title}\n> 📅 版本：${verLabel}\n\n---\n\n${content}`;

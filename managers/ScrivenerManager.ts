@@ -4,7 +4,7 @@ import { parseContent, RE_FILE_ID, DraftCard } from '../utils';
 import { NovelSmithSettings } from '../settings';
 import { ChapterSelectionModal, SimpleConfirmModal } from '../modals';
 import { DRAFT_FILENAME, TEMPLATES_DIR, DRAFTS_DIR, ensureFolderExists } from '../utils';
-
+import { t } from '../locales';
 
 export class ScrivenerManager {
     app: App;
@@ -36,15 +36,36 @@ export class ScrivenerManager {
             const existingDraft = this.app.vault.getAbstractFileByPath(draftPath);
 
             // 將原本的編譯邏輯包裝成一個函數，方便稍後呼叫
-            const startCompileProcess = () => {
-                const files = currentFolder.children.filter((f) =>
+            // 🔥 防禦升級：將函數改為 async，以便讀取檔案內容
+            const startCompileProcess = async () => {
+                const rawFiles = currentFolder.children.filter((f) =>
                     f instanceof TFile && f.extension === 'md' && f.name !== DRAFT_FILENAME &&
                     !f.name.includes("Script") && !f.name.includes("_History") && !f.name.startsWith("_")
                 ) as TFile[];
 
-                files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+                rawFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
-                if (files.length === 0) { new Notice("⚠️ 資料夾內沒有可串聯的檔案。"); return; }
+                if (rawFiles.length === 0) { new Notice("⚠️ 資料夾內沒有可串聯的檔案。"); return; }
+
+                // =======================================================
+                // 🛡️ 文稿雷達探測：過濾出真正有「劇情卡片」的檔案 (或全新空白檔)
+                // =======================================================
+                const validFiles: TFile[] = [];
+                for (const f of rawFiles) {
+                    // 使用 cachedRead 極速讀取檔案內容 (幾十個 File 都只需幾毫秒)
+                    const content = await this.app.vault.cachedRead(f);
+
+                    // 如果有 ###### 標記，或者係一個全新嘅空白檔案 (容許用家開新檔寫作)，就視為合法
+                    if (content.includes("######") || content.trim() === "") {
+                        validFiles.push(f);
+                    }
+                }
+
+                // 如果過濾完之後一滴剩 (例如成個資料夾都係百科/設定集)
+                if (validFiles.length === 0) {
+                    new Notice(t("warn_no_valid_manuscript"), 6000);
+                    return; // 果斷落閘！
+                }
 
                 let targetFileName = activeFile.name;
                 let targetSceneRaw = "";
@@ -58,8 +79,9 @@ export class ScrivenerManager {
                     }
                 }
 
-                new ChapterSelectionModal(this.app, files, async (selectedFiles) => {
-                    new Notice("⚡️ 準備串聯編譯...");
+                // 🔥 記得將傳入去嘅變數由 files 改為過濾後嘅 validFiles！
+                new ChapterSelectionModal(this.app, validFiles, async (selectedFiles) => {
+                    new Notice(t("scrivener_compiling"));
                     await this.compileDraft(currentFolder, selectedFiles, targetFileName, targetSceneRaw);
                 }).open();
             };

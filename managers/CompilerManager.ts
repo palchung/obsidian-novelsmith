@@ -108,9 +108,6 @@ export class CompilerManager {
                 content = content.replace(/\[\[(?:[^\]]*\|)?([^\]]+)\]\]/g, "$1");
             }
 
-
-
-
             // G. 移除 ID 標記 (強制執行，防止洩漏)
             content = content.replace(RE_FILE_ID_HEADING, "");
             content = content.replace(RE_FOLDER_HEADING, "");
@@ -120,6 +117,12 @@ export class CompilerManager {
 
             // H. 壓縮空行
             content = content.replace(/\n{3,}/g, "\n\n");
+
+            // 🔥 新增：如果用家揀咗，就喺內容最頂加上檔案名稱作為 H2 標題！
+            if (options.insertFileNameAsHeading) {
+                // file.basename 會自動甩走 .md 副檔名，非常乾淨
+                finalContent += `## ${file.basename}\n\n`;
+            }
 
             finalContent += content.trim() + "\n\n"; // 章節間加空行
         }
