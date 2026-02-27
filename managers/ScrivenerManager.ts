@@ -2,7 +2,7 @@
 import { App, Notice, TFile, TFolder, MarkdownView, moment } from 'obsidian';
 import { parseContent, RE_FILE_ID, DraftCard } from '../utils';
 import { NovelSmithSettings } from '../settings';
-import { ChapterSelectionModal } from '../modals';
+import { ChapterSelectionModal, SimpleConfirmModal } from '../modals';
 import { DRAFT_FILENAME, TEMPLATES_DIR, DRAFTS_DIR, ensureFolderExists } from '../utils';
 
 
@@ -31,31 +31,53 @@ export class ScrivenerManager {
             new Notice("⚡️ 準備同步回寫 (Sync)...");
             await this.syncBack(activeFile, currentFolder);
         } else {
-            const files = currentFolder.children.filter((f) =>
-                f instanceof TFile && f.extension === 'md' && f.name !== DRAFT_FILENAME &&
-                !f.name.includes("Script") && !f.name.includes("_History") && !f.name.startsWith("_")
-            ) as TFile[];
+            // 🔥 防自爆機制：檢查資料夾內是否已經存在未同步的草稿！
+            const draftPath = `${currentFolder.path}/${DRAFT_FILENAME}`;
+            const existingDraft = this.app.vault.getAbstractFileByPath(draftPath);
 
-            files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+            // 將原本的編譯邏輯包裝成一個函數，方便稍後呼叫
+            const startCompileProcess = () => {
+                const files = currentFolder.children.filter((f) =>
+                    f instanceof TFile && f.extension === 'md' && f.name !== DRAFT_FILENAME &&
+                    !f.name.includes("Script") && !f.name.includes("_History") && !f.name.startsWith("_")
+                ) as TFile[];
 
-            if (files.length === 0) { new Notice("⚠️ 資料夾內沒有可串聯的檔案。"); return; }
+                files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
-            let targetFileName = activeFile.name;
-            let targetSceneRaw = "";
-            const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-            if (view) {
-                const editor = view.editor;
-                const cursor = editor.getCursor();
-                for (let i = cursor.line; i >= 0; i--) {
-                    const line = editor.getLine(i);
-                    if (line.trim().startsWith("######")) { targetSceneRaw = line.trim(); break; }
+                if (files.length === 0) { new Notice("⚠️ 資料夾內沒有可串聯的檔案。"); return; }
+
+                let targetFileName = activeFile.name;
+                let targetSceneRaw = "";
+                const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+                if (view) {
+                    const editor = view.editor;
+                    const cursor = editor.getCursor();
+                    for (let i = cursor.line; i >= 0; i--) {
+                        const line = editor.getLine(i);
+                        if (line.trim().startsWith("######")) { targetSceneRaw = line.trim(); break; }
+                    }
                 }
-            }
 
-            new ChapterSelectionModal(this.app, files, async (selectedFiles) => {
-                new Notice("⚡️ 準備串聯編譯...");
-                await this.compileDraft(currentFolder, selectedFiles, targetFileName, targetSceneRaw);
-            }).open();
+                new ChapterSelectionModal(this.app, files, async (selectedFiles) => {
+                    new Notice("⚡️ 準備串聯編譯...");
+                    await this.compileDraft(currentFolder, selectedFiles, targetFileName, targetSceneRaw);
+                }).open();
+            };
+
+            // 🔥 核心攔截：如果發現舊草稿，彈出超嚴重警告視窗！
+            if (existingDraft instanceof TFile) {
+                new SimpleConfirmModal(
+                    this.app,
+                    "🚨 嚴重警告：發現未同步的串聯草稿！\n\n此資料夾內已經有一個串聯草稿存在。如果您現在重新啟動串聯模式，舊草稿中【所有未同步的修改】將會被徹底覆寫並永久遺失！\n\n確定要強行覆寫嗎？\n(強烈建議先按「取消」，打開該草稿並點擊「💾 同步並結束」)",
+                    () => {
+                        // 用家確認要強行覆寫，先放行
+                        startCompileProcess();
+                    }
+                ).open();
+            } else {
+                // 如果無舊草稿，直接正常啟動
+                startCompileProcess();
+            }
         }
     }
 

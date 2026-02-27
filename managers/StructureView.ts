@@ -3,6 +3,7 @@ import Sortable from 'sortablejs';
 import NovelSmithPlugin from '../main';
 import { SimpleConfirmModal } from '../modals';
 import { DRAFT_FILENAME } from '../utils';
+import { t } from '../locales';
 
 export const VIEW_TYPE_STRUCTURE = "novelsmith-structure-view";
 
