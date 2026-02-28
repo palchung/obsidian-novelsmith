@@ -151,6 +151,11 @@ export default class NovelSmithPlugin extends Plugin {
                 const view = this.app.workspace.getActiveViewOfType(MarkdownView);
                 if (view) {
                     if (!checking && this.checkInBookFolder(view.file)) {
+                        // 🔥 防呆海關：檢查是否已設定匯出路徑
+                        if (!this.settings.exportFolderPath || this.settings.exportFolderPath.trim() === "") {
+                            new Notice("⚠️ 請先到設定頁面 (Settings) 設定您的「編譯匯出路徑」！");
+                            return true;
+                        }
                         this.compilerManager.openCompileModal(view);
                     }
                     return true;
@@ -300,6 +305,11 @@ export default class NovelSmithPlugin extends Plugin {
                 const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
                 if (markdownView) {
                     if (!checking && this.checkInBookFolder(markdownView.file)) {
+                        // 🔥 防呆海關：檢查是否已設定百科路徑
+                        if (!this.settings.wikiFolderPath || this.settings.wikiFolderPath.trim() === "") {
+                            new Notice("⚠️ 請先到設定頁面 (Settings) 設定您的「百科存放資料夾」！");
+                            return true;
+                        }
                         this.wikiManager.scanAndCreateWiki(markdownView);
                     }
                     return true;
@@ -333,7 +343,7 @@ export default class NovelSmithPlugin extends Plugin {
     public checkInBookFolderSilent(file: TFile | null): boolean {
         if (!file) return false;
         const bookFolder = this.settings.bookFolderPath;
-        if (!bookFolder) return true;
+        if (!bookFolder || bookFolder.trim() === "") return false;
 
         // 🔥 絕對結界：靜默攔截所有後台操作
         if (file.path.includes(`/${BACKSTAGE_DIR}/`)) return false;
@@ -348,7 +358,12 @@ export default class NovelSmithPlugin extends Plugin {
         }
 
         const bookFolder = this.settings.bookFolderPath;
-        if (!bookFolder) return true;
+
+        // 🔥 修復：如果未設定資料夾，彈出溫馨提示，並阻擋所有操作！
+        if (!bookFolder || bookFolder.trim() === "") {
+            new Notice("⚠️ 歡迎使用 NovelSmith！請先到設定頁面 (Settings) 設定您的「專屬寫作資料夾」並進行初始化。");
+            return false;
+        }
 
         // 🔥 絕對結界：如果路徑包含 _Backstage，一律落閘放狗！
         if (file.path.includes(`/${BACKSTAGE_DIR}/`)) {

@@ -9,10 +9,10 @@ export interface NovelSmithSettings {
 }
 
 export const DEFAULT_SETTINGS: NovelSmithSettings = {
-    bookFolderPath: 'MyBook',
+    bookFolderPath: '',
     keepDraftOnSync: false,
-    wikiFolderPath: 'MyBook/Wiki',
-    exportFolderPath: 'Output'
+    wikiFolderPath: '',
+    exportFolderPath: ''
 }
 
 export class NovelSmithSettingTab extends PluginSettingTab {
@@ -44,6 +44,27 @@ export class NovelSmithSettingTab extends PluginSettingTab {
                     this.plugin.settings.bookFolderPath = value;
                     await this.plugin.saveSettings();
                 }));
+
+        new Setting(containerEl)
+            .setName("🎉 初始化 NovelSmith")
+            .setDesc("一鍵建立您的專屬寫作資料夾、_Backstage 系統後台，並生成新手劇情卡片範本。")
+            .addButton(btn => btn
+                .setButtonText("🚀 立即初始化")
+                .setCta() // 變成醒目的主按鈕顏色
+                .onClick(async () => {
+                    const folder = this.plugin.settings.bookFolderPath;
+                    if (!folder || folder.trim() === "") {
+                        new Notice("⚠️ 請先在上方輸入您想要的「資料夾名稱」！");
+                        return;
+                    }
+
+                    // 呼叫 main.ts 裡面的強大生成器！
+                    // forceShowNotice = true, openAfterCreate = true
+                    await this.plugin.ensureTemplateFileExists(true, true);
+                    new Notice(`✅ 初始化成功！您的寫作基地 [${folder}] 已準備就緒！`);
+                })
+            );
+
 
         new Setting(containerEl)
             .setName('同步後保留草稿紀錄')
