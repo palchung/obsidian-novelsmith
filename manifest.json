@@ -3,7 +3,7 @@
     "name": "NovelSmith",
     "version": "1.0.0",
     "minAppVersion": "0.15.0",
-    "description": "An industrial-grade writing system for the epic novel 'Sword and Sheaves'.",
+    "description": "Forge your novel, one scene at a time. A Scrivener-inspired writing environment.",
     "author": "Fong Leng",
     "authorUrl": "https://github.com/fongleng",
     "isDesktopOnly": false
