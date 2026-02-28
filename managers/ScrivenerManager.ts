@@ -3,7 +3,7 @@ import { App, Notice, TFile, TFolder, MarkdownView, moment } from 'obsidian';
 import { parseContent, RE_FILE_ID, DraftCard } from '../utils';
 import { NovelSmithSettings } from '../settings';
 import { ChapterSelectionModal, SimpleConfirmModal } from '../modals';
-import { DRAFT_FILENAME, TEMPLATES_DIR, DRAFTS_DIR, ensureFolderExists } from '../utils';
+import { generateSceneId, DRAFT_FILENAME, TEMPLATES_DIR, DRAFTS_DIR, ensureFolderExists } from '../utils';
 import { t } from '../locales';
 
 export class ScrivenerManager {
@@ -242,7 +242,7 @@ export class ScrivenerManager {
                 } else {
                     if (!draftCard.key) continue;
                     let uuid = draftCard.id;
-                    if (!uuid) uuid = crypto.randomUUID().substring(0, 8);
+                    if (!uuid) uuid = generateSceneId();
                     const idTag = ` <span class="ns-id" data-scene-id="${uuid}"></span>`;
 
                     let cleanRawHeader = draftCard.rawHeader.replace(/<span.*?<\/span>/g, "").trimEnd();

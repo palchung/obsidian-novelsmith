@@ -1,7 +1,7 @@
 import { App, Notice, MarkdownView, EditorPosition, TFile } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 import { InputModal, GenericSuggester, SceneCreateModal } from '../modals';
-import { TEMPLATES_DIR } from '../utils';
+import { generateSceneId, TEMPLATES_DIR, parseUniversalScenes } from '../utils';
 import NovelSmithPlugin from '../main';
 
 export class PlotManager {
@@ -19,26 +19,38 @@ export class PlotManager {
         this.settings = newSettings;
     }
 
+    // ==========================================
+    // 🔥 效能優化：範本快取 (Template Cache)
+    // ==========================================
+    private templateCache: string | null = null;
+    private templateCacheTime: number = 0;
+
     private async getTemplateContent(sceneName: string, colorId: string = "default"): Promise<string> {
         const tplPath = `${this.settings.bookFolderPath}/${TEMPLATES_DIR}/NovelSmith_Template.md`;
         let templateText = "";
         const tplFile = this.app.vault.getAbstractFileByPath(tplPath);
-        const uuid = crypto.randomUUID().substring(0, 8);
+        const uuid = generateSceneId();
 
+        // 智能判斷 Callout 類型 (配合顏色連動)
         const calloutType = colorId === "default" ? "NSmith" : `NSmith-${colorId}`;
 
         if (tplFile instanceof TFile) {
-            templateText = await this.app.vault.read(tplFile);
-            // 🔥 魔術替換：喺原本嘅 UUID 後面靜靜雞攝入 data-color
+            // 🔥 核心魔法：檢查快取！如果檔案無被修改過，直接使用記憶體版本
+            if (this.templateCache && tplFile.stat.mtime === this.templateCacheTime) {
+                templateText = this.templateCache;
+            } else {
+                // 如果係第一次開，或者用家改過個範本，先至重新讀取硬碟
+                templateText = await this.app.vault.read(tplFile);
+                this.templateCache = templateText;
+                this.templateCacheTime = tplFile.stat.mtime;
+            }
+
             templateText = templateText.replace(/data-scene-id="{{UUID}}">/, `data-scene-id="{{UUID}}" data-color="${colorId}">`);
-            // 如果係自訂範本，嘗試將 [!NSmith] 換成對應顏色
+            // 動態轉換範本入面的 Callout 顏色
             templateText = templateText.replace(/> \[!NSmith\]/, `> [!${calloutType}]`);
         } else {
-            // 🔥 換上動態 Callout 類型
             templateText = `###### 🎬 {{SceneName}} <span class="ns-id" data-scene-id="${uuid}" data-color="${colorId}"></span>\n> [!${calloutType}] 情節資訊\n> - Time:: \n> - POV:: \n> - Status:: #Writing\n> - Note:: \n\n`;
         }
-
-
 
         return templateText
             .replace(/{{SceneName}}/g, sceneName)
@@ -95,30 +107,17 @@ export class PlotManager {
         const cursor = editor.getCursor();
         const lineCount = editor.lineCount();
 
-        let parentHeaderLine = -1;
-        for (let i = cursor.line; i >= 0; i--) {
-            const line = editor.getLine(i).trim();
-            if (line.startsWith("######")) {
-                parentHeaderLine = i;
-                break;
-            }
-        }
-
-        let metadataLines: string[] = [];
-        if (parentHeaderLine !== -1) {
-            for (let i = parentHeaderLine + 1; i < lineCount; i++) {
-                const line = editor.getLine(i).trim();
-                if (line === "" || (!line.startsWith(">") && !line.startsWith("- "))) break;
-                metadataLines.push(editor.getLine(i));
-            }
-        }
+        // 🔥 P2 架構重構：直接呼叫全域雷達，秒速定位當前游標所在的卡片與屬性！
+        const parsedScenes = parseUniversalScenes(editor.getValue());
+        const currentScene = [...parsedScenes].reverse().find(s => s.lineIndex <= cursor.line);
+        let metadataLines: string[] = currentScene ? currentScene.meta : [];
 
         // 🔥 升級版：分拆時都可以揀色！
         new SceneCreateModal(this.app, "🔪 分拆新情節", "", async (newSceneName, colorId) => {
             if (!newSceneName) return;
 
             let newContent = "";
-            const uuid = crypto.randomUUID().substring(0, 8);
+            const uuid = generateSceneId();
 
             if (metadataLines.length > 0) {
                 // 🔥 分拆時加入 data-color
@@ -166,27 +165,15 @@ export class PlotManager {
             return;
         }
 
-        const allScenes: { label: string, line: number, raw: string }[] = [];
-        const htmlCommentStart = "<" + "!--";
-
-        for (let i = 0; i < lineCount; i++) {
-            const line = editor.getLine(i).trim();
-            if (line.startsWith("######") && i !== targetHeaderLine) {
-                let cleanLabel = line.replace(/######\s*/, "").replace(/^🎬\s*/, "");
-                if (cleanLabel.includes(htmlCommentStart)) {
-                    cleanLabel = cleanLabel.split(htmlCommentStart)[0];
-                }
-                if (cleanLabel.includes("<span")) cleanLabel = cleanLabel.split("<span")[0];
-                if (cleanLabel.includes("<small>")) cleanLabel = cleanLabel.split("<small>")[0];
-                cleanLabel = cleanLabel.trim();
-
-                allScenes.push({
-                    label: cleanLabel,
-                    line: i,
-                    raw: line
-                });
-            }
-        }
+        // 🔥 P2 架構重構：呼叫全域雷達，瞬間取得所有乾淨的場景資料！
+        const parsedScenes = parseUniversalScenes(editor.getValue());
+        const allScenes = parsedScenes
+            .filter(s => s.lineIndex !== targetHeaderLine)
+            .map(s => ({
+                label: s.title,
+                line: s.lineIndex,
+                raw: s.rawHeader
+            }));
 
         if (allScenes.length === 0) {
             new Notice("⚠️ 找不到其他情節可以合併");

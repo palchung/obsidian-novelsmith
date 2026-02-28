@@ -2,7 +2,7 @@ import { App, Notice, MarkdownView, TFile } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 // 🔥 引入新視窗
 import { CompileModal, CompileOptions, ChapterSelectionModal } from '../modals';
-import { DRAFT_FILENAME, RE_FILE_ID_HEADING, RE_FOLDER_HEADING, RE_SCENE_INFO } from '../utils';
+import { ensureFolderExists, DRAFT_FILENAME, RE_FILE_ID_HEADING, RE_FOLDER_HEADING, RE_SCENE_INFO } from '../utils';
 
 export class CompilerManager {
     app: App;
@@ -128,8 +128,8 @@ export class CompilerManager {
             content = content.replace(RE_FILE_ID_HEADING, "");
             content = content.replace(RE_FOLDER_HEADING, "");
 
-            // 🔥 致命 Bug 修復：徹底清除情節標題尾隨的隱形 ID 標籤，確保文稿 100% 乾淨出街！
-            content = content.replace(/<span class="ns-id" data-scene-id=".*?"><\/span>/g, "");
+            // 🔥 升級版：無論裡面加咗 data-color 定其他屬性，一律通殺！
+            content = content.replace(/<span class="ns-id"[^>]*><\/span>/g, "");
 
             // H. 壓縮空行
             content = content.replace(/\n{3,}/g, "\n\n");
@@ -145,9 +145,8 @@ export class CompilerManager {
 
         // 2. 寫入目標位置
         const exportFolder = this.settings.exportFolderPath || "Output";
-        if (!this.app.vault.getAbstractFileByPath(exportFolder)) {
-            await this.app.vault.createFolder(exportFolder);
-        }
+        // 🔥 升級版：支援無限多層資料夾自動建立
+        await ensureFolderExists(this.app, exportFolder);
 
         // 🔥 防撞名升級：時間戳記加入秒數 (HHmmss)
         const timestamp = window.moment().format("YYYYMMDD_HHmmss");

@@ -1,7 +1,7 @@
 import { App, Notice, MarkdownView, TFile, TFolder, moment } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 import { SimpleConfirmModal } from '../modals';
-import { extractSceneColor, getColorById, extractSceneId, cleanSceneTitle, RE_EXTRACT_ID, DRAFT_FILENAME, BACKSTAGE_DIR, SCENE_DB_FILE, ensureFolderExists } from '../utils';
+import { isScriveningsDraft, generateSceneId, parseUniversalScenes, extractSceneColor, getColorById, extractSceneId, cleanSceneTitle, RE_EXTRACT_ID, DRAFT_FILENAME, BACKSTAGE_DIR, SCENE_DB_FILE, ensureFolderExists } from '../utils';
 
 
 interface SceneData {
@@ -18,6 +18,7 @@ export class SceneManager {
     // 🔥 效能引擎：防抖計時器
     private dbTimer: number | null = null;
     private dbInFlight: Promise<void> | null = null;
+    private dbPending: boolean = false;
 
     // 🔥 終極省電優化：加入增量更新快取，記錄檔案的路徑、最後修改時間與情節數據
     private fileCache: Map<string, { mtime: number, scenes: SceneData[] }> = new Map();
@@ -32,11 +33,29 @@ export class SceneManager {
         if (this.dbTimer) window.clearTimeout(this.dbTimer);
         this.dbTimer = window.setTimeout(() => {
             this.dbTimer = null;
-            this.dbInFlight = this.generateDatabase()
-                .catch(e => console.error("NovelSmith DB 更新失敗", e))
-                .finally(() => { this.dbInFlight = null; });
+            this.triggerDatabaseGeneration();
         }, delayMs);
     }
+
+
+    // 🔥 新增：互斥鎖與排隊系統 (Mutex Lock & Queue)
+    private async triggerDatabaseGeneration() {
+        if (this.dbInFlight) {
+            this.dbPending = true; // 前面有人寫緊，舉手排隊先
+            return;
+        }
+
+        this.dbInFlight = (async () => {
+            do {
+                this.dbPending = false;
+                await this.generateDatabase().catch(e => console.error("NovelSmith DB 更新失敗", e));
+            } while (this.dbPending); // 如果寫緊期間有人排隊，就無縫接軌再做一次！
+        })();
+
+        await this.dbInFlight;
+        this.dbInFlight = null;
+    }
+
 
     async assignIDs(view: MarkdownView) {
         new SimpleConfirmModal(this.app, "這將會為所有情節標題添加隱形 ID，確定嗎？", async () => {
@@ -55,7 +74,7 @@ export class SceneManager {
             const line = editor.getLine(i);
             if (line.trim().startsWith("######")) {
                 if (!RE_EXTRACT_ID.test(line)) {
-                    const uuid = crypto.randomUUID().substring(0, 8);
+                    const uuid = generateSceneId();
                     const idTag = ` <span class="ns-id" data-scene-id="${uuid}"></span>`;
                     newLines.push(line.trimEnd() + idTag);
                     hasChanges = true;
@@ -84,7 +103,7 @@ export class SceneManager {
         let filesChanged = 0;
         for (const file of files) {
             let content = await this.app.vault.read(file);
-            if (content.includes('++ FILE_ID:') || content.includes('## 📜')) continue;
+            if (isScriveningsDraft(content)) continue;
 
             let lines = content.split("\n");
             let fileHasChanges = false;
@@ -93,7 +112,7 @@ export class SceneManager {
             for (const line of lines) {
                 if (line.trim().startsWith("######")) {
                     if (!RE_EXTRACT_ID.test(line)) {
-                        const uuid = crypto.randomUUID().substring(0, 8);
+                        const uuid = generateSceneId();
                         const idTag = ` <span class="ns-id" data-scene-id="${uuid}"></span>`;
                         newLines.push(line.trimEnd() + idTag);
                         fileHasChanges = true;
@@ -143,7 +162,7 @@ export class SceneManager {
             if (isEditing || !this.fileCache.has(file.path) || this.fileCache.get(file.path)!.mtime !== file.stat.mtime) {
                 const content = isEditing ? view.editor.getValue() : await this.app.vault.read(file);
 
-                if (content.includes('++ FILE_ID:') || content.includes('## 📜')) continue;
+                if (isScriveningsDraft(content)) continue;
 
                 fileScenes = this.extractScenesFromFile(content.split("\n"));
 
@@ -200,27 +219,13 @@ export class SceneManager {
         else await this.app.vault.create(dbPath, dbContent);
     }
 
+    // 🔥 P2 架構重構：直接呼叫 utils 的全域雷達，不再自己寫迴圈掃描！
     private extractScenesFromFile(lines: string[]): SceneData[] {
-        const scenes: SceneData[] = [];
-        let currentScene: SceneData | null = null;
-        const htmlCommentStart = "<" + "!--";
-
-        for (const line of lines) {
-            const trimLine = line.trim();
-            if (trimLine.startsWith("######")) {
-                let uuid = extractSceneId(trimLine) || "";
-                let exactTitle = cleanSceneTitle(trimLine);
-                let colorId = extractSceneColor(trimLine); // 🔥 讀取隱藏顏色
-
-                // 🔥 將 colorId 放入物件
-                currentScene = { id: uuid, title: exactTitle, meta: [], colorId: colorId };
-                scenes.push(currentScene);
-            } else if (currentScene && trimLine.startsWith(">")) {
-                currentScene.meta.push(trimLine);
-            } else if (currentScene && !trimLine.startsWith(">") && trimLine !== "") {
-                currentScene = null;
-            }
-        }
-        return scenes;
+        return parseUniversalScenes(lines).map(scene => ({
+            id: scene.id || "",
+            title: scene.title,
+            meta: scene.meta,
+            colorId: scene.colorId
+        }));
     }
 }

@@ -1,7 +1,7 @@
 import { App, Notice, MarkdownView, TFile } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 import { updateRedundantPatterns } from '../decorators';
-import { AIDS_DIR, ensureFolderExists } from '../utils';
+import { AIDS_DIR, ensureFolderExists, replaceEntireDocument } from '../utils';
 import { CleanDraftModal } from '../modals';
 
 export class WritingManager {
@@ -191,10 +191,14 @@ export class WritingManager {
         }
         allReplacements.sort((a, b) => b.wrong.length - a.wrong.length);
 
-        // 🔥 效能大躍進：預先編譯所有 Regex！(將建立次數由幾萬次降到幾十次)
+        // 🔥 效能大躍進：預先編譯所有 Regex！加上英文單詞邊界防護！
         const compiledReplacements = allReplacements.map(item => {
             const escapedWrong = item.wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            let pattern = escapedWrong;
+
+            // 🔥 防誤傷機制 1：如果錯字係全英文，強制加上單詞邊界 \b
+            const isEnglishWord = /^[a-zA-Z0-9].*[a-zA-Z0-9]$|^[a-zA-Z0-9]$/.test(item.wrong);
+            let pattern = isEnglishWord ? `\\b${escapedWrong}\\b` : escapedWrong;
+
             // 處理正確名稱包含了錯誤名稱的情況 (例如：錯: 小明 -> 正: 王小明)
             if (item.correct.startsWith(item.wrong)) {
                 const suffix = item.correct.slice(item.wrong.length);
@@ -213,16 +217,53 @@ export class WritingManager {
         let totalCount = 0;
         let changesLog: string[] = [];
         const lines = content.split("\n");
+        let inCodeBlock = false;
+        let inYaml = false;
 
-        const processedLines = lines.map(line => {
-            // 略過系統標籤與屬性行
+        const processedLines = lines.map((line, index) => {
+            // ==========================================
+            // 🛡️ 絕對結界 1：大區塊防護 (YAML 與 Code Block)
+            // ==========================================
+            // 1. 跳過 YAML 區塊 (通常在檔案最頂部)
+            if (index === 0 && line.trim() === "---") { inYaml = true; return line; }
+            if (inYaml) { if (line.trim() === "---") inYaml = false; return line; }
+
+            // 2. 跳過 Markdown 程式碼區塊 (```)
+            if (line.trim().startsWith("```")) {
+                inCodeBlock = !inCodeBlock;
+                return line;
+            }
+            if (inCodeBlock) return line;
+
+            // 3. 略過系統標籤與屬性行
             if (line.includes("<small>++ FILE_ID") || line.includes("++ FILE_ID:")) return line;
             if (line.trim().startsWith(">") && line.includes("::")) return line;
 
             let newLine = line;
 
-            // 🔥 大師級優化：利用 replace callback，將 test、match、replace 三個步驟合而為一！
-            // Regex 引擎只需跑 1 次，效能極致發揮！
+            // ==========================================
+            // 🎭 絕對結界 2：「遮罩魔法」(保護同行內的網址/代碼)
+            // ==========================================
+            const masks: { token: string, original: string }[] = [];
+            let maskCounter = 0;
+
+            // 遮蓋網址 (http / https)
+            newLine = newLine.replace(/https?:\/\/[^\s\)]+/g, (match) => {
+                const token = `__NS_MASK_${maskCounter++}__`;
+                masks.push({ token, original: match });
+                return token;
+            });
+
+            // 遮蓋行內代碼 (`code`)
+            newLine = newLine.replace(/`[^`]+`/g, (match) => {
+                const token = `__NS_MASK_${maskCounter++}__`;
+                masks.push({ token, original: match });
+                return token;
+            });
+
+            // ==========================================
+            // ✍️ 執行正字替換
+            // ==========================================
             compiledReplacements.forEach(item => {
                 if (item.regex) {
                     item.regex.lastIndex = 0; // 保險起見重置指標
@@ -235,13 +276,23 @@ export class WritingManager {
                     });
                 }
             });
+
+            // ==========================================
+            // 🪄 解除遮罩：將網址同行內代碼還原！
+            // ==========================================
+            masks.forEach(mask => {
+                newLine = newLine.replace(mask.token, mask.original);
+            });
+
             return newLine;
         });
 
         if (totalCount > 0) {
             const finalContent = processedLines.join("\n");
             if (finalContent !== content) {
-                view.editor.setValue(finalContent);
+                // 🔥 P2 優化：呼叫全域無痕替換
+                replaceEntireDocument(view.editor, finalContent);
+
                 new Notice(`✅ 修正了 ${totalCount} 個錯處。\n` + changesLog.slice(0, 3).join("\n") + (changesLog.length > 3 ? "\n..." : ""), 5000);
             }
         } else {
@@ -266,7 +317,9 @@ export class WritingManager {
             if (options.removeInternalLinks) content = content.replace(/\[\[(?:[^\]]*\|)?([^\]]+)\]\]/g, "$1");
 
             if (content !== originalContent) {
-                view.editor.setValue(content);
+                // 🔥 P2 優化：呼叫全域無痕替換
+                replaceEntireDocument(view.editor, content);
+
                 new Notice("🧹 一鍵定稿完成！選定的標記已清除。");
             } else {
                 new Notice("👌 沒有發現需要清除的標記。");

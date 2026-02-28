@@ -1,7 +1,7 @@
 import { App, Notice, TFile, MarkdownView, moment } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 import { InputModal, GenericSuggester } from '../modals';
-import { HISTORY_DIR, ensureFolderExists, extractSceneId, cleanSceneTitle } from '../utils';
+import { parseUniversalScenes, HISTORY_DIR, ensureFolderExists, extractSceneId, cleanSceneTitle } from '../utils';
 
 export class HistoryManager {
     app: App;
@@ -20,27 +20,15 @@ export class HistoryManager {
         const cursor = editor.getCursor();
         const lineCount = editor.lineCount();
 
-        let headerLineIndex = -1;
-        let headerContent = "";
-        let sceneId = null;
-        let sceneTitle = "";
+        // 🔥 P2 架構重構：全域雷達一秒搞定基礎資料
+        const parsedScenes = parseUniversalScenes(editor.getValue());
+        const currentScene = [...parsedScenes].reverse().find(s => s.lineIndex <= cursor.line);
 
-        for (let i = cursor.line; i >= 0; i--) {
-            const line = editor.getLine(i);
-            if (line.trim().startsWith("######")) {
-                headerLineIndex = i;
-                headerContent = line;
-                break;
-            }
-        }
+        if (!currentScene) return null;
 
-        if (headerLineIndex === -1) return null;
-
-        sceneId = extractSceneId(headerContent);
-        sceneTitle = cleanSceneTitle(headerContent);
-
+        // 依然需要向下尋找此情節的結尾位置 (遇到下個標記或檔案結尾)
         let endLineIndex = lineCount;
-        for (let i = headerLineIndex + 1; i < lineCount; i++) {
+        for (let i = currentScene.lineIndex + 1; i < lineCount; i++) {
             const line = editor.getLine(i);
             if (line.trim().startsWith("######") || line.includes("++ FILE_ID")) {
                 endLineIndex = i;
@@ -49,11 +37,11 @@ export class HistoryManager {
         }
 
         return {
-            id: sceneId,
-            title: sceneTitle,
-            startLine: headerLineIndex,
+            id: currentScene.id,
+            title: currentScene.title,
+            startLine: currentScene.lineIndex,
             endLine: endLineIndex,
-            headerRaw: headerContent
+            headerRaw: currentScene.rawHeader
         };
     }
 

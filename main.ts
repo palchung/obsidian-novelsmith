@@ -10,7 +10,7 @@ import { CompilerManager } from './managers/CompilerManager';
 import { SceneManager } from './managers/SceneManager';
 import { redundantHighlighter, dialogueHighlighter, structureHighlighter } from './decorators';
 import { StructureView, VIEW_TYPE_STRUCTURE } from './managers/StructureView';
-import { DRAFT_FILENAME, BACKSTAGE_DIR, TEMPLATES_DIR, ensureFolderExists } from './utils';
+import { DRAFT_FILENAME, BACKSTAGE_DIR, TEMPLATES_DIR, ensureFolderExists, isScriveningsDraft } from './utils';
 
 export default class NovelSmithPlugin extends Plugin {
     settings: NovelSmithSettings;
@@ -131,7 +131,7 @@ export default class NovelSmithPlugin extends Plugin {
                     if (!checking && this.checkInBookFolder(view.file)) {
                         const content = view.editor.getValue();
                         // 🔥 終極防護網：如果係「封存草稿」，只作普通儲存，絕對不派發 ID！
-                        if (view.file.name !== DRAFT_FILENAME && (content.includes('++ FILE_ID:') || content.includes('## 📜'))) {
+                        if (view.file.name !== DRAFT_FILENAME && (isScriveningsDraft(content))) {
                             new Notice("💾 封存草稿已儲存 (為保護檔案，系統不會在此重新分配 ID)。");
                             return true;
                         }
@@ -180,7 +180,7 @@ export default class NovelSmithPlugin extends Plugin {
                             this.executeSmartSave(markdownView);
                         }
                         // 🔥 防護網升級：只認最核心字眼，新舊草稿通殺！
-                        else if (content.includes('++ FILE_ID:') || content.includes('## 📜')) {
+                        else if (isScriveningsDraft(content)) {
                             new Notice("⛔ 系統拒絕：這是一份串聯草稿檔（或封存草稿），不能在此處啟動串聯模式以免發生無限迴圈！");
                         }
                         // 正常章節檔案，安全啟動串聯模式

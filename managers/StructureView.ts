@@ -2,7 +2,7 @@ import { ItemView, WorkspaceLeaf, MarkdownView, Notice, Menu } from 'obsidian';
 import Sortable from 'sortablejs';
 import NovelSmithPlugin from '../main';
 import { SimpleConfirmModal } from '../modals';
-import { extractSceneId, cleanSceneTitle, DRAFT_FILENAME, extractSceneColor, getColorById, SCENE_COLORS } from '../utils';
+import { isScriveningsDraft, replaceEntireDocument, extractSceneId, cleanSceneTitle, DRAFT_FILENAME, extractSceneColor, getColorById, SCENE_COLORS } from '../utils';
 import { t } from '../locales';
 
 export const VIEW_TYPE_STRUCTURE = "novelsmith-structure-view";
@@ -196,7 +196,7 @@ export class StructureView extends ItemView {
                 if (file.name === DRAFT_FILENAME) {
                     this.plugin.executeSmartSave(view);
                 }
-                else if (content.includes('++ FILE_ID:') || content.includes('## 📜')) {
+                else if (isScriveningsDraft(content)) {
                     new Notice("⛔ 系統拒絕：這是一份封存草稿檔，不能在此處啟動串聯模式以免發生無限迴圈！");
                 }
                 else {
@@ -245,7 +245,7 @@ export class StructureView extends ItemView {
         // 輔助函數：檢查是否為封存草稿 (防呆用)
         const isArchivedDraft = (file: any, content: string) => {
             return file.name !== DRAFT_FILENAME &&
-                (content.includes('++ FILE_ID:') || content.includes('## 📜'));
+                (isScriveningsDraft(content));
         };
 
         const btnInsert = btnRow.createEl("button", { text: "➕ 插入卡片" });
@@ -406,6 +406,11 @@ export class StructureView extends ItemView {
 
             chapter.scenes.forEach((scene) => {
                 const scCard = sceneList.createDiv({ cls: "ns-scene-card" });
+
+                // 🔥 新增呢兩行：將 ID 同標題綁定喺卡片上，作為安全識別碼！
+                scCard.dataset.sceneId = scene.id || "";
+                scCard.dataset.sceneName = scene.name || "";
+
 
                 // 🔥 1. 套用 CSS 顏色濾鏡！
                 const colorObj = getColorById(scene.colorId);
@@ -688,31 +693,81 @@ export class StructureView extends ItemView {
         if (!view) return;
         new Notice("💾 排版更新中...");
 
-        // 🔥 效能優化：改用陣列收集字串，最後一次過 join，速度極快！
+        // =========================================================
+        // 🚨 防禦升級：強制即時讀取最新正文，徹底解決「食字」危機！
+        // =========================================================
+        const liveText = view.editor.getValue();
+        const liveTree = this.parseDocument(liveText); // 即時解剖最新鮮嘅文稿
+
+        const liveSceneMap = new Map<string, string>();
+        const liveChapterPreambleMap = new Map<string, string>();
+        let rootPreamble = "";
+
+        // 將最新鮮嘅內容分門別類，放入字典備用
+        liveTree.forEach(ch => {
+            if (ch.name === "root") {
+                rootPreamble = ch.preamble;
+            } else {
+                liveChapterPreambleMap.set(ch.name, ch.preamble);
+            }
+
+            ch.scenes.forEach(sc => {
+                // 用 ID 做鎖匙，如果未有 ID 就用標題名 (Fallback)
+                const key = sc.id ? sc.id : sc.name;
+                liveSceneMap.set(key, sc.content);
+            });
+        });
+
+        // =========================================================
+        // 🧱 開始根據 DOM 拖拉後嘅「新順序」，重新砌返篇文出嚟
+        // =========================================================
         const chunks: string[] = [];
         if (this.docYaml.trim()) chunks.push(this.docYaml.trim());
+
         const chapterBoxes = container.querySelectorAll(".ns-chapter-box");
 
         chapterBoxes.forEach((box) => {
             const el = box as HTMLElement;
             const chName = el.dataset.name;
-            const chPreamble = this.chapterPreambleMap.get(el) || "";
 
-            if (chName && chName !== "root") {
+            // 1. 處理章節標題同前言
+            if (chName === "root") {
+                if (rootPreamble.trim()) chunks.push(rootPreamble.trim());
+            } else if (chName && chName !== "root") {
                 chunks.push(`# 📄 ${chName}\n<span class="ns-file-id">++ FILE_ID: ${chName} ++</span>`);
+                const chPreamble = liveChapterPreambleMap.get(chName) || "";
+                if (chPreamble.trim()) chunks.push(chPreamble.trim());
             }
-            if (chPreamble.trim()) chunks.push(chPreamble.trim());
 
+            // 2. 處理情節卡片 (用身分證去字典攞最新內容)
             const scenes = el.querySelectorAll(".ns-scene-card");
             scenes.forEach((sc) => {
-                const content = this.sceneContentMap.get(sc as HTMLElement);
+                const scEl = sc as HTMLElement;
+                const scId = scEl.dataset.sceneId;
+                const scName = scEl.dataset.sceneName;
+
+                // 精準對接：優先用 ID 搵，搵唔到先用標題名
+                const content = (scId && liveSceneMap.has(scId))
+                    ? liveSceneMap.get(scId)
+                    : liveSceneMap.get(scName || "");
+
                 if (content && content.trim()) {
                     chunks.push(content.trimEnd());
                 }
             });
         });
 
-        view.editor.setValue(chunks.join("\n\n") + "\n");
+        // =========================================================
+        // ✍️ 寫入編輯器並強制刷新
+        // =========================================================
+
+        const finalText = chunks.join("\n\n") + "\n";
+        // 🔥 P2 優化：無痕替換，完美保留用家的 Ctrl+Z 復原歷史
+        replaceEntireDocument(view.editor, finalText);
+
+        // 🔥 強制清空指紋，令下一次 parseAndRender 100% 重繪最新行數與內容
+        this.lastOutlineHash = "";
+        this.parseAndRender();
     }
 
 
