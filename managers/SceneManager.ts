@@ -1,7 +1,7 @@
 import { App, Notice, MarkdownView, TFile, TFolder, moment } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 import { SimpleConfirmModal } from '../modals';
-import { isScriveningsDraft, generateSceneId, parseUniversalScenes, extractSceneColor, getColorById, extractSceneId, cleanSceneTitle, RE_EXTRACT_ID, DRAFT_FILENAME, BACKSTAGE_DIR, SCENE_DB_FILE, ensureFolderExists } from '../utils';
+import { replaceEntireDocument, ST_WARNING, isScriveningsDraft, generateSceneId, parseUniversalScenes, extractSceneColor, getColorById, extractSceneId, cleanSceneTitle, RE_EXTRACT_ID, DRAFT_FILENAME, BACKSTAGE_DIR, SCENE_DB_FILE, ensureFolderExists } from '../utils';
 
 
 interface SceneData {
@@ -70,23 +70,41 @@ export class SceneManager {
         const newLines: string[] = [];
         let hasChanges = false;
 
+        // 🔥 終極修復：準備一本「身分證登記冊」，防止 Copy & Paste 造成的雙胞胎！
+        const seenIds = new Set<string>();
+
         for (let i = 0; i < lineCount; i++) {
             const line = editor.getLine(i);
             if (line.trim().startsWith("######")) {
-                if (!RE_EXTRACT_ID.test(line)) {
-                    const uuid = generateSceneId();
-                    const idTag = ` <span class="ns-id" data-scene-id="${uuid}"></span>`;
+                const idMatch = line.match(RE_EXTRACT_ID);
+
+                if (!idMatch) {
+                    // 情況 A：完全無 ID -> 派發新 ID
+                    const idTag = ` <span class="ns-id" data-scene-id="${generateSceneId()}" data-warning="${ST_WARNING}"></span>`;
                     newLines.push(line.trimEnd() + idTag);
                     hasChanges = true;
                 } else {
-                    newLines.push(line);
+                    const currentId = idMatch[1];
+                    if (seenIds.has(currentId)) {
+                        // 情況 B：發現雙胞胎 (ID 重複)！-> 強制換新 ID
+                        const newId = generateSceneId();
+                        const fixedLine = line.replace(currentId, newId);
+                        newLines.push(fixedLine);
+                        seenIds.add(newId);
+                        hasChanges = true;
+                        console.log(`NovelSmith 攔截：發現重複 ID ${currentId}，已自動更換為 ${newId}`);
+                    } else {
+                        // 情況 C：合法 ID -> 記錄在案，直接放行
+                        seenIds.add(currentId);
+                        newLines.push(line);
+                    }
                 }
             } else {
                 newLines.push(line);
             }
         }
 
-        if (hasChanges) editor.setValue(newLines.join("\n"));
+        if (hasChanges) replaceEntireDocument(editor, newLines.join("\n"));
         this.scheduleGenerateDatabase();
     }
 
@@ -94,13 +112,16 @@ export class SceneManager {
 
 
     async assignIDsToAllFiles(folder: TFolder) {
-
         const files = folder.children.filter(f =>
             f instanceof TFile && f.extension === 'md' && !f.name.startsWith("_") &&
             f.name !== DRAFT_FILENAME
         ) as TFile[];
 
         let filesChanged = 0;
+
+        // 🔥 升級：將 seenIds 放在檔案迴圈的「外面」，進行跨檔案的終極查重！
+        const seenIds = new Set<string>();
+
         for (const file of files) {
             let content = await this.app.vault.read(file);
             if (isScriveningsDraft(content)) continue;
@@ -111,19 +132,38 @@ export class SceneManager {
 
             for (const line of lines) {
                 if (line.trim().startsWith("######")) {
-                    if (!RE_EXTRACT_ID.test(line)) {
-                        const uuid = generateSceneId();
-                        const idTag = ` <span class="ns-id" data-scene-id="${uuid}"></span>`;
+                    const idMatch = line.match(RE_EXTRACT_ID);
+
+                    if (!idMatch) {
+                        // 情況 A：無 ID -> 派發
+                        const idTag = ` <span class="ns-id" data-scene-id="${generateSceneId()}" data-warning="${ST_WARNING}"></span>`;
                         newLines.push(line.trimEnd() + idTag);
                         fileHasChanges = true;
-                    } else newLines.push(line);
+                    } else {
+                        const currentId = idMatch[1];
+                        if (seenIds.has(currentId)) {
+                            // 情況 B：跨檔案/同檔案發現重複 ID！-> 強制換新
+                            const newId = generateSceneId();
+                            const fixedLine = line.replace(currentId, newId);
+                            newLines.push(fixedLine);
+                            seenIds.add(newId);
+                            fileHasChanges = true;
+                            console.log(`NovelSmith 攔截：檔案 ${file.name} 發現重複 ID ${currentId}，已更換為 ${newId}`);
+                        } else {
+                            // 情況 C：合法 ID -> 記錄在案
+                            seenIds.add(currentId);
+                            newLines.push(line);
+                        }
+                    }
                 } else newLines.push(line);
             }
+
             if (fileHasChanges) {
                 await this.app.vault.modify(file, newLines.join("\n"));
                 filesChanged++;
             }
         }
+
         if (filesChanged > 0) this.scheduleGenerateDatabase();
     }
 
@@ -150,6 +190,22 @@ export class SceneManager {
                 return true;
             })
             .sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true }));
+
+        // =========================================================
+        // 🔥 企業級防護 2：清理幽靈快取 (Purge Dead Cache)
+        // =========================================================
+        const validPaths = new Set(files.map(f => f.path));
+        for (const cachePath of this.fileCache.keys()) {
+            if (!validPaths.has(cachePath)) {
+                this.fileCache.delete(cachePath); // 把已經不存在的檔案從記憶體中踢走！
+                console.log(`NovelSmith 系統優化：已清除幽靈快取 ${cachePath}`);
+            }
+        }
+        // =========================================================
+
+
+
+
 
         let dbContent = `---\nTry: Dataview_Target\nUpdated: ${moment().format("YYYY-MM-DD HH:mm:ss")}\n---\n\n# 📊 場景數據庫 (系統自動生成)\n> [!warning] 請勿手動修改此檔案\n\n`;
         const view = this.app.workspace.getActiveViewOfType(MarkdownView);

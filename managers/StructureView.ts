@@ -49,6 +49,7 @@ export class StructureView extends ItemView {
 
     // 🔥 新增：防止選單「穿透點擊 (Ghost Click)」的無敵護盾
     private isMenuClicking: boolean = false;
+    private renderTimer: number | null = null;
 
     private activeTab: 'outline' | 'history' | 'info' = 'outline';
     private selectedSceneId: string | null = null;
@@ -90,7 +91,11 @@ export class StructureView extends ItemView {
             }
         }));
         this.registerEvent(this.app.workspace.on('editor-change', () => {
-            if (this.activeTab === 'outline') setTimeout(() => this.parseAndRender(), 500);
+            if (this.activeTab === 'outline') {
+                // 🔥 終極修復：真正的防抖 (Debounce)！有新輸入就取消舊的排隊！
+                if (this.renderTimer) window.clearTimeout(this.renderTimer);
+                this.renderTimer = window.setTimeout(() => this.parseAndRender(), 500);
+            }
         }));
         this.registerDomEvent(document, 'mouseup', () => {
             if (this.activeTab === 'history' || this.activeTab === 'info') setTimeout(() => this.parseAndRender(), 100);
@@ -117,58 +122,55 @@ export class StructureView extends ItemView {
         }
         this.isRefreshing = true;
 
-        const container = this.contentEl.querySelector(".ns-structure-container") as HTMLElement;
-        if (!container) { this.isRefreshing = false; return; }
 
-        // 🔥 使用精準鎖定雷達
-        const view = this.getValidMarkdownView();
 
-        // 🔥 指紋檢查邏輯：如果大綱沒變，直接退出，節省 iPad 電量！
-        if (view && this.activeTab === 'outline') {
-            const editor = view.editor;
-            const lineCount = editor.lineCount();
-            let hashBuilder = "";
+        // 🔥 升級 2：加入 try...finally 無敵解鎖結界
+        try {
+            const container = this.contentEl.querySelector(".ns-structure-container") as HTMLElement;
+            if (!container) return; // 唔使再自己寫 this.isRefreshing = false 啦，finally 會幫你做！
 
-            // 🔥 終極省電優化：放棄 split("\n")，改用 getLine 逐行讀取。
-            // 完全零 Array 記憶體分配，大幅減輕 iPad 垃圾回收 (GC) 負擔！
-            for (let i = 0; i < lineCount; i++) {
-                const line = editor.getLine(i);
-                if (line.startsWith("#") || line.startsWith("<small>")) {
-                    hashBuilder += line + "|";
+            const view = this.getValidMarkdownView();
+
+            if (view && this.activeTab === 'outline') {
+                const editor = view.editor;
+                const lineCount = editor.lineCount();
+                let hashBuilder = "";
+
+                for (let i = 0; i < lineCount; i++) {
+                    const line = editor.getLine(i);
+                    if (line.startsWith("#") || line.startsWith("<small>")) {
+                        hashBuilder += line + "|";
+                    }
                 }
+
+                if (hashBuilder === this.lastOutlineHash) return;
+                this.lastOutlineHash = hashBuilder;
             }
 
-            if (hashBuilder === this.lastOutlineHash) {
-                this.isRefreshing = false;
-                return; // 結構無變，直接收工，零消耗！
+            container.empty();
+            this.renderHeader(container, view);
+
+            const contentDiv = container.createDiv({ cls: "ns-tab-content" });
+            contentDiv.style.marginTop = "10px";
+
+            if (!view) {
+                contentDiv.setText("⚠️ 請先打開一篇筆記");
+                return;
             }
-            this.lastOutlineHash = hashBuilder;
-        }
 
-        container.empty();
-        this.renderHeader(container, view);
+            if (this.activeTab === 'outline') await this.renderOutline(contentDiv, view);
+            else if (this.activeTab === 'info') await this.renderInfo(contentDiv, view);
+            else await this.renderHistory(contentDiv, view);
 
-        const contentDiv = container.createDiv({ cls: "ns-tab-content" });
-        contentDiv.style.marginTop = "10px";
-
-        if (!view) {
-            contentDiv.setText("⚠️ 請先打開一篇筆記");
+        } finally {
+            // 🔥 無論上面嘅渲染過程係成功定係 Error 崩潰，最後一定會執行呢度！
+            // 保證大綱面板絕對唔會永久卡死！
             this.isRefreshing = false;
-            return;
+            if (this.pendingRefresh) {
+                this.pendingRefresh = false;
+                this.parseAndRender();
+            }
         }
-
-        if (this.activeTab === 'outline') await this.renderOutline(contentDiv, view);
-        else if (this.activeTab === 'info') await this.renderInfo(contentDiv, view);
-        else await this.renderHistory(contentDiv, view);
-
-        this.isRefreshing = false;
-
-        // 🔥 做完之後，檢查頭先有冇人排隊，有就即刻補做一次！
-        if (this.pendingRefresh) {
-            this.pendingRefresh = false;
-            this.parseAndRender();
-        }
-
 
     }
 
@@ -388,6 +390,9 @@ export class StructureView extends ItemView {
 
         if (tree.length === 0) { container.setText("📭 找不到章節或情節標記"); return; }
 
+        // 🔥 防禦結界 1：準備一個計數機，專門對付無 ID 嘅雙胞胎！
+        const renderNameCount = new Map<string, number>();
+
         tree.forEach((chapter, chIndex) => {
             if (chapter.name === "root" && chapter.scenes.length === 0) return;
 
@@ -406,6 +411,18 @@ export class StructureView extends ItemView {
 
             chapter.scenes.forEach((scene) => {
                 const scCard = sceneList.createDiv({ cls: "ns-scene-card" });
+
+                // ==========================================
+                // 🔥 核心修復：生成絕對防撞名的 Safe Key！
+                // ==========================================
+                let safeKey = scene.id;
+                if (!safeKey) {
+                    const count = renderNameCount.get(scene.name) || 0;
+                    safeKey = `NO_ID_${scene.name}_${count}`;
+                    renderNameCount.set(scene.name, count + 1);
+                }
+                scCard.dataset.safeKey = safeKey; // 狠狠地綁定落去張卡度！
+
 
                 // 🔥 新增呢兩行：將 ID 同標題綁定喺卡片上，作為安全識別碼！
                 scCard.dataset.sceneId = scene.id || "";
@@ -485,7 +502,7 @@ export class StructureView extends ItemView {
     }
 
     async renderHistory(container: HTMLElement, view: MarkdownView) {
-        if (view.file && !view.file.path.includes("版本預覽_Temp")) {
+        if (view.file && !view.file.path.includes("preview_Temp")) {
             const editor = view.editor;
             const cursor = editor.getCursor();
             let foundTitle = null; let foundId = null;
@@ -691,19 +708,34 @@ export class StructureView extends ItemView {
 
     async saveChanges(container: HTMLElement, view: MarkdownView) {
         if (!view) return;
+
+        const liveText = view.editor.getValue();
+        const liveTree = this.parseDocument(liveText);
+
+        // =========================================================
+        // 🚨 防禦結界 2A：「防吞字」數量核對系統！
+        // =========================================================
+        let liveSceneCount = 0;
+        liveTree.forEach(ch => liveSceneCount += ch.scenes.length);
+        const domScenes = container.querySelectorAll(".ns-scene-card");
+
+        if (liveSceneCount !== domScenes.length) {
+            new Notice("⚠️ 偵測到文稿有未刷新的新增內容！為保護資料，本次拖拉已取消。請稍候一秒！");
+            this.parseAndRender(); // 強制重繪大綱，還原視覺拖拉
+            return;
+        }
+
         new Notice("💾 排版更新中...");
 
         // =========================================================
-        // 🚨 防禦升級：強制即時讀取最新正文，徹底解決「食字」危機！
+        // 🛡️ 防禦結界 2B：防撞名字典 (Safe Key Map)
         // =========================================================
-        const liveText = view.editor.getValue();
-        const liveTree = this.parseDocument(liveText); // 即時解剖最新鮮嘅文稿
-
         const liveSceneMap = new Map<string, string>();
         const liveChapterPreambleMap = new Map<string, string>();
         let rootPreamble = "";
 
-        // 將最新鮮嘅內容分門別類，放入字典備用
+        const liveNameCount = new Map<string, number>();
+
         liveTree.forEach(ch => {
             if (ch.name === "root") {
                 rootPreamble = ch.preamble;
@@ -712,14 +744,19 @@ export class StructureView extends ItemView {
             }
 
             ch.scenes.forEach(sc => {
-                // 用 ID 做鎖匙，如果未有 ID 就用標題名 (Fallback)
-                const key = sc.id ? sc.id : sc.name;
+                // 用同一套邏輯，為即時正文計算出對應的 Safe Key
+                let key = sc.id;
+                if (!key) {
+                    const count = liveNameCount.get(sc.name) || 0;
+                    key = `NO_ID_${sc.name}_${count}`;
+                    liveNameCount.set(sc.name, count + 1);
+                }
                 liveSceneMap.set(key, sc.content);
             });
         });
 
         // =========================================================
-        // 🧱 開始根據 DOM 拖拉後嘅「新順序」，重新砌返篇文出嚟
+        // 🧱 開始根據 DOM 拖拉後嘅「新順序」，精準重新砌返篇文！
         // =========================================================
         const chunks: string[] = [];
         if (this.docYaml.trim()) chunks.push(this.docYaml.trim());
@@ -730,7 +767,7 @@ export class StructureView extends ItemView {
             const el = box as HTMLElement;
             const chName = el.dataset.name;
 
-            // 1. 處理章節標題同前言
+            // 1. 章節標題與前言
             if (chName === "root") {
                 if (rootPreamble.trim()) chunks.push(rootPreamble.trim());
             } else if (chName && chName !== "root") {
@@ -739,20 +776,20 @@ export class StructureView extends ItemView {
                 if (chPreamble.trim()) chunks.push(chPreamble.trim());
             }
 
-            // 2. 處理情節卡片 (用身分證去字典攞最新內容)
+            // 2. 情節卡片 (使用絕對安全的 Safe Key)
             const scenes = el.querySelectorAll(".ns-scene-card");
             scenes.forEach((sc) => {
                 const scEl = sc as HTMLElement;
-                const scId = scEl.dataset.sceneId;
-                const scName = scEl.dataset.sceneName;
+                const safeKey = scEl.dataset.safeKey; // 🔥 抽出安全鎖匙
 
-                // 精準對接：優先用 ID 搵，搵唔到先用標題名
-                const content = (scId && liveSceneMap.has(scId))
-                    ? liveSceneMap.get(scId)
-                    : liveSceneMap.get(scName || "");
+                const content = safeKey ? liveSceneMap.get(safeKey) : null;
 
                 if (content && content.trim()) {
                     chunks.push(content.trimEnd());
+                } else {
+                    // 終極保底：如果真係發生時空扭曲搵唔到，用返 WeakMap 舊內容
+                    const fallbackContent = this.sceneContentMap.get(scEl);
+                    if (fallbackContent) chunks.push(fallbackContent.trimEnd());
                 }
             });
         });
@@ -760,12 +797,11 @@ export class StructureView extends ItemView {
         // =========================================================
         // ✍️ 寫入編輯器並強制刷新
         // =========================================================
-
         const finalText = chunks.join("\n\n") + "\n";
-        // 🔥 P2 優化：無痕替換，完美保留用家的 Ctrl+Z 復原歷史
+
+        // P2 優化：無痕替換
         replaceEntireDocument(view.editor, finalText);
 
-        // 🔥 強制清空指紋，令下一次 parseAndRender 100% 重繪最新行數與內容
         this.lastOutlineHash = "";
         this.parseAndRender();
     }

@@ -10,7 +10,7 @@ import { CompilerManager } from './managers/CompilerManager';
 import { SceneManager } from './managers/SceneManager';
 import { redundantHighlighter, dialogueHighlighter, structureHighlighter } from './decorators';
 import { StructureView, VIEW_TYPE_STRUCTURE } from './managers/StructureView';
-import { DRAFT_FILENAME, BACKSTAGE_DIR, TEMPLATES_DIR, ensureFolderExists, isScriveningsDraft } from './utils';
+import { ST_WARNING, DRAFT_FILENAME, BACKSTAGE_DIR, TEMPLATES_DIR, ensureFolderExists, isScriveningsDraft } from './utils';
 
 export default class NovelSmithPlugin extends Plugin {
     settings: NovelSmithSettings;
@@ -35,6 +35,14 @@ export default class NovelSmithPlugin extends Plugin {
         await this.loadSettings();
 
 
+        this.scrivenerManager = new ScrivenerManager(this.app, this.settings);
+        this.historyManager = new HistoryManager(this.app, this.settings);
+        this.writingManager = new WritingManager(this.app, this.settings);
+        this.plotManager = new PlotManager(this.app, this.settings, this);
+        this.wikiManager = new WikiManager(this.app, this.settings);
+        this.compilerManager = new CompilerManager(this.app, this.settings);
+        this.sceneManager = new SceneManager(this.app, this.settings);
+
         this.registerEditorExtension([redundantHighlighter, dialogueHighlighter, structureHighlighter]);
 
         this.registerView(
@@ -53,24 +61,10 @@ export default class NovelSmithPlugin extends Plugin {
         // =================================================================
         // 🔥 貼心 UX 2：當 Obsidian 畫面載入完成後，自動把面板掛載到右邊！
         // =================================================================
-        this.app.workspace.onLayoutReady(() => {
-            this.activateView();
-        });
+        // this.app.workspace.onLayoutReady(() => {
+        //     this.activateView();
+        // });
 
-
-
-
-
-
-
-
-        this.scrivenerManager = new ScrivenerManager(this.app, this.settings);
-        this.historyManager = new HistoryManager(this.app, this.settings);
-        this.writingManager = new WritingManager(this.app, this.settings);
-        this.plotManager = new PlotManager(this.app, this.settings, this);
-        this.wikiManager = new WikiManager(this.app, this.settings);
-        this.compilerManager = new CompilerManager(this.app, this.settings);
-        this.sceneManager = new SceneManager(this.app, this.settings);
 
         this.addSettingTab(new NovelSmithSettingTab(this.app, this));
 
@@ -399,7 +393,7 @@ export default class NovelSmithPlugin extends Plugin {
 
         const file = this.app.vault.getAbstractFileByPath(tplPath);
         if (!file) {
-            const defaultTemplate = `###### 🎬 {{SceneName}} <span class="ns-id" data-scene-id="{{UUID}}"></span>\n> [!NSmith] 情節資訊\n> - Time:: \n> - POV:: \n> - Status:: #Writing\n> - Note:: \n\n這裡開始寫正文...`;
+            const defaultTemplate = `###### 🎬 {{SceneName}} <span class="ns-id" data-scene-id="{{UUID}}" data-warning="${ST_WARNING}"></span>\n> [!NSmith] 情節資訊\n> - Time:: \n> - POV:: \n> - Status:: #Writing\n> - Note:: \n\n這裡開始寫正文...`;
             try {
                 const newFile = await this.app.vault.create(tplPath, defaultTemplate);
 

@@ -71,7 +71,7 @@ export class CompilerManager {
 
             // A. 移除 YAML
             if (options.removeYaml) {
-                content = content.replace(/^---\n[\s\S]*?\n---\n?/, "");
+                content = content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
             }
 
             // B. 移除情節卡片
@@ -105,7 +105,7 @@ export class CompilerManager {
 
             // 🔥 新增：移除內部連結 (保留顯示文字)
             if (options.removeInternalLinks) {
-                content = content.replace(/\[\[(?:[^\]]*\|)?([^\]]+)\]\]/g, "$1");
+                content = content.replace(/(?<!\!)\[\[(?:[^\]]*\|)?([^\]]+)\]\]/g, "$1");
             }
 
 
@@ -134,10 +134,14 @@ export class CompilerManager {
             // H. 壓縮空行
             content = content.replace(/\n{3,}/g, "\n\n");
 
-            // 🔥 新增：如果用家揀咗，就喺內容最頂加上檔案名稱作為 H2 標題！
-            if (options.insertFileNameAsHeading) {
-                // file.basename 會自動甩走 .md 副檔名，非常乾淨
-                finalContent += `## ${file.basename}\n\n`;
+            // 🔥 終極升級：根據用家選擇的 H1-H5 層級，動態插入檔案名稱作為標題！
+            if (options.insertFileNameAsHeading && options.insertFileNameAsHeading !== 'none') {
+                // 將字串 '1', '2' 轉換為數字
+                const level = parseInt(options.insertFileNameAsHeading, 10);
+                // 根據數字生成對應數量的 # 符號
+                const hashes = '#'.repeat(level);
+
+                finalContent += `${hashes} ${file.basename}\n\n`;
             }
 
             finalContent += content.trim() + "\n\n"; // 章節間加空行

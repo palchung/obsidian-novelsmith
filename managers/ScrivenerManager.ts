@@ -3,7 +3,7 @@ import { App, Notice, TFile, TFolder, MarkdownView, moment } from 'obsidian';
 import { parseContent, RE_FILE_ID, DraftCard } from '../utils';
 import { NovelSmithSettings } from '../settings';
 import { ChapterSelectionModal, SimpleConfirmModal } from '../modals';
-import { generateSceneId, DRAFT_FILENAME, TEMPLATES_DIR, DRAFTS_DIR, ensureFolderExists } from '../utils';
+import { HISTORY_DIR, ST_WARNING, generateSceneId, DRAFT_FILENAME, TEMPLATES_DIR, DRAFTS_DIR, ensureFolderExists } from '../utils';
 import { t } from '../locales';
 
 export class ScrivenerManager {
@@ -124,9 +124,15 @@ export class ScrivenerManager {
                     contentChunks.push(`${l}\n\n`);
                     isMeta = true;
                 } else if (isMeta) {
-                    // 🔥 致命細節修復：遇到空行不要 continue，而是當作正文的開始並保留！
-                    if (l.startsWith(">")) continue;
-                    else { isMeta = false; buffer.push(line); }
+                    // 🔥 P0 修復：精準識別 Callout，絕不誤食正文的 Blockquote！
+                    if (l.startsWith("> [!NSmith") || l.startsWith("> [!info") || l.startsWith("> -") || l === ">") {
+                        continue;
+                    } else if (l === "") {
+                        continue; // 略過屬性與正文之間的空白行
+                    } else {
+                        isMeta = false;
+                        buffer.push(line); // 遇到真正的正文 (即使是 > 開頭的引言)
+                    }
                 } else {
                     buffer.push(line);
                 }
@@ -210,16 +216,35 @@ export class ScrivenerManager {
         let updatedCount = 0;
         const writePromises: Promise<void>[] = [];
 
+        // 🔥 升級 3：準備一本「失蹤人口名冊」
+        const skippedFiles: string[] = [];
+
+        // 🔥 企業級防護 1A：準備「同步前快照」目錄與陣列
+        const syncTimestamp = moment().format("YYYYMMDD_HHmmss");
+        const snapshotDir = `${this.settings.bookFolderPath}/${HISTORY_DIR}/Sync_Snapshots/${syncTimestamp}`;
+        let snapshotDirCreated = false;
+        const snapshotPromises: Promise<TFile>[] = [];
+
+
+
         for (let i = 1; i < fileBlocks.length; i += 2) {
             const fileName = fileBlocks[i].trim();
             let blockContent = fileBlocks[i + 1];
 
             if (!blockContent) continue;
             const cachedData = fileContentCache.get(fileName);
-            if (!cachedData) continue;
+            if (!cachedData) {
+                skippedFiles.push(fileName);
+                continue;
+            };
+
+
 
             const originalData = parsedOriginalCache.get(fileName);
-            if (!originalData) continue; // 防呆保護
+            if (!originalData) {
+                skippedFiles.push(fileName);
+                continue;
+            }; // 防呆保護
 
 
             const draftData = parseContent(blockContent, false);
@@ -238,13 +263,19 @@ export class ScrivenerManager {
                 else if (localTitleMap.has(draftCard.key)) originalCard = localTitleMap.get(draftCard.key);
 
                 if (originalCard) {
-                    chunks.push(`${draftCard.rawHeader}\n${originalCard.meta.join("\n").trim()}\n\n${draftCard.body}\n\n`);
+                    // 🔥 P0 修復：強制補回可能被用家誤刪的 ID 標籤！
+                    let safeHeader = draftCard.rawHeader.trimEnd();
+                    if (originalCard.id && !safeHeader.includes(originalCard.id)) {
+                        // 清理殘留的半截 span (防呆)，然後補回完整 ID
+                        safeHeader = safeHeader.replace(/<span.*?<\/span>/g, "").trimEnd();
+                        safeHeader += ` <span class="ns-id" data-scene-id="${originalCard.id}" data-warning="${ST_WARNING}"></span>`;
+                    }
+                    chunks.push(`${safeHeader}\n${originalCard.meta.join("\n").trim()}\n\n${draftCard.body}\n\n`);
                 } else {
                     if (!draftCard.key) continue;
                     let uuid = draftCard.id;
                     if (!uuid) uuid = generateSceneId();
-                    const idTag = ` <span class="ns-id" data-scene-id="${uuid}"></span>`;
-
+                    const idTag = ` <span class="ns-id" data-scene-id="${uuid}" data-warning="${ST_WARNING}"></span>`;
                     let cleanRawHeader = draftCard.rawHeader.replace(/<span.*?<\/span>/g, "").trimEnd();
                     chunks.push(`${cleanRawHeader}${idTag}\n`);
 
@@ -269,9 +300,23 @@ export class ScrivenerManager {
 
 
             if (finalContent !== cachedData.text.trim()) {
+                // 🔥 企業級防護 1B：在覆寫前，先把原稿內容備份到 Snapshot 資料夾！
+                if (!snapshotDirCreated) {
+                    await ensureFolderExists(this.app, snapshotDir);
+                    snapshotDirCreated = true;
+                }
+                const snapshotPath = `${snapshotDir}/${fileName}`;
+                // 記錄寫入快照的 Promise
+                snapshotPromises.push(this.app.vault.create(snapshotPath, cachedData.text));
+
+                // 記錄真正覆寫原稿的 Promise
                 writePromises.push(this.app.vault.modify(cachedData.file, finalContent));
                 updatedCount++;
             }
+        }
+        // 🔥 企業級防護 1C：確保所有快照都安全落地後，才執行真正的覆寫！
+        if (snapshotPromises.length > 0) {
+            await Promise.all(snapshotPromises);
         }
         await Promise.all(writePromises);
 
@@ -295,6 +340,10 @@ export class ScrivenerManager {
         }
 
         if (leafToClose) leafToClose.detach();
+        // 🔥 升級 3：如果有失蹤人口，即刻發出最高級別警告！
+        if (skippedFiles.length > 0) {
+            new Notice(`🚨 嚴重警告：有 ${skippedFiles.length} 個檔案無法同步（可能已被改名或刪除）！\n受影響檔案：${skippedFiles.join(", ")}`, 15000);
+        }
     }
 
     // =========================================================

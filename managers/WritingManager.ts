@@ -314,8 +314,8 @@ export class WritingManager {
             if (options.removeHighlights) content = content.replace(/==/g, "");
 
             // 🔥 新增：移除內部連結 (保留顯示文字，例如 [[Alias|Display]] 變成 Display)
-            if (options.removeInternalLinks) content = content.replace(/\[\[(?:[^\]]*\|)?([^\]]+)\]\]/g, "$1");
-
+            // 🔥 P2 微調：使用 Negative Lookbehind (?<!\!)，完美避開圖片 ![[...]]，只拆除純文字連結！
+            if (options.removeInternalLinks) content = content.replace(/(?<!\!)\[\[(?:[^\]]*\|)?([^\]]+)\]\]/g, "$1");
             if (content !== originalContent) {
                 // 🔥 P2 優化：呼叫全域無痕替換
                 replaceEntireDocument(view.editor, content);

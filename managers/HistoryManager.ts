@@ -57,9 +57,14 @@ export class HistoryManager {
         let bodyLines = [];
         let isMeta = true;
 
+        // 🔥 終極修復：精準識別 Callout，保護正文的 Blockquote！
         for (const line of lines) {
-            if (isMeta && (line.trim().startsWith(">") || line.trim() === "")) continue;
-            isMeta = false;
+            if (isMeta) {
+                const trimLine = line.trim();
+                if (trimLine.startsWith("> [!NSmith") || trimLine.startsWith("> [!info") || trimLine.startsWith("> -") || trimLine === ">") continue;
+                if (trimLine === "") continue;
+                isMeta = false;
+            }
             bodyLines.push(line);
         }
 
@@ -68,7 +73,13 @@ export class HistoryManager {
 
         new InputModal(this.app, `備份：${scene.title}`, async (verName) => {
             if (!verName) return;
-            const finalVerName = verName.trim() === "" ? "自動備份" : verName;
+
+
+            // 🔥 升級 4：消毒處理！強制將所有換行符號 (Enter) 轉換為空格，防止破壞 Markdown 格式
+            const sanitizedVerName = verName.replace(/[\r\n]+/g, " ").trim();
+            const finalVerName = sanitizedVerName === "" ? "自動備份" : sanitizedVerName;
+
+
             await this.executeSave(scene.id!, scene.title, cleanContent, finalVerName);
             if (onComplete) onComplete();
         }).open();
@@ -130,8 +141,12 @@ export class HistoryManager {
         const currentLines = currentRangeText.split("\n");
         let metaBuffer = [];
 
+        // 🔥 終極修復：還原時同樣精準識別，不破壞正文
         for (const line of currentLines) {
-            if (line.trim().startsWith(">") || (line.trim() === "" && metaBuffer.length > 0)) {
+            const trimLine = line.trim();
+            if (trimLine.startsWith("> [!NSmith") || trimLine.startsWith("> [!info") || trimLine.startsWith("> -") || trimLine === ">") {
+                metaBuffer.push(line);
+            } else if (trimLine === "" && metaBuffer.length > 0) {
                 metaBuffer.push(line);
             } else break;
         }

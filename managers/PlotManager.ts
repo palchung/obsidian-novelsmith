@@ -1,7 +1,7 @@
 import { App, Notice, MarkdownView, EditorPosition, TFile } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 import { InputModal, GenericSuggester, SceneCreateModal } from '../modals';
-import { generateSceneId, TEMPLATES_DIR, parseUniversalScenes } from '../utils';
+import { ST_WARNING, generateSceneId, TEMPLATES_DIR, parseUniversalScenes } from '../utils';
 import NovelSmithPlugin from '../main';
 
 export class PlotManager {
@@ -49,7 +49,7 @@ export class PlotManager {
             // 動態轉換範本入面的 Callout 顏色
             templateText = templateText.replace(/> \[!NSmith\]/, `> [!${calloutType}]`);
         } else {
-            templateText = `###### 🎬 {{SceneName}} <span class="ns-id" data-scene-id="${uuid}" data-color="${colorId}"></span>\n> [!${calloutType}] 情節資訊\n> - Time:: \n> - POV:: \n> - Status:: #Writing\n> - Note:: \n\n`;
+            templateText = `###### 🎬 {{SceneName}} <span class="ns-id" data-scene-id="${generateSceneId()}" data-warning="${ST_WARNING}" data-color="${colorId}"></span>\n> [!${calloutType}] 情節資訊\n> - Time:: \n> - POV:: \n> - Status:: #Writing\n> - Note:: \n\n`;
         }
 
         return templateText
@@ -121,10 +121,16 @@ export class PlotManager {
 
             if (metadataLines.length > 0) {
                 // 🔥 分拆時加入 data-color
-                newContent += `###### 🎬 ${newSceneName} <span class="ns-id" data-scene-id="${uuid}" data-color="${colorId}"></span>\n`;
-
+                newContent += `###### 🎬 ${newSceneName} <span class="ns-id" data-scene-id="${generateSceneId()}" data-warning="${ST_WARNING}" data-color="${colorId}"></span>\n`;
                 for (let line of metadataLines) {
                     if (line.includes("Scene::")) continue;
+
+                    // 🔥 終極修復 1：攔截並修改遺傳下來的 Callout 顏色！
+                    if (line.startsWith("> [!NSmith")) {
+                        const calloutType = colorId === "default" ? "NSmith" : `NSmith-${colorId}`;
+                        line = line.replace(/> \[!NSmith[^\]]*\]/, `> [!${calloutType}]`);
+                    }
+
                     newContent += `${line}\n`;
                 }
             } else {
@@ -148,17 +154,20 @@ export class PlotManager {
         const cursor = editor.getCursor();
         const lineCount = editor.lineCount();
 
-        let targetHeaderLine = -1;
-        let targetHeaderText = "";
+        // 🔥 P2 微調：改用全域雷達定位目標情節，並強制要求 ID！
+        const parsedScenes = parseUniversalScenes(editor.getValue());
+        const currentScene = [...parsedScenes].reverse().find(s => s.lineIndex <= cursor.line);
 
-        for (let i = cursor.line; i >= 0; i--) {
-            const line = editor.getLine(i).trim();
-            if (line.startsWith("######")) {
-                targetHeaderLine = i;
-                targetHeaderText = line;
-                break;
-            }
+        if (!currentScene || !currentScene.id) {
+            new Notice("⚠️ 請先將游標放在有 ID 的主情節 (A) 範圍內。如果未有 ID，請先點擊「同步」按鈕！");
+            return;
         }
+
+        const targetSceneId = currentScene.id;
+        const targetHeaderLine = currentScene.lineIndex;
+
+
+
 
         if (targetHeaderLine === -1) {
             new Notice("⚠️ 請先將游標放在主情節 (A) 範圍內");
@@ -166,7 +175,7 @@ export class PlotManager {
         }
 
         // 🔥 P2 架構重構：呼叫全域雷達，瞬間取得所有乾淨的場景資料！
-        const parsedScenes = parseUniversalScenes(editor.getValue());
+        //const parsedScenes = parseUniversalScenes(editor.getValue());
         const allScenes = parsedScenes
             .filter(s => s.lineIndex !== targetHeaderLine)
             .map(s => ({
@@ -185,12 +194,12 @@ export class PlotManager {
             allScenes,
             (item) => item.label,
             (selectedScene) => {
-                this.executeMerge(view, targetHeaderText, selectedScene.line);
+                this.executeMerge(view, targetSceneId, selectedScene.line);
             }
         ).open();
     }
 
-    executeMerge(view: MarkdownView, targetHeaderText: string, sourceStartLine: number) {
+    executeMerge(view: MarkdownView, targetSceneId: string, sourceStartLine: number) {
         const editor = view.editor;
         const currentLineCount = editor.lineCount();
         let sourceEndLine = currentLineCount;
@@ -203,13 +212,16 @@ export class PlotManager {
             }
         }
 
-        let bodyStartLine = sourceStartLine + 1;
+        // 🔥 終極修復 2：預設身軀起點為「結尾」(即預設沒有正文)。
+        // 這樣可以防止完全沒有正文的新卡片，將 Callout 誤當成正文吸走！
+        let bodyStartLine = sourceEndLine;
+
         for (let i = sourceStartLine + 1; i < sourceEndLine; i++) {
             const line = editor.getLine(i).trim();
             if (line.startsWith(">") || line === "") {
                 continue;
             } else {
-                bodyStartLine = i;
+                bodyStartLine = i; // 找到真正的正文起點
                 break;
             }
         }
@@ -229,8 +241,9 @@ export class PlotManager {
         let newTargetHeaderLine = -1;
         const newLineCount = editor.lineCount();
 
+        // 🔥 P2 微調：用宇宙唯一的 ID 去認人，就算有 10 個同名情節都絕對唔會認錯！
         for (let i = 0; i < newLineCount; i++) {
-            if (editor.getLine(i).trim() === targetHeaderText.trim()) {
+            if (editor.getLine(i).includes(`data-scene-id="${targetSceneId}"`)) {
                 newTargetHeaderLine = i;
                 break;
             }

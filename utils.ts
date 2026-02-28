@@ -145,8 +145,11 @@ export const parseContent = (text: string, isOriginal: boolean = false): ParseRe
             isCollectingMeta = true;
         } else if (hasHitFirstCard) {
             if (isCollectingMeta) {
-                if (trimLine.startsWith(">")) {
+                // 🔥 P0 修復：精準識別屬性，保護正文的 Blockquote！
+                if (trimLine.startsWith("> [!NSmith") || trimLine.startsWith("> [!info") || trimLine.startsWith("> -") || trimLine === ">") {
                     currentMeta.push(line);
+                } else if (trimLine === "") {
+                    // 略過屬性與正文之間的空白行，但不當作正文
                 } else {
                     isCollectingMeta = false;
                     currentBodyLines.push(line);
@@ -262,7 +265,7 @@ export const replaceEntireDocument = (editor: any, newContent: string) => {
 
 // 2. 統一 ID 生成器
 export const generateSceneId = (): string => {
-    return crypto.randomUUID().substring(0, 8);
+    return crypto.randomUUID().substring(0, 12);
 };
 
 // 3. 封存草稿偵測器

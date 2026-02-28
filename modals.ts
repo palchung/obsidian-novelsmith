@@ -96,7 +96,7 @@ export interface CompileOptions {
     mergeBold: boolean;       // 合併 ** 粗體 **
     removeHighlights: boolean;// 移除 == 高亮 ==
     removeInternalLinks: boolean;
-    insertFileNameAsHeading: boolean;
+    insertFileNameAsHeading: string;
     hashtagAction: 'none' | 'remove-all' | 'remove-hash';
 }
 
@@ -109,7 +109,7 @@ export class CompileModal extends Modal {
         mergeBold: true,
         removeHighlights: true,
         removeInternalLinks: true,
-        insertFileNameAsHeading: true,
+        insertFileNameAsHeading: 'none',
         hashtagAction: 'none'
     };
 
@@ -128,11 +128,18 @@ export class CompileModal extends Modal {
 
 
         new Setting(contentEl)
-            .setName(t("modal_compile_opt_heading") || "將檔名轉換為 H2 章節標題")
-            .setDesc(t("modal_compile_opt_heading_desc") || "在每個檔案的開頭自動插入 ## 檔案名稱")
-            .addToggle(t => t
+            .setName(t("modal_compile_opt_heading") || "📄 插入檔案名稱作為章節標題")
+            .setDesc(t("modal_compile_opt_heading_desc") || "在每個章節頂部插入對應層級的標題。為免與劇情卡片 (H6) 衝突，最多支援至 H5。")
+            .addDropdown(drop => drop
+                .addOption('none', '不插入 (預設)')
+                .addOption('1', 'H1 (# 標題)')
+                .addOption('2', 'H2 (## 標題)')
+                .addOption('3', 'H3 (### 標題)')
+                .addOption('4', 'H4 (#### 標題)')
+                .addOption('5', 'H5 (##### 標題)')
                 .setValue(this.options.insertFileNameAsHeading)
-                .onChange(v => this.options.insertFileNameAsHeading = v));
+                .onChange(value => this.options.insertFileNameAsHeading = value)
+            );
 
 
         new Setting(contentEl)
