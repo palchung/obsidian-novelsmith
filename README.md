@@ -77,7 +77,7 @@ To ensure the absolute safety of your manuscript, please keep these rules in min
 ## 🚀 Installation
 
 **Manual Installation:**
-1. Download the latest `main.js`, `manifest.json`, and `styles.css` from the [Releases page](link-to-your-releases).
+1. Download the latest `main.js`, `manifest.json`, and `styles.css` from the [Releases page](https://github.com/palchung/obsidian-novelsmith/releases/tag/1.0.0).
 2. Create a folder named `novelsmith` inside your vault's `.obsidian/plugins/` directory.
 3. Place the downloaded files into the `novelsmith` folder.
 4. Reload Obsidian and enable **NovelSmith** in the Community Plugins settings.
