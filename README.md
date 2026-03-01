@@ -6,7 +6,7 @@
 
 ## 🎮 Try the Demo Vault (Interactive Tutorial)
 
-Before installing NovelSmith on your precious manuscript, **we highly recommend downloading the [NovelSmith Demo Vault](https://github.com/fongleng/novelsmith-demo).** This is not just a showcase—it serves as an interactive, hands-on tutorial. You can safely play around with Scrivenings Mode, drag and drop scene cards, and test the atomic backup features using the dummy text provided. It's the fastest way to understand how the plugin works!
+Before installing NovelSmith on your precious manuscript, **we highly recommend downloading the [NovelSmith Demo Vault](https://github.com/palchung/novelsmith-demo).** This is not just a showcase—it serves as an interactive, hands-on tutorial. You can safely play around with Scrivenings Mode, drag and drop scene cards, and test the atomic backup features using the dummy text provided. It's the fastest way to understand how the plugin works!
 
 ---
 
@@ -107,7 +107,7 @@ NovelSmith respects your data. It relies on minimal, non-intrusive syntax:
 > While I have poured my heart into developing and testing NovelSmith extensively to ensure its stability, this plugin performs complex file operations (including merging, overwriting, and moving files). **By using this plugin, you acknowledge that you do so at your own risk.** >
 > The developer cannot be held legally responsible for any accidental data loss, corruption, or overwritten text. **Always, always keep independent backups of your vault** (e.g., using Obsidian Sync, Git, or cloud storage). 
 > 
-> If you encounter any bugs, glitches, or unexpected behavior, please let me know by submitting a detailed report on the [GitHub Issues page](https://github.com/fongleng/novelsmith/issues) so I can squash it!
+> If you encounter any bugs, glitches, or unexpected behavior, please let me know by submitting a detailed report on the [GitHub Issues page](https://github.com/palchung/obsidian-novelsmith/issues) so I can squash it!
 
 ---
 
