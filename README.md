@@ -1,6 +1,12 @@
-# ⚔️ NovelSmith (Still Under Development)
+# ⚔️ NovelSmith (Beta)
 
 **Forge your novel, one scene at a time.** NovelSmith is a comprehensive, Scrivener-inspired writing environment built directly into Obsidian. It transforms your vault into a powerhouse for long-form fiction writing, offering seamless chapter merging, atomic version control, dynamic outlining, color-coded scene management, and intelligent writing aids—all without breaking standard Markdown.
+
+---
+
+## 🎮 Try the Demo Vault (Interactive Tutorial)
+
+Before installing NovelSmith on your precious manuscript, **we highly recommend downloading the [NovelSmith Demo Vault](https://github.com/fongleng/novelsmith-demo).** This is not just a showcase—it serves as an interactive, hands-on tutorial. You can safely play around with Scrivenings Mode, drag and drop scene cards, and test the atomic backup features using the dummy text provided. It's the fastest way to understand how the plugin works!
 
 ---
 
@@ -9,7 +15,7 @@
 If you are transitioning from Scrivener or other traditional novel-writing software, you might be accustomed to the "1 File = 1 Scene" structure, where Chapters are simply folders. **NovelSmith takes a different, Obsidian-optimized approach:**
 
 * **1 Markdown File = 1 Chapter:** To prevent your Obsidian vault from becoming cluttered with hundreds of tiny files (and to keep your Graph View clean), NovelSmith treats each physical `.md` file as a complete **Chapter**.
-* **Scenes live inside the Chapter:** Within that Chapter file, you divide the text into smaller, modular **Scenes** using `###### 🎬 Scene Name` headers. 
+* **Scenes live inside the Chapter:** Within that Chapter file, you divide the text into smaller, modular **Scenes** using `###### 🎬 Scene Name` headers and Callout. 
 * **The Structure View Magic:** NovelSmith's custom right-sidebar reads these `######` headers and transforms them into draggable, color-coded **"Scene Cards"**. 
 * **Why this matters:** This design allows you to scroll and read a whole chapter naturally in Obsidian without needing to compile, while the plugin still gives you the granular power to drag, drop, split, merge, and back up individual scenes within that chapter.
 
@@ -24,7 +30,7 @@ Tired of jumping between dozens of chapter files?
 * **Safe Archiving & Discarding:** Option to archive your merged drafts with timestamps instead of deleting them. Realize your edits went wrong? Just click "Discard Draft" to safely trash the temporary file without touching your original chapters.
 
 ### 🗂️ Interactive Structure View & Plot Management
-A custom right-sidebar control panel designed for novelists.
+A custom right-sidebar control panel designed for novelists. *(Fully optimized for Mobile and Touch devices!)*
 * **Drag-and-Drop Outline:** Reorder scenes and chapters intuitively. Changes sync instantly to your manuscript with zero-trace replacement (preserving your `Ctrl+Z` Undo history!).
 * **Color-Coded Scene Cards:** Insert, split, or merge scenes with a single click. Assign colors (Red for Conflict, Blue for POV A, etc.) to your Scene Cards to visually map out your plot in the sidebar.
 * **Precision Merging:** Use the "Merge Scene" command to flawlessly absorb text from one scene into another based on their unique IDs.
@@ -71,7 +77,7 @@ To ensure the absolute safety of your manuscript, please keep these rules in min
 ## 🚀 Installation
 
 **Manual Installation:**
-1. Download the latest `main.js`, `manifest.json`, and `styles.css` from the Releases page.
+1. Download the latest `main.js`, `manifest.json`, and `styles.css` from the [Releases page](link-to-your-releases).
 2. Create a folder named `novelsmith` inside your vault's `.obsidian/plugins/` directory.
 3. Place the downloaded files into the `novelsmith` folder.
 4. Reload Obsidian and enable **NovelSmith** in the Community Plugins settings.
@@ -83,7 +89,7 @@ To ensure the absolute safety of your manuscript, please keep these rules in min
 To get the most out of NovelSmith, configure your workspace:
 
 1. **Designate a Book Folder:** NovelSmith's features will *only* activate within this specific folder to protect your other Obsidian notes.
-2. **Generate Templates:** Trigger the "Insert Scene Card" command for the first time, and NovelSmith will generate a customizable `NovelSmith_Template.md` for you.
+2. **Initialize:** Click the "Initialize Now" button in the settings to automatically generate your `_Backstage` folder and a customizable `NovelSmith_Template.md` scene card.
 3. **Writing Aid Lists:** Set up your Redundant Words list and Fix-It list to supercharge your editing phase.
 
 ---
@@ -96,6 +102,19 @@ NovelSmith respects your data. It relies on minimal, non-intrusive syntax:
 
 ---
 
-## 🤝 Contributing & License
-Contributions, issues, and feature requests are welcome!
+## ⚠️ Disclaimer & Data Safety
+
+> While I have poured my heart into developing and testing NovelSmith extensively to ensure its stability, this plugin performs complex file operations (including merging, overwriting, and moving files). **By using this plugin, you acknowledge that you do so at your own risk.** >
+> The developer cannot be held legally responsible for any accidental data loss, corruption, or overwritten text. **Always, always keep independent backups of your vault** (e.g., using Obsidian Sync, Git, or cloud storage). 
+> 
+> If you encounter any bugs, glitches, or unexpected behavior, please let me know by submitting a detailed report on the [GitHub Issues page](https://github.com/fongleng/novelsmith/issues) so I can squash it!
+
+---
+
+## 🤝 Contributing & Support
+Contributions, issues, and feature requests are highly welcome!
+If this plugin helped you forge your novel and you'd like to support its continued development, consider buying me a coffee:
+
+☕ [Buy Me a Coffee](https://buymecoffee.com/fongleng20e)
+
 This project is licensed under the MIT License.

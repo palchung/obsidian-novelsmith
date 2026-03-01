@@ -133,6 +133,6 @@ export class NovelSmithSettingTab extends PluginSettingTab {
                     await this.plugin.writingManager.ensureFixListExists(true);
                 }));
 
-        containerEl.createEl('p', { text: 'Designed for Sword and Sheaves.' });
+        containerEl.createEl('p', { text: 'By writers, for writers.' });
     }
 }
