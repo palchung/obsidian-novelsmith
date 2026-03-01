@@ -126,8 +126,15 @@ export class CompileModal extends Modal {
         contentEl.createEl('h2', { text: '📤 匯出編譯設定' });
         contentEl.createEl('p', { text: '請選擇要清理的內容，這些操作只會影響輸出檔，不會修改原稿。', cls: 'setting-item-description' });
 
+        // ==========================================
+        // 🛠️ 手機版 UI 拯救：建立「可滾動」的選項區域
+        // ==========================================
+        const scrollArea = contentEl.createDiv();
+        scrollArea.style.maxHeight = "55vh"; // 限制最大高度為螢幕高度的 55%
+        scrollArea.style.overflowY = "auto";
+        scrollArea.style.paddingRight = "10px"; // 留位畀捲軸
 
-        new Setting(contentEl)
+        new Setting(scrollArea)
             .setName(t("modal_compile_opt_heading") || "📄 插入檔案名稱作為章節標題")
             .setDesc(t("modal_compile_opt_heading_desc") || "在每個章節頂部插入對應層級的標題。為免與劇情卡片 (H6) 衝突，最多支援至 H5。")
             .addDropdown(drop => drop
@@ -142,49 +149,49 @@ export class CompileModal extends Modal {
             );
 
 
-        new Setting(contentEl)
+        new Setting(scrollArea)
             .setName('移除 YAML Frontmatter')
             .setDesc('刪除檔案開頭的 --- 設定區塊')
             .addToggle(toggle => toggle
                 .setValue(this.options.removeYaml)
                 .onChange(value => this.options.removeYaml = value));
 
-        new Setting(contentEl)
+        new Setting(scrollArea)
             .setName('移除情節卡片 (Callout)')
             .setDesc('刪除 ###### 🎬 及相關引用塊')
             .addToggle(toggle => toggle
                 .setValue(this.options.removeSceneInfo)
                 .onChange(value => this.options.removeSceneInfo = value));
 
-        new Setting(contentEl)
+        new Setting(scrollArea)
             .setName('移除註釋')
             .setDesc('刪除所有 %% 註釋內容 %%')
             .addToggle(toggle => toggle
                 .setValue(this.options.removeComments)
                 .onChange(value => this.options.removeComments = value));
 
-        new Setting(contentEl)
+        new Setting(scrollArea)
             .setName('移除刪除線內容')
             .setDesc('刪除所有 ~~ 被刪除的文字 ~~')
             .addToggle(toggle => toggle
                 .setValue(this.options.removeStrikethrough)
                 .onChange(value => this.options.removeStrikethrough = value));
 
-        new Setting(contentEl)
+        new Setting(scrollArea)
             .setName('合併粗體 (定稿)')
             .setDesc('將 **粗體文字** 轉為普通文字')
             .addToggle(toggle => toggle
                 .setValue(this.options.mergeBold)
                 .onChange(value => this.options.mergeBold = value));
 
-        new Setting(contentEl)
+        new Setting(scrollArea)
             .setName('移除高亮')
             .setDesc('移除所有 == 高亮符號 ==')
             .addToggle(toggle => toggle
                 .setValue(this.options.removeHighlights)
                 .onChange(value => this.options.removeHighlights = value));
 
-        new Setting(contentEl)
+        new Setting(scrollArea)
             .setName('移除內部連結符號')
             .setDesc('將 [[連結|顯示名稱]] 轉換為純文字 (只保留顯示名稱)')
             .addToggle(toggle => toggle
@@ -192,7 +199,7 @@ export class CompileModal extends Modal {
                 .onChange(val => this.options.removeInternalLinks = val));
 
         // 喺加入 removeInternalLinks 的 Setting 下面，加入這段：
-        new Setting(contentEl)
+        new Setting(scrollArea)
             .setName("標籤處理 (Hashtags)")
             .setDesc("處理文稿中的 #標籤 (系統能精準識別，絕不會誤刪 # 標題)")
             .addDropdown(drop => drop
@@ -203,9 +210,17 @@ export class CompileModal extends Modal {
                 .onChange(value => this.options.hashtagAction = value as any)
             );
 
+        // ==========================================
+        // 🛠️ 手機版 UI 拯救：建立「永遠置底」的按鈕區域
+        // ==========================================
+        const buttonArea = contentEl.createDiv();
+        buttonArea.style.marginTop = "20px";
+        buttonArea.style.paddingTop = "10px";
+        buttonArea.style.borderTop = "1px solid var(--background-modifier-border)";
+        buttonArea.style.display = "flex";
+        buttonArea.style.justifyContent = "flex-end"; // 將掣推向右邊
 
-
-        new Setting(contentEl)
+        new Setting(buttonArea)
             .addButton(btn => btn
                 .setButtonText('開始編譯')
                 .setCta()
@@ -241,6 +256,7 @@ export class ChapterSelectionModal extends Modal {
         contentEl.empty();
         contentEl.createEl('h2', { text: '📚 Step 1: 選擇要合併的章節' });
 
+
         // --- 控制列：全選/全不選 ---
         const controlDiv = contentEl.createDiv({ cls: 'ns-chapter-controls' });
         controlDiv.style.marginBottom = '10px';
@@ -261,7 +277,7 @@ export class ChapterSelectionModal extends Modal {
 
         // --- 檔案列表容器 (可滾動) ---
         const listDiv = contentEl.createDiv({ cls: 'ns-chapter-list' });
-        listDiv.style.maxHeight = '300px';
+        listDiv.style.maxHeight = '50vh';
         listDiv.style.overflowY = 'auto';
         listDiv.style.border = '1px solid var(--background-modifier-border)';
         listDiv.style.padding = '10px';
@@ -271,8 +287,18 @@ export class ChapterSelectionModal extends Modal {
         // 渲染列表
         this.refreshList(listDiv);
 
+        // ==========================================
+        // 🔥 手機版 UI 拯救：固定置底按鈕區域
+        // ==========================================
+        const buttonArea = contentEl.createDiv();
+        buttonArea.style.borderTop = "1px solid var(--background-modifier-border)";
+        buttonArea.style.paddingTop = "10px";
+        buttonArea.style.display = "flex";
+        buttonArea.style.justifyContent = "flex-end";
+
+
         // --- 下一步按鈕 ---
-        new Setting(contentEl)
+        new Setting(buttonArea)
             .addButton(btn => btn
                 .setButtonText('下一步 (設定清理選項) 👉')
                 .setCta()

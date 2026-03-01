@@ -358,13 +358,15 @@ export class ScrivenerManager {
             leafToClose = view.leaf;
         }
 
+        // 功成身退，關閉分頁
+        if (leafToClose) leafToClose.detach();
+
         // 🔥 貼心安全網：使用 app.vault.trash(file, true)
         // true 代表放入 Mac/Windows 系統的垃圾桶，而不是徹底刪除，讓作家有機會反悔！
         await this.app.vault.trash(draftFile, true);
         new Notice("🗑️ 草稿已捨棄！原稿維持不變。\n(如需挽回，請到電腦作業系統的垃圾桶找回)");
 
-        // 功成身退，關閉分頁
-        if (leafToClose) leafToClose.detach();
+
     }
 }
 
