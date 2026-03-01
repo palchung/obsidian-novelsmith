@@ -4,8 +4,8 @@
     "version": "1.0.0",
     "minAppVersion": "1.4.0",
     "description": "A comprehensive, Scrivener-inspired writing environment. Features seamless scenes merging, version control, and color-coded scene management.",
-    "author": "Fong Leng",
-    "authorUrl": "https://github.com/fongleng",
-    "fundingUrl": "https://buymecoffee.com/fongleng20e",
+    "author": "Pal Chung",
+    "authorUrl": "https://github.com/palchung",
+    "fundingUrl": "https://buymeacoffee.com/palchung",
     "isDesktopOnly": false
 }
