@@ -19,7 +19,7 @@ export const RE_SCENE_EMOJI = /^🎬\s*/;
 // Header (ID part)
 //export const RE_SCENE_HEADER_HTML = /###### (.*?)( /;
 export const RE_EXTRACT_ID = /(?:SCENE_ID:\s*|data-scene-id=")([a-zA-Z0-9-]+)/;
-export const RE_SCENE_INFO = /^###### 🎬 .*[\r\n]+(> .*[\r\n]*)*/gm;
+export const RE_SCENE_INFO = /^###### .*[\r\n]+(> .*[\r\n]*)*/gm;
 // Used to match header lines (###### Title )
 export const RE_SCENE_HEADER = /^(###### .*?)( )?$/;
 // Used to match header lines that already have an ID

@@ -202,15 +202,11 @@ export default class NovelSmithPlugin extends Plugin {
             id: 'save-scene-version',
             name: 'Atomic Save: Current Scene',
             icon: 'save',
-            checkCallback: (checking: boolean) => {
-                const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-                if (markdownView) {
-                    if (!checking && this.checkInBookFolder(markdownView.file)) {
-                        this.historyManager.saveVersion(markdownView);
-                    }
-                    return true;
+            // 🔥 改用 editorCallback，強制鎖定呼叫指令時的游標位置
+            editorCallback: (editor, view) => {
+                if (this.checkInBookFolder(view.file)) {
+                    this.historyManager.saveVersion(view);
                 }
-                return false;
             }
         });
 
@@ -218,15 +214,10 @@ export default class NovelSmithPlugin extends Plugin {
             id: 'restore-scene-version',
             name: 'Atomic Restore: Current Scene',
             icon: 'history',
-            checkCallback: (checking: boolean) => {
-                const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-                if (markdownView) {
-                    if (!checking && this.checkInBookFolder(markdownView.file)) {
-                        this.historyManager.restoreVersion(markdownView);
-                    }
-                    return true;
+            editorCallback: (editor, view) => {
+                if (this.checkInBookFolder(view.file)) {
+                    this.historyManager.restoreVersion(view);
                 }
-                return false;
             }
         });
 
@@ -234,15 +225,10 @@ export default class NovelSmithPlugin extends Plugin {
             id: 'split-scene',
             name: 'Plot: Split Scene',
             icon: 'scissors',
-            checkCallback: (checking: boolean) => {
-                const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-                if (markdownView) {
-                    if (!checking && this.checkInBookFolder(markdownView.file)) {
-                        this.plotManager.splitScene(markdownView);
-                    }
-                    return true;
+            editorCallback: (editor, view) => {
+                if (this.checkInBookFolder(view.file)) {
+                    this.plotManager.splitScene(view);
                 }
-                return false;
             }
         });
 
@@ -250,15 +236,10 @@ export default class NovelSmithPlugin extends Plugin {
             id: 'merge-scene',
             name: 'Plot: Merge Scene',
             icon: 'magnet',
-            checkCallback: (checking: boolean) => {
-                const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-                if (markdownView) {
-                    if (!checking && this.checkInBookFolder(markdownView.file)) {
-                        this.plotManager.mergeScene(markdownView);
-                    }
-                    return true;
+            editorCallback: (editor, view) => {
+                if (this.checkInBookFolder(view.file)) {
+                    this.plotManager.mergeScene(view);
                 }
-                return false;
             }
         });
 
@@ -408,7 +389,7 @@ export default class NovelSmithPlugin extends Plugin {
 
         const file = this.app.vault.getAbstractFileByPath(tplPath);
         if (!file) {
-            const defaultTemplate = `###### 🎬 {{SceneName}} <span class="ns-id" data-scene-id="{{UUID}}" data-warning="${ST_WARNING}"></span>\n> [!NSmith] Scene Info\n> - Time:: \n> - POV:: \n> - Status:: #Writing\n> - Note:: \n\nWrite your story here...`;
+            const defaultTemplate = `###### {{SceneName}} <span class="ns-id" data-scene-id="{{UUID}}" data-warning="${ST_WARNING}"></span>\n> [!NSmith] Scene Info\n> - Time:: \n> - POV:: \n> - Status:: #Writing\n> - Note:: \n\nWrite your story here...`;
             try {
                 const newFile = await this.app.vault.create(tplPath, defaultTemplate);
 

@@ -158,7 +158,7 @@ export class CompileModal extends Modal {
 
         new Setting(scrollArea)
             .setName('Remove Scene Cards (Callout)')
-            .setDesc('Delete ###### 🎬 and related callout blocks.')
+            .setDesc('Delete ###### and related callout blocks.')
             .addToggle(toggle => toggle
                 .setValue(this.options.removeSceneInfo)
                 .onChange(value => this.options.removeSceneInfo = value));

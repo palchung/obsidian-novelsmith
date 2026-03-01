@@ -56,7 +56,7 @@ export class PlotManager {
 
 
         } else {
-            templateText = `###### 🎬 {{SceneName}} <span class="ns-id" data-scene-id="${generateSceneId()}" data-warning="${ST_WARNING}" data-color="${colorId}"></span>\n> [!${calloutType}] Scene Info\n> - Time:: \n> - POV:: \n> - Status:: #Writing\n> - Note:: \n\n`;
+            templateText = `###### {{SceneName}} <span class="ns-id" data-scene-id="${generateSceneId()}" data-warning="${ST_WARNING}" data-color="${colorId}"></span>\n> [!${calloutType}] Scene Info\n> - Time:: \n> - POV:: \n> - Status:: #Writing\n> - Note:: \n\n`;
         }
 
         return templateText
@@ -128,7 +128,7 @@ export class PlotManager {
 
             if (metadataLines.length > 0) {
                 // 🔥 Add data-color during splitting
-                newContent += `###### 🎬 ${newSceneName} <span class="ns-id" data-scene-id="${generateSceneId()}" data-warning="${ST_WARNING}" data-color="${colorId}"></span>\n`;
+                newContent += `###### ${newSceneName} <span class="ns-id" data-scene-id="${generateSceneId()}" data-warning="${ST_WARNING}" data-color="${colorId}"></span>\n`;
                 for (let line of metadataLines) {
                     if (line.includes("Scene::")) continue;
 
