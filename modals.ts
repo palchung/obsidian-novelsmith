@@ -1,9 +1,9 @@
 import { App, FuzzySuggestModal, Modal, Setting, TFile, Notice } from 'obsidian';
 import { t } from './locales';
-import { SCENE_COLORS } from './utils'; // 確保路徑正確
+import { SCENE_COLORS } from './utils'; // Ensure path is correct
 
 // ============================================================
-// 1. 通用的輸入框 Modal (保留：給原子存檔用)
+// 1. Generic Input Modal (Retained: for atomic saving)
 // ============================================================
 export class InputModal extends Modal {
     result: string;
@@ -21,7 +21,7 @@ export class InputModal extends Modal {
         contentEl.createEl('h2', { text: this.title });
 
         new Setting(contentEl)
-            .setName('名稱')
+            .setName('Name')
             .addText((text) =>
                 text.onChange((value) => {
                     this.result = value;
@@ -37,7 +37,7 @@ export class InputModal extends Modal {
         new Setting(contentEl)
             .addButton((btn) =>
                 btn
-                    .setButtonText('確認')
+                    .setButtonText('Confirm')
                     .setCta()
                     .onClick(() => {
                         this.onSubmit(this.result);
@@ -52,7 +52,7 @@ export class InputModal extends Modal {
 }
 
 // ============================================================
-// 2. 通用的選擇清單 (Suggester) (保留：給歷史還原用)
+// 2. Generic Selection List (Suggester) (Retained: for history restoration)
 // ============================================================
 export class GenericSuggester<T> extends FuzzySuggestModal<T> {
     items: T[];
@@ -85,16 +85,16 @@ export class GenericSuggester<T> extends FuzzySuggestModal<T> {
 }
 
 // ============================================================
-// 3. 🔥 新增：編譯選項視窗 (CompileModal)
+// 3. 🔥 New: Compile Options Modal (CompileModal)
 // ============================================================
 
 export interface CompileOptions {
-    removeYaml: boolean;      // 移除 YAML
-    removeSceneInfo: boolean; // 移除情節卡片 (Callout)
-    removeComments: boolean;  // 移除 %% 註釋 %%
-    removeStrikethrough: boolean; // 移除 ~~ 刪除線 ~~
-    mergeBold: boolean;       // 合併 ** 粗體 **
-    removeHighlights: boolean;// 移除 == 高亮 ==
+    removeYaml: boolean;      // Remove YAML
+    removeSceneInfo: boolean; // Remove Scene Cards (Callout)
+    removeComments: boolean;  // Remove %% comments %%
+    removeStrikethrough: boolean; // Remove ~~ strikethrough ~~
+    mergeBold: boolean;       // Merge ** bold text **
+    removeHighlights: boolean;// Remove == highlights ==
     removeInternalLinks: boolean;
     insertFileNameAsHeading: string;
     hashtagAction: 'none' | 'remove-all' | 'remove-hash';
@@ -123,106 +123,106 @@ export class CompileModal extends Modal {
     onOpen() {
         const { contentEl } = this;
         contentEl.empty();
-        contentEl.createEl('h2', { text: '📤 匯出編譯設定' });
-        contentEl.createEl('p', { text: '請選擇要清理的內容，這些操作只會影響輸出檔，不會修改原稿。', cls: 'setting-item-description' });
+        contentEl.createEl('h2', { text: '📤 Compile & Export Settings' });
+        contentEl.createEl('p', { text: 'Select the content to clean. These actions only affect the output file and will not modify your original manuscript.', cls: 'setting-item-description' });
 
         // ==========================================
-        // 🛠️ 手機版 UI 拯救：建立「可滾動」的選項區域
+        // 🛠️ Mobile UI Rescue: Create a "scrollable" options area
         // ==========================================
         const scrollArea = contentEl.createDiv();
-        scrollArea.style.maxHeight = "55vh"; // 限制最大高度為螢幕高度的 55%
+        scrollArea.style.maxHeight = "55vh"; // Limit maximum height to 55% of the screen height
         scrollArea.style.overflowY = "auto";
-        scrollArea.style.paddingRight = "10px"; // 留位畀捲軸
+        scrollArea.style.paddingRight = "10px"; // Leave space for the scrollbar
 
         new Setting(scrollArea)
-            .setName(t("modal_compile_opt_heading") || "📄 插入檔案名稱作為章節標題")
-            .setDesc(t("modal_compile_opt_heading_desc") || "在每個章節頂部插入對應層級的標題。為免與劇情卡片 (H6) 衝突，最多支援至 H5。")
+            .setName(t("modal_compile_opt_heading") || "📄 Insert File Name as Chapter Heading")
+            .setDesc(t("modal_compile_opt_heading_desc") || "Insert corresponding level headings at the top of each chapter. To avoid conflicts with Scene Cards (H6), up to H5 is supported.")
             .addDropdown(drop => drop
-                .addOption('none', '不插入 (預設)')
-                .addOption('1', 'H1 (# 標題)')
-                .addOption('2', 'H2 (## 標題)')
-                .addOption('3', 'H3 (### 標題)')
-                .addOption('4', 'H4 (#### 標題)')
-                .addOption('5', 'H5 (##### 標題)')
+                .addOption('none', 'Do Not Insert (Default)')
+                .addOption('1', 'H1 (# Heading)')
+                .addOption('2', 'H2 (## Heading)')
+                .addOption('3', 'H3 (### Heading)')
+                .addOption('4', 'H4 (#### Heading)')
+                .addOption('5', 'H5 (##### Heading)')
                 .setValue(this.options.insertFileNameAsHeading)
                 .onChange(value => this.options.insertFileNameAsHeading = value)
             );
 
 
         new Setting(scrollArea)
-            .setName('移除 YAML Frontmatter')
-            .setDesc('刪除檔案開頭的 --- 設定區塊')
+            .setName('Remove YAML Frontmatter')
+            .setDesc('Delete the --- configuration block at the beginning of the file.')
             .addToggle(toggle => toggle
                 .setValue(this.options.removeYaml)
                 .onChange(value => this.options.removeYaml = value));
 
         new Setting(scrollArea)
-            .setName('移除情節卡片 (Callout)')
-            .setDesc('刪除 ###### 🎬 及相關引用塊')
+            .setName('Remove Scene Cards (Callout)')
+            .setDesc('Delete ###### 🎬 and related callout blocks.')
             .addToggle(toggle => toggle
                 .setValue(this.options.removeSceneInfo)
                 .onChange(value => this.options.removeSceneInfo = value));
 
         new Setting(scrollArea)
-            .setName('移除註釋')
-            .setDesc('刪除所有 %% 註釋內容 %%')
+            .setName('Remove Comments')
+            .setDesc('Delete all %% comments %%.')
             .addToggle(toggle => toggle
                 .setValue(this.options.removeComments)
                 .onChange(value => this.options.removeComments = value));
 
         new Setting(scrollArea)
-            .setName('移除刪除線內容')
-            .setDesc('刪除所有 ~~ 被刪除的文字 ~~')
+            .setName('Remove Strikethrough')
+            .setDesc('Delete all ~~strikethrough~~ text.')
             .addToggle(toggle => toggle
                 .setValue(this.options.removeStrikethrough)
                 .onChange(value => this.options.removeStrikethrough = value));
 
         new Setting(scrollArea)
-            .setName('合併粗體 (定稿)')
-            .setDesc('將 **粗體文字** 轉為普通文字')
+            .setName('Merge Bold Text (Finalize)')
+            .setDesc('Convert **bold text** into normal text.')
             .addToggle(toggle => toggle
                 .setValue(this.options.mergeBold)
                 .onChange(value => this.options.mergeBold = value));
 
         new Setting(scrollArea)
-            .setName('移除高亮')
-            .setDesc('移除所有 == 高亮符號 ==')
+            .setName('Remove Highlights')
+            .setDesc('Remove all ==highlight symbols==.')
             .addToggle(toggle => toggle
                 .setValue(this.options.removeHighlights)
                 .onChange(value => this.options.removeHighlights = value));
 
         new Setting(scrollArea)
-            .setName('移除內部連結符號')
-            .setDesc('將 [[連結|顯示名稱]] 轉換為純文字 (只保留顯示名稱)')
+            .setName('Remove Internal Link Symbols')
+            .setDesc('Convert [[Link|Display Name]] to plain text (keeping only the display name).')
             .addToggle(toggle => toggle
                 .setValue(this.options.removeInternalLinks)
                 .onChange(val => this.options.removeInternalLinks = val));
 
-        // 喺加入 removeInternalLinks 的 Setting 下面，加入這段：
+        // Below the removeInternalLinks Setting, add this section:
         new Setting(scrollArea)
-            .setName("標籤處理 (Hashtags)")
-            .setDesc("處理文稿中的 #標籤 (系統能精準識別，絕不會誤刪 # 標題)")
+            .setName("Hashtag Processing")
+            .setDesc("Process #tags in the manuscript (The system identifies accurately and will never accidentally delete # headers).")
             .addDropdown(drop => drop
-                .addOption('none', '保留原樣')
-                .addOption('remove-hash', '僅刪除 # 符號 (例如 #Draft 變成 Draft)')
-                .addOption('remove-all', '完全刪除該標籤與文字')
+                .addOption('none', 'Keep as is')
+                .addOption('remove-hash', 'Remove # symbol only (e.g., #Draft becomes Draft)')
+                .addOption('remove-all', 'Completely remove the tag and text')
                 .setValue(this.options.hashtagAction)
                 .onChange(value => this.options.hashtagAction = value as any)
             );
 
         // ==========================================
-        // 🛠️ 手機版 UI 拯救：建立「永遠置底」的按鈕區域
+        // 🛠️ Mobile UI Rescue: Create an "always-at-bottom" button area
         // ==========================================
         const buttonArea = contentEl.createDiv();
         buttonArea.style.marginTop = "20px";
         buttonArea.style.paddingTop = "10px";
         buttonArea.style.borderTop = "1px solid var(--background-modifier-border)";
         buttonArea.style.display = "flex";
-        buttonArea.style.justifyContent = "flex-end"; // 將掣推向右邊
+        buttonArea.style.justifyContent = "flex-end"; // Push buttons to the right
 
         new Setting(buttonArea)
             .addButton(btn => btn
-                .setButtonText('開始編譯')
+                .setButtonText('Start Compilation')
                 .setCta()
                 .onClick(() => {
                     this.close();
@@ -237,7 +237,7 @@ export class CompileModal extends Modal {
 }
 
 // ============================================================
-// 4. 🔥 新增：章節選擇視窗 (Step 1)
+// 4. 🔥 New: Chapter Selection Modal (Step 1)
 // ============================================================
 export class ChapterSelectionModal extends Modal {
     allFiles: TFile[];
@@ -247,35 +247,35 @@ export class ChapterSelectionModal extends Modal {
     constructor(app: App, files: TFile[], onNext: (selected: TFile[]) => void) {
         super(app);
         this.allFiles = files;
-        this.selectedSet = new Set(files); // 預設全選
+        this.selectedSet = new Set(files); // Default select all
         this.onNext = onNext;
     }
 
     onOpen() {
         const { contentEl } = this;
         contentEl.empty();
-        contentEl.createEl('h2', { text: '📚 Step 1: 選擇要合併的章節' });
+        contentEl.createEl('h2', { text: '📚 Step 1: Select Chapters to Compile' });
 
 
-        // --- 控制列：全選/全不選 ---
+        // --- Control Row: Select All / Deselect All ---
         const controlDiv = contentEl.createDiv({ cls: 'ns-chapter-controls' });
         controlDiv.style.marginBottom = '10px';
         controlDiv.style.display = 'flex';
         controlDiv.style.gap = '10px';
 
-        const btnAll = controlDiv.createEl('button', { text: '✅ 全選' });
+        const btnAll = controlDiv.createEl('button', { text: '✅ Select All' });
         btnAll.onclick = () => {
             this.allFiles.forEach(f => this.selectedSet.add(f));
             this.refreshList(listDiv);
         };
 
-        const btnNone = controlDiv.createEl('button', { text: '⬜️ 全不選' });
+        const btnNone = controlDiv.createEl('button', { text: '⬜️ Deselect All' });
         btnNone.onclick = () => {
             this.selectedSet.clear();
             this.refreshList(listDiv);
         };
 
-        // --- 檔案列表容器 (可滾動) ---
+        // --- File List Container (Scrollable) ---
         const listDiv = contentEl.createDiv({ cls: 'ns-chapter-list' });
         listDiv.style.maxHeight = '50vh';
         listDiv.style.overflowY = 'auto';
@@ -284,11 +284,11 @@ export class ChapterSelectionModal extends Modal {
         listDiv.style.marginBottom = '20px';
         listDiv.style.borderRadius = '4px';
 
-        // 渲染列表
+        // Render list
         this.refreshList(listDiv);
 
         // ==========================================
-        // 🔥 手機版 UI 拯救：固定置底按鈕區域
+        // 🔥 Mobile UI Rescue: Fixed bottom button area
         // ==========================================
         const buttonArea = contentEl.createDiv();
         buttonArea.style.borderTop = "1px solid var(--background-modifier-border)";
@@ -297,26 +297,26 @@ export class ChapterSelectionModal extends Modal {
         buttonArea.style.justifyContent = "flex-end";
 
 
-        // --- 下一步按鈕 ---
+        // --- Next Step Button ---
         new Setting(buttonArea)
             .addButton(btn => btn
-                .setButtonText('下一步 (設定清理選項) 👉')
+                .setButtonText('Next Step (Set Cleanup Options) 👉')
                 .setCta()
                 .onClick(() => {
-                    // 過濾出選擇的檔案 (保持原始排序)
+                    // Filter out selected files (maintaining original order)
                     const finalSelection = this.allFiles.filter(f => this.selectedSet.has(f));
 
                     if (finalSelection.length === 0) {
-                        new Notice("⚠️ 請至少選擇一個章節！");
+                        new Notice("⚠️ Please select at least one chapter!");
                         return;
                     }
 
                     this.close();
-                    this.onNext(finalSelection); // 進入下一步
+                    this.onNext(finalSelection); // Proceed to the next step
                 }));
     }
 
-    // 輔助：重新渲染列表 (當點擊全選/全不選時)
+    // Helper: Re-render list (when clicking select all/deselect all)
     refreshList(container: HTMLElement) {
         container.empty();
         this.allFiles.forEach(file => {
@@ -337,7 +337,7 @@ export class ChapterSelectionModal extends Modal {
 }
 
 
-// 5. 🔥 新增：確認視窗 (SimpleConfirmModal)
+// 5. 🔥 New: Confirmation Modal (SimpleConfirmModal)
 export class SimpleConfirmModal extends Modal {
     onConfirm: () => void;
     message: string;
@@ -354,10 +354,10 @@ export class SimpleConfirmModal extends Modal {
 
         const div = contentEl.createDiv({ cls: 'modal-button-container' });
 
-        const btnCancel = div.createEl('button', { text: '取消' });
+        const btnCancel = div.createEl('button', { text: 'Cancel' });
         btnCancel.onclick = () => this.close();
 
-        const btnConfirm = div.createEl('button', { text: '確認執行', cls: 'mod-cta' });
+        const btnConfirm = div.createEl('button', { text: 'Confirm Execution', cls: 'mod-cta' });
         btnConfirm.onclick = () => {
             this.close();
             this.onConfirm();
@@ -394,17 +394,17 @@ export class CleanDraftModal extends Modal {
     onOpen() {
         const { contentEl } = this;
         contentEl.empty();
-        contentEl.createEl("h2", { text: "🧹 一鍵定稿" });
-        contentEl.createEl("p", { text: "請選擇要從當前文章中清除的標記 (預設全選)：", cls: "setting-item-description" });
+        contentEl.createEl("h2", { text: "🧹 Clean Draft" });
+        contentEl.createEl("p", { text: "Select the markers to clear from the current document (default is select all):", cls: "setting-item-description" });
 
-        new Setting(contentEl).setName("移除註釋 (%%...%%)").addToggle(t => t.setValue(this.options.removeComments).onChange(v => this.options.removeComments = v));
-        new Setting(contentEl).setName("移除刪除線 (~~...~~)").addToggle(t => t.setValue(this.options.removeStrikethrough).onChange(v => this.options.removeStrikethrough = v));
-        new Setting(contentEl).setName("移除高亮 (==...==)").addToggle(t => t.setValue(this.options.removeHighlights).onChange(v => this.options.removeHighlights = v));
-        new Setting(contentEl).setName("移除內部連結 ([[...]])").setDesc("保留顯示文字，僅移除雙括號").addToggle(t => t.setValue(this.options.removeInternalLinks).onChange(v => this.options.removeInternalLinks = v));
+        new Setting(contentEl).setName("Remove Comments (%%...%%)").addToggle(t => t.setValue(this.options.removeComments).onChange(v => this.options.removeComments = v));
+        new Setting(contentEl).setName("Remove Strikethrough (~~...~~)").addToggle(t => t.setValue(this.options.removeStrikethrough).onChange(v => this.options.removeStrikethrough = v));
+        new Setting(contentEl).setName("Remove Highlights (==...==)").addToggle(t => t.setValue(this.options.removeHighlights).onChange(v => this.options.removeHighlights = v));
+        new Setting(contentEl).setName("Remove Internal Links ([...])").setDesc("Keep display text, remove only the double brackets.").addToggle(t => t.setValue(this.options.removeInternalLinks).onChange(v => this.options.removeInternalLinks = v));
 
         new Setting(contentEl)
             .addButton(btn => btn
-                .setButtonText("確定清除")
+                .setButtonText("Confirm Cleanup")
                 .setCta()
                 .onClick(() => {
                     this.close();
@@ -418,7 +418,7 @@ export class CleanDraftModal extends Modal {
 }
 
 // ============================================================
-// 🎨 豪華版劇情卡片建立器 (支援選色)
+// 🎨 Premium Scene Card Creator (Supports color selection)
 // ============================================================
 export class SceneCreateModal extends Modal {
     titleText: string;
@@ -439,7 +439,7 @@ export class SceneCreateModal extends Modal {
         contentEl.createEl("h2", { text: this.titleText });
 
         new Setting(contentEl)
-            .setName("情節名稱")
+            .setName("Scene Name")
             .addText(text => {
                 text.setValue(this.defaultName);
                 text.onChange(value => { this.defaultName = value; });
@@ -450,10 +450,10 @@ export class SceneCreateModal extends Modal {
             });
 
         const colorSetting = new Setting(contentEl)
-            .setName("標籤顏色")
-            .setDesc("為這個情節選擇一個代表色 (可選)");
+            .setName("Tag Color")
+            .setDesc("Select a representative color for this scene (Optional).");
 
-        // 建立顏色丸仔容器
+        // Create color picker container
         const colorContainer = colorSetting.controlEl.createDiv({ cls: "ns-color-picker-container" });
         colorContainer.style.display = "flex";
         colorContainer.style.gap = "8px";
@@ -474,7 +474,7 @@ export class SceneCreateModal extends Modal {
 
             btn.onclick = () => {
                 this.selectedColorId = color.id;
-                // 重置所有邊框，高亮被選中嘅顏色
+                // Reset all borders, highlight the selected color
                 Array.from(colorContainer.children).forEach((child: HTMLElement) => {
                     child.style.border = "2px solid transparent";
                 });
@@ -484,7 +484,7 @@ export class SceneCreateModal extends Modal {
 
         new Setting(contentEl)
             .addButton(btn => btn
-                .setButtonText("確定")
+                .setButtonText("Confirm")
                 .setCta()
                 .onClick(() => this.submit()));
 
@@ -493,7 +493,7 @@ export class SceneCreateModal extends Modal {
 
     submit() {
         if (!this.defaultName.trim()) {
-            new Notice("請輸入情節名稱！");
+            new Notice("Please enter a scene name!");
             return;
         }
         this.close();

@@ -20,13 +20,13 @@ export class HistoryManager {
         const cursor = editor.getCursor();
         const lineCount = editor.lineCount();
 
-        // 🔥 P2 架構重構：全域雷達一秒搞定基礎資料
+        // 🔥 P2 Architecture Refactoring: Global radar handles basic data instantly
         const parsedScenes = parseUniversalScenes(editor.getValue());
         const currentScene = [...parsedScenes].reverse().find(s => s.lineIndex <= cursor.line);
 
         if (!currentScene) return null;
 
-        // 依然需要向下尋找此情節的結尾位置 (遇到下個標記或檔案結尾)
+        // Still need to search downwards for the end of this scene (until the next marker or EOF)
         let endLineIndex = lineCount;
         for (let i = currentScene.lineIndex + 1; i < lineCount; i++) {
             const line = editor.getLine(i);
@@ -49,15 +49,15 @@ export class HistoryManager {
         const editor = view.editor;
         const scene = this.getSceneInfoAtCursor(editor);
 
-        if (!scene) { new Notice("⚠️ 請將游標放在 ###### 情節範圍內"); return; }
-        if (!scene.id) { new Notice("🚫 此情節尚未有 ID！請先執行智能儲存。"); return; }
+        if (!scene) { new Notice("⚠️ Please place your cursor within a ###### scene block."); return; }
+        if (!scene.id) { new Notice("🚫 This scene does not have an ID yet! Please execute Smart Save first."); return; }
 
         const rawRange = editor.getRange({ line: scene.startLine + 1, ch: 0 }, { line: scene.endLine, ch: 0 });
         const lines = rawRange.split("\n");
         let bodyLines = [];
         let isMeta = true;
 
-        // 🔥 終極修復：精準識別 Callout，保護正文的 Blockquote！
+        // 🔥 Ultimate Fix: Accurately identify Callout, protecting the Blockquote of the body text!
         for (const line of lines) {
             if (isMeta) {
                 const trimLine = line.trim();
@@ -69,15 +69,15 @@ export class HistoryManager {
         }
 
         const cleanContent = bodyLines.join("\n").trim();
-        if (!cleanContent) { new Notice("⚠️ 情節內文是空的，無法存檔。"); return; }
+        if (!cleanContent) { new Notice("⚠️ The scene body is empty; cannot be saved."); return; }
 
-        new InputModal(this.app, `備份：${scene.title}`, async (verName) => {
+        new InputModal(this.app, `Backup: ${scene.title}`, async (verName) => {
             if (!verName) return;
 
 
-            // 🔥 升級 4：消毒處理！強制將所有換行符號 (Enter) 轉換為空格，防止破壞 Markdown 格式
+            // 🔥 Upgrade 4: Sanitization! Force convert all line breaks (Enter) to spaces to prevent breaking Markdown formatting
             const sanitizedVerName = verName.replace(/[\r\n]+/g, " ").trim();
-            const finalVerName = sanitizedVerName === "" ? "自動備份" : sanitizedVerName;
+            const finalVerName = sanitizedVerName === "" ? "Auto Backup" : sanitizedVerName;
 
 
             await this.executeSave(scene.id!, scene.title, cleanContent, finalVerName);
@@ -86,7 +86,7 @@ export class HistoryManager {
     }
 
     async executeSave(id: string, title: string, content: string, verName: string) {
-        // 🔥 修改：直接使用合併後的路徑
+        // 🔥 Modification: Directly use the merged path
         const historyFolder = `${this.settings.bookFolderPath}/${HISTORY_DIR}`;
         const targetFilePath = `${historyFolder}/${id}.md`;
 
@@ -96,10 +96,10 @@ export class HistoryManager {
         const timestamp = moment().format("YYYY-MM-DD HH:mm");
 
         if (!(historyFile instanceof TFile)) {
-            // 🔥 YAML 炸彈拆除：安全處理標題中的雙引號，並改用更標準的列表格式
+            // 🔥 YAML Bomb Defusal: Safely handle double quotes in titles, and switch to a more standard list format
             const safeTitle = title.replace(/"/g, '\\"');
 
-            const fileHeader = `---\naliases:\n  - "${safeTitle}"\ncreated: ${timestamp}\nscene_id: ${id}\n---\n# 📜 歷史紀錄：${title}\n> [!info] 系統提示\n> 此檔案以 ID 命名，即使原稿改名，紀錄依然存在。\n\n`;
+            const fileHeader = `---\naliases:\n  - "${safeTitle}"\ncreated: ${timestamp}\nscene_id: ${id}\n---\n# 📜 History Record: ${title}\n> [!info] System Notice\n> This file is named by ID, so records remain even if the manuscript is renamed.\n\n`;
 
             historyFile = await this.app.vault.create(targetFilePath, fileHeader);
         }
@@ -109,12 +109,12 @@ export class HistoryManager {
 
         if (historyFile instanceof TFile) {
             await this.app.vault.append(historyFile, versionBlock);
-            new Notice(`✅ 原子備份成功！\n(ID: ${id})`);
+            new Notice(`✅ Atomic Backup successful!\n(ID: ${id})`);
         }
     }
 
     public async getSceneVersions(sceneId: string) {
-        // 🔥 修改：直接使用合併後的路徑
+        // 🔥 Modification: Directly use the merged path
         const historyPath = `${this.settings.bookFolderPath}/${HISTORY_DIR}/${sceneId}.md`;
         const historyFile = this.app.vault.getAbstractFileByPath(historyPath);
 
@@ -141,7 +141,7 @@ export class HistoryManager {
         const currentLines = currentRangeText.split("\n");
         let metaBuffer = [];
 
-        // 🔥 終極修復：還原時同樣精準識別，不破壞正文
+        // 🔥 Ultimate Fix: Accurately identify during restoration, without breaking the body text
         for (const line of currentLines) {
             const trimLine = line.trim();
             if (trimLine.startsWith("> [!NSmith") || trimLine.startsWith("> [!info") || trimLine.startsWith("> -") || trimLine === ">") {
@@ -153,15 +153,15 @@ export class HistoryManager {
 
         const finalBlock = metaBuffer.join("\n").trim() + "\n\n" + newContent + "\n";
         editor.replaceRange(finalBlock, { line: scene.startLine + 1, ch: 0 }, { line: scene.endLine, ch: 0 });
-        new Notice("✅ 版本已還原！");
+        new Notice("✅ Version restored successfully!");
     }
 
     public async showPreview(title: string, verLabel: string, content: string) {
-        // 🔥 修改：直接使用合併後的路徑
+        // 🔥 Modification: Directly use the merged path
         const previewPath = `${this.settings.bookFolderPath}/${HISTORY_DIR}/preview_Temp.md`;
         let previewFile = this.app.vault.getAbstractFileByPath(previewPath);
 
-        const previewText = `# 👀 預覽：${title}\n> 📅 版本：${verLabel}\n\n---\n\n${content}`;
+        const previewText = `# 👀 Preview: ${title}\n> 📅 Version: ${verLabel}\n\n---\n\n${content}`;
 
         if (!(previewFile instanceof TFile)) {
             await this.app.vault.create(previewPath, previewText);
@@ -173,22 +173,22 @@ export class HistoryManager {
         let leaf = this.app.workspace.getLeavesOfType("markdown").find(l => l.view.file && l.view.file.path === previewPath);
         if (!leaf) leaf = this.app.workspace.getLeaf('split', 'vertical');
         if (previewFile instanceof TFile) await leaf.openFile(previewFile);
-        new Notice("👀 預覽已開啟 (右側)");
+        new Notice("👀 Preview opened (Right panel)");
     }
 
     async restoreVersion(view: MarkdownView) {
         const editor = view.editor;
         const scene = this.getSceneInfoAtCursor(editor);
 
-        if (!scene || !scene.id) { new Notice("⚠️ 無法還原：請確保游標在有 ID 的情節內。"); return; }
+        if (!scene || !scene.id) { new Notice("⚠️ Cannot restore: Please ensure your cursor is inside a scene with an ID."); return; }
 
         const versions = await this.getSceneVersions(scene.id);
-        if (versions.length === 0) { new Notice("⚠️ 找不到任何版本紀錄。"); return; }
+        if (versions.length === 0) { new Notice("⚠️ No version records found."); return; }
 
         new GenericSuggester(this.app, versions, (item) => item.label, (selectedVersion) => {
             const actions = [
-                { label: "👀 預覽內容 (Preview)", id: "preview" },
-                { label: "⏪ 確認還原 (Restore)", id: "restore" }
+                { label: "👀 Preview", id: "preview" },
+                { label: "⏪ Restore", id: "restore" }
             ];
             new GenericSuggester(this.app, actions, (action) => action.label, async (selectedAction) => {
                 if (selectedAction.id === "preview") {

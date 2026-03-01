@@ -1,5 +1,5 @@
 /* ============================================================
-   🔍 贅字與對話模式 (保持不變)
+   🔍 Redundant words and Dialogue mode (remains unchanged)
    ============================================================ */
 .cm-redundant-text {
     background-color: rgba(255, 80, 80, 0.25);
@@ -22,10 +22,10 @@ body.mode-dialogue .cm-dialogue-text {
 }
 
 /* ============================================================
-   🙈 結構樣式 (Structure Decorators) - 安全縮小版
+   🙈 Structure Decorators - Safe scaled-down version
    ============================================================ */
 
-/* 1. 檔案大標題 (# 📄 檔案名)：優雅置中，似實體書章節 */
+/* 1. File Main Header (# 📄 File name): Elegantly centered, like a physical book chapter */
 .cm-small-header {
     display: block !important;
     text-align: center !important;
@@ -38,25 +38,25 @@ body.mode-dialogue .cm-dialogue-text {
     letter-spacing: 2px;
 }
 
-/* 2. 確保 CodeMirror 裝飾器唔會干擾我哋嘅神聖結界 */
+/* 2. Ensure CodeMirror decorators do not interfere with our sacred barriers */
 .cm-small-id {
     display: none !important;
 }
 
 /* ============================================================
-   📱 觸控大綱 (Structure View)
+   📱 Touch-friendly Outline (Structure View)
    ============================================================ */
 
-/* 整個面板的容器 */
+/* Container for the entire panel */
 .ns-structure-container {
     padding: 15px 10px;
     height: 100%;
     overflow-y: auto;
     overflow-x: hidden !important;
-    /* 🔥 絕對鎖死：嚴禁左右滑動！ */
+    /* 🔥 Absolutely locked: Horizontal scrolling strictly prohibited! */
 }
 
-/* 章節容器 (像一個個箱子) */
+/* Chapter container (like individual boxes) */
 .ns-chapter-box {
     background-color: var(--background-secondary);
     border: 1px solid var(--background-modifier-border);
@@ -64,11 +64,11 @@ body.mode-dialogue .cm-dialogue-text {
     margin-bottom: 15px;
     padding: 8px;
     word-wrap: break-word;
-    /* 🔥 確保資訊面板的長文字自動換行，不撐爆畫面 */
+    /* 🔥 Ensure long text in the info panel wraps automatically, preventing layout breaks */
     overflow-wrap: break-word;
 }
 
-/* 章節標題卡片 */
+/* Chapter header card */
 .ns-chapter-card {
     background-color: var(--interactive-accent);
     color: var(--text-on-accent);
@@ -81,27 +81,27 @@ body.mode-dialogue .cm-dialogue-text {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* 2. 情節列表 (放卡片的地方) */
+/* 2. Scene list (where cards are placed) */
 .ns-scene-list {
     min-height: 20px;
-    /* 即使空的也能拖進去 */
+    /* Can be dragged into even if empty */
     padding: 2px;
 }
 
-/* 情節卡片 (特大號，方便手指篤) */
+/* Scene card (Extra large for easy touch) */
 .ns-scene-card {
     background-color: var(--background-primary);
     border: 1px solid var(--background-modifier-border);
     border-left: 4px solid var(--text-muted);
-    /* 左邊加條線做識別 */
+    /* Add a line on the left for identification */
     border-radius: 6px;
     padding: 12px 10px;
-    /* 大一點的 Padding */
+    /* Larger padding */
     margin-bottom: 8px;
     cursor: grab;
     transition: transform 0.1s, box-shadow 0.1s;
 
-    /* 讓文字不換行，超出顯示 ... */
+    /* Prevent text wrapping, truncate with ... */
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -112,15 +112,15 @@ body.mode-dialogue .cm-dialogue-text {
 
 .ns-scene-card:hover {
     border-color: var(--interactive-accent);
-    /* 邊框變色 */
+    /* Border color change */
     background-color: var(--background-primary-alt);
-    /* 背景微變 */
+    /* Slight background change */
     transform: translateY(-1px);
-    /* 輕微浮起 */
+    /* Slight lift effect */
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
-/* 拖拽時的特效 */
+/* Drag and drop visual effects */
 .sortable-ghost {
     opacity: 0.4;
     background-color: var(--interactive-accent);
@@ -132,24 +132,24 @@ body.mode-dialogue .cm-dialogue-text {
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
 }
 
-/* 重新整理按鈕 */
+/* Refresh button */
 .ns-refresh-btn {
     width: 100%;
     margin-bottom: 10px;
 }
 
 /* ============================================================
-   🎛️ 側邊控制面板 (Control Panel UI)
+   🎛️ Control Panel UI
    ============================================================ */
 
-/* 頂部按鈕區與分頁區的容器 (🔥 終極吸頂版) */
+/* Container for top buttons and tabs (🔥 Ultimate sticky header) */
 .ns-control-header {
     display: flex;
     flex-direction: column;
     gap: 8px;
     border-bottom: 1px solid var(--background-modifier-border);
 
-    /* 🔥 修正：精準抵消 10px 邊距，一像素也不凸出去！ */
+    /* 🔥 Fix: Precisely offset the 10px margin, not a single pixel out of bounds! */
     margin: -15px -10px 10px -10px;
     padding: 15px 10px 10px 10px;
 
@@ -159,7 +159,7 @@ body.mode-dialogue .cm-dialogue-text {
     z-index: 99;
 }
 
-/* 橫向按鈕列 */
+/* Horizontal button row */
 .ns-button-row {
     display: flex;
     gap: 5px;
@@ -174,7 +174,7 @@ body.mode-dialogue .cm-dialogue-text {
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-/* 分頁標籤列 (Tabs) */
+/* Tab row */
 .ns-tabs-row {
     display: flex;
     gap: 5px;
@@ -207,7 +207,7 @@ body.mode-dialogue .cm-dialogue-text {
 }
 
 /* ============================================================
-   🕰️ 歷史紀錄分頁 (History Tab)
+   🕰️ History Tab
    ============================================================ */
 .ns-history-list {
     display: flex;
@@ -243,42 +243,42 @@ body.mode-dialogue .cm-dialogue-text {
 }
 
 /* ============================================================
-   🏷️ 專屬情節卡片 Callout: [!NSmith]
+   🏷️ Exclusive Scene Card Callout: [!NSmith]
    ============================================================ */
 .callout[data-callout="nsmith"] {
     --callout-color: 100, 150, 255;
-    /* 藍色系，可以隨意更改 rgb 值 */
+    /* Blue theme, rgb values can be freely changed */
     --callout-icon: lucide-film;
-    /* 電影場景 icon */
+    /* Movie scene icon */
     background-color: rgba(var(--callout-color), 0.1);
     border-left: 4px solid rgb(var(--callout-color));
 }
 
 /* ============================================================
-   🥷 專屬情節卡片 ID 隱形斗篷
+   🥷 Exclusive Scene Card ID Invisibility Cloak
    ============================================================ */
 .ns-id {
     display: none;
 }
 
-/* 3. 檔案 ID (<span class="ns-file-id">)：由隱形變為「系統防護線」 */
+/* 3. File ID (<span class="ns-file-id">): From invisible to 'System Defense Line' */
 .ns-file-id {
     display: inline-block;
     width: 100%;
     text-align: center;
     font-size: 0 !important;
-    /* 完美隱藏原本篤眼篤鼻的 ID 亂碼 */
+    /* Perfectly hide the original obtrusive ID gibberish */
     color: transparent !important;
     user-select: none !important;
-    /* 降低被滑鼠誤選的機率 */
+    /* Reduce the chance of accidental mouse selection */
     pointer-events: none !important;
-    /* 滑鼠點擊會直接穿透 */
+    /* Mouse clicks will pass straight through */
     margin-bottom: 30px;
 }
 
-/* 4. 利用 CSS 偽元素，無中生有變出一條警告橫線！ */
+/* 4. Use CSS pseudo-elements to magically conjure a warning divider! */
 .ns-file-id::before {
-    content: "━━━━━━━━ ✂️ 系統檔案邊界 ‧ 請勿刪除 ✂️ ━━━━━━━━";
+    content: "━━━━━━━━ ✂️ System File Boundary ‧ Do Not Delete ✂️ ━━━━━━━━";
     font-size: 12px;
     color: var(--text-faint);
     letter-spacing: 2px;
@@ -286,16 +286,16 @@ body.mode-dialogue .cm-dialogue-text {
 }
 
 /* ============================================================
-   🎨 NovelSmith 劇情卡片顏色系統 (支援深淺色模式自動適應)
+   🎨 NovelSmith Scene Card Color System (Auto-adapts to Dark/Light modes)
    ============================================================ */
 
-/* 預設邊框顏色，等佢未揀色嗰陣都靚仔 */
+/* Default border color, looks good even before a color is picked */
 .ns-scene-card {
     border-left: 4px solid transparent;
     transition: all 0.2s ease-in-out;
 }
 
-/* 當滑鼠指住卡片時微微加深，提升手感 */
+/* Slightly darken on hover for better tactile feel */
 .ns-scene-card:hover {
     filter: brightness(0.95);
 }
@@ -304,7 +304,7 @@ body.mode-dialogue .cm-dialogue-text {
     filter: brightness(1.15);
 }
 
-/* 6 隻主色嘅透明水彩背景 + 實色左邊框 */
+/* 6 main colors with transparent watercolor background + solid left border */
 .ns-scene-card.ns-color-red {
     background-color: rgba(var(--color-red-rgb), 0.15) !important;
     border-left-color: var(--color-red) !important;
@@ -331,23 +331,23 @@ body.mode-dialogue .cm-dialogue-text {
 }
 
 .ns-scene-card.ns-color-grey {
-    /* 灰色用 Obsidian 預設嘅基礎色，最為融和 */
+    /* Grey uses Obsidian's default base color for maximum harmony */
     background-color: rgba(var(--color-base-60-rgb), 0.15) !important;
     border-left-color: var(--text-muted) !important;
 }
 
 /* ============================================================
-   🎨 劇情卡片 Callout 連動顏色 (支援深淺色模式)
+   🎨 Scene Card Callout Linked Colors (Supports Dark/Light modes)
    ============================================================ */
 
-/* 預設 (舊有卡片兼容) */
+/* Default (Compatible with older cards) */
 .callout[data-callout="nsmith"],
 .callout[data-callout="nsmith-default"] {
     --callout-color: var(--color-base-60-rgb);
     --callout-icon: lucide-clapperboard;
 }
 
-/* 七彩變身 */
+/* Colorful transformations */
 .callout[data-callout="nsmith-red"] {
     --callout-color: var(--color-red-rgb);
     --callout-icon: lucide-clapperboard;
@@ -376,4 +376,29 @@ body.mode-dialogue .cm-dialogue-text {
 .callout[data-callout="nsmith-grey"] {
     --callout-color: var(--color-base-60-rgb);
     --callout-icon: lucide-clapperboard;
+}
+
+/* ============================================================
+   ✨ 按鈕點擊特效 (Button Animation Effects)
+   ============================================================ */
+@keyframes ns-button-click-pulse {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(0.92);
+        opacity: 0.8;
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.ns-btn-flash {
+    animation: ns-button-click-pulse 0.3s ease-out !important;
+    background-color: var(--interactive-accent) !important;
+    color: var(--text-on-accent) !important;
+    transition: all 0.2s ease;
 }

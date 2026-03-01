@@ -22,21 +22,19 @@ export class ScrivenerManager {
 
     async toggleScrivenings() {
         const activeFile = this.app.workspace.getActiveFile();
-        if (!activeFile) { new Notice("❌ 請先打開一個檔案！"); return; }
+        if (!activeFile) { new Notice("❌ Please open a file first!"); return; }
 
         const currentFolder = activeFile.parent;
-        if (!currentFolder) { new Notice("❌ 檔案位置異常"); return; }
+        if (!currentFolder) { new Notice("❌ Abnormal file location."); return; }
 
         if (activeFile.name === DRAFT_FILENAME) {
-            new Notice("⚡️ 準備同步回寫 (Sync)...");
+            new Notice("⚡️ Preparing to sync back (Sync)...");
             await this.syncBack(activeFile, currentFolder);
         } else {
-            // 🔥 防自爆機制：檢查資料夾內是否已經存在未同步的草稿！
+            // 🔥 Anti-self-destruct mechanism
             const draftPath = `${currentFolder.path}/${DRAFT_FILENAME}`;
             const existingDraft = this.app.vault.getAbstractFileByPath(draftPath);
 
-            // 將原本的編譯邏輯包裝成一個函數，方便稍後呼叫
-            // 🔥 防禦升級：將函數改為 async，以便讀取檔案內容
             const startCompileProcess = async () => {
                 const rawFiles = currentFolder.children.filter((f) =>
                     f instanceof TFile && f.extension === 'md' && f.name !== DRAFT_FILENAME &&
@@ -48,23 +46,23 @@ export class ScrivenerManager {
                 if (rawFiles.length === 0) { new Notice("⚠️ 資料夾內沒有可串聯的檔案。"); return; }
 
                 // =======================================================
-                // 🛡️ 文稿雷達探測：過濾出真正有「劇情卡片」的檔案 (或全新空白檔)
+                // 🛡️ Draft Radar: Look for file with scenes card
                 // =======================================================
                 const validFiles: TFile[] = [];
                 for (const f of rawFiles) {
-                    // 使用 cachedRead 極速讀取檔案內容 (幾十個 File 都只需幾毫秒)
+
                     const content = await this.app.vault.cachedRead(f);
 
-                    // 如果有 ###### 標記，或者係一個全新嘅空白檔案 (容許用家開新檔寫作)，就視為合法
+
                     if (content.includes("######") || content.trim() === "") {
                         validFiles.push(f);
                     }
                 }
 
-                // 如果過濾完之後一滴剩 (例如成個資料夾都係百科/設定集)
+
                 if (validFiles.length === 0) {
                     new Notice(t("warn_no_valid_manuscript"), 6000);
-                    return; // 果斷落閘！
+                    return;
                 }
 
                 let targetFileName = activeFile.name;
@@ -79,25 +77,25 @@ export class ScrivenerManager {
                     }
                 }
 
-                // 🔥 記得將傳入去嘅變數由 files 改為過濾後嘅 validFiles！
+
                 new ChapterSelectionModal(this.app, validFiles, async (selectedFiles) => {
                     new Notice(t("scrivener_compiling"));
                     await this.compileDraft(currentFolder, selectedFiles, targetFileName, targetSceneRaw);
                 }).open();
             };
 
-            // 🔥 核心攔截：如果發現舊草稿，彈出超嚴重警告視窗！
+
             if (existingDraft instanceof TFile) {
                 new SimpleConfirmModal(
                     this.app,
-                    "🚨 嚴重警告：發現未同步的串聯草稿！\n\n此資料夾內已經有一個串聯草稿存在。如果您現在重新啟動串聯模式，舊草稿中【所有未同步的修改】將會被徹底覆寫並永久遺失！\n\n確定要強行覆寫嗎？\n(強烈建議先按「取消」，打開該草稿並點擊「💾 同步並結束」)",
+                    "🚨 Warning: non-sync Scrivenering draft is found\n\nScrivenering draft exist in this folder. Start a new scrivenering draft will remove all your previous non-sync draft!\n\nAre you sure to replace it?\n(Suggest you to cancel and open the original draft, then press 💾 Sync and close)",
                     () => {
-                        // 用家確認要強行覆寫，先放行
+
                         startCompileProcess();
                     }
                 ).open();
             } else {
-                // 如果無舊草稿，直接正常啟動
+
                 startCompileProcess();
             }
         }
@@ -105,7 +103,7 @@ export class ScrivenerManager {
 
     async compileDraft(folder: TFolder, files: TFile[], targetFileName: string, targetSceneRaw: string) {
         let contentChunks: string[] = [];
-        contentChunks.push(`## 📜 串聯潤稿模式：${folder.name}\n`);
+        contentChunks.push(`## 📜 Scrivenering Mode：${folder.name}\n`);
 
         for (const file of files) {
             const content = await this.app.vault.read(file);
@@ -124,14 +122,14 @@ export class ScrivenerManager {
                     contentChunks.push(`${l}\n\n`);
                     isMeta = true;
                 } else if (isMeta) {
-                    // 🔥 P0 修復：精準識別 Callout，絕不誤食正文的 Blockquote！
+                    // 🔥 P0 Repair：Prevent removing Blockquote！
                     if (l.startsWith("> [!NSmith") || l.startsWith("> [!info") || l.startsWith("> -") || l === ">") {
                         continue;
                     } else if (l === "") {
-                        continue; // 略過屬性與正文之間的空白行
+                        continue;
                     } else {
                         isMeta = false;
-                        buffer.push(line); // 遇到真正的正文 (即使是 > 開頭的引言)
+                        buffer.push(line);
                     }
                 } else {
                     buffer.push(line);
@@ -150,7 +148,7 @@ export class ScrivenerManager {
         if (draftFile instanceof TFile) {
             const leaf = this.app.workspace.getLeaf(false);
             await leaf.openFile(draftFile);
-            new Notice(`✅ 編譯完成！共 ${files.length} 章`);
+            new Notice(`✅ Compilation complete！Total ${files.length} Chapters`);
 
             setTimeout(() => {
                 const newView = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -179,10 +177,10 @@ export class ScrivenerManager {
         const draftContent = await this.app.vault.read(draftFile);
 
         if (!draftContent.includes('<span class="ns-file-id">++ FILE_ID:')) {
-            new Notice("❌ 嚴重錯誤：找不到任何 FILE_ID 標記！無法同步。", 0); return;
+            new Notice("❌ Error：FILE_ID can't be found, Sync abort", 0); return;
         }
 
-        new Notice("🚀 同步中… (ID 優先模式)");
+        new Notice("🚀 Sync in process…");
 
         let leafToClose = null;
         const view = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -204,7 +202,7 @@ export class ScrivenerManager {
             data.cards.forEach(card => { if (card.id) globalIdMap.set(card.id, card); });
         }));
 
-        // 🔥 效能大躍進：在進入迴圈前「預先讀取」範本，避免迴圈內瘋狂讀取硬碟！
+
         let cachedTemplateText: string | null = null;
         const backstageTplPath = `${this.settings.bookFolderPath}/${TEMPLATES_DIR}/NovelSmith_Template.md`;
         const tplFile = this.app.vault.getAbstractFileByPath(backstageTplPath);
@@ -216,10 +214,10 @@ export class ScrivenerManager {
         let updatedCount = 0;
         const writePromises: Promise<void>[] = [];
 
-        // 🔥 升級 3：準備一本「失蹤人口名冊」
+
         const skippedFiles: string[] = [];
 
-        // 🔥 企業級防護 1A：準備「同步前快照」目錄與陣列
+        // 🔥 Draft protection 1A：prepare a snapshots before scrivenering
         const syncTimestamp = moment().format("YYYYMMDD_HHmmss");
         const snapshotDir = `${this.settings.bookFolderPath}/${HISTORY_DIR}/Sync_Snapshots/${syncTimestamp}`;
         let snapshotDirCreated = false;
@@ -244,7 +242,7 @@ export class ScrivenerManager {
             if (!originalData) {
                 skippedFiles.push(fileName);
                 continue;
-            }; // 防呆保護
+            };
 
 
             const draftData = parseContent(blockContent, false);
@@ -252,7 +250,7 @@ export class ScrivenerManager {
             const localTitleMap = new Map<string, DraftCard>();
             originalData.cards.forEach(card => localTitleMap.set(card.key, card));
 
-            // 🔥 大師級優化：改用陣列收集字串，徹底杜絕 += 造成的記憶體不斷重新分配！
+
             const chunks: string[] = [];
 
             if (originalData.headers.trim()) chunks.push(originalData.headers.trim() + "\n\n");
@@ -263,10 +261,10 @@ export class ScrivenerManager {
                 else if (localTitleMap.has(draftCard.key)) originalCard = localTitleMap.get(draftCard.key);
 
                 if (originalCard) {
-                    // 🔥 P0 修復：強制補回可能被用家誤刪的 ID 標籤！
+                    // 🔥 P0 repair：recover ID due to mistaken deletion
                     let safeHeader = draftCard.rawHeader.trimEnd();
                     if (originalCard.id && !safeHeader.includes(originalCard.id)) {
-                        // 清理殘留的半截 span (防呆)，然後補回完整 ID
+                        // remove span, then assign ID
                         safeHeader = safeHeader.replace(/<span.*?<\/span>/g, "").trimEnd();
                         safeHeader += ` <span class="ns-id" data-scene-id="${originalCard.id}" data-warning="${ST_WARNING}"></span>`;
                     }
@@ -282,8 +280,8 @@ export class ScrivenerManager {
                     if (draftCard.meta && draftCard.meta.length > 0) {
                         chunks.push(`${draftCard.meta.join("\n").trim()}\n\n`);
                     } else {
-                        // 使用剛才預先讀好的快取，瞬間生成
-                        let metaBlock = `> [!NSmith] 情節資訊\n> - Scene:: ${draftCard.key}\n> - Status:: #Writing`;
+
+                        let metaBlock = `> [!NSmith] Scene Info\n> - Scene:: ${draftCard.key}\n> - Status:: #Writing`;
                         if (cachedTemplateText) {
                             const metaBlockMatch = cachedTemplateText.match(/> \[!NSmith\][\s\S]*?(?=\n[^>]|$)/);
                             if (metaBlockMatch) metaBlock = metaBlockMatch[0].replace(/{{SceneName}}/g, draftCard.key).trim();
@@ -294,34 +292,34 @@ export class ScrivenerManager {
                 }
             }
 
-            // 🔥 迴圈結束後，一次過 join 成為字串，效能提升百倍！
+
             let finalContent = chunks.join("").trim();
 
 
 
             if (finalContent !== cachedData.text.trim()) {
-                // 🔥 企業級防護 1B：在覆寫前，先把原稿內容備份到 Snapshot 資料夾！
+                // 🔥 Protection 1B：Save Snapshot into history folder before sync.
                 if (!snapshotDirCreated) {
                     await ensureFolderExists(this.app, snapshotDir);
                     snapshotDirCreated = true;
                 }
                 const snapshotPath = `${snapshotDir}/${fileName}`;
-                // 記錄寫入快照的 Promise
+
                 snapshotPromises.push(this.app.vault.create(snapshotPath, cachedData.text));
 
-                // 記錄真正覆寫原稿的 Promise
+
                 writePromises.push(this.app.vault.modify(cachedData.file, finalContent));
                 updatedCount++;
             }
         }
-        // 🔥 企業級防護 1C：確保所有快照都安全落地後，才執行真正的覆寫！
+        // 🔥 Protection 1C：Execute sync after snapshorts are in place.
         if (snapshotPromises.length > 0) {
             await Promise.all(snapshotPromises);
         }
         await Promise.all(writePromises);
 
         // =========================================================
-        // 🔥 執行草稿封存：時間戳記放最前面！
+        // 🔥 Execute draft saving
         // =========================================================
         if (this.settings.keepDraftOnSync) {
             const timestamp = moment().format("YYYYMMDD_HHmmss");
@@ -329,42 +327,41 @@ export class ScrivenerManager {
             await ensureFolderExists(this.app, backstageDrafts);
 
             const baseName = draftFile.basename;
-            // 🔥 新命名規則：20260225_1742_NSmith_Scrivenering.md
+            // 🔥 New naming rule：20260225_1742_NSmith_Scrivenering.md
             const newPath = `${backstageDrafts}/${timestamp}_${baseName}.md`;
 
             await this.app.fileManager.renameFile(draftFile, newPath);
-            new Notice(`✅ 同步完成！草稿已封存`);
+            new Notice(`✅ Sync complete, draft saved`);
         } else {
             await this.app.vault.delete(draftFile);
-            new Notice(`✅ 同步完成！更新了 ${updatedCount} 個檔案。`);
+            new Notice(`✅ Sync complete, updated ${updatedCount} files.`);
         }
 
         if (leafToClose) leafToClose.detach();
-        // 🔥 升級 3：如果有失蹤人口，即刻發出最高級別警告！
+
         if (skippedFiles.length > 0) {
-            new Notice(`🚨 嚴重警告：有 ${skippedFiles.length} 個檔案無法同步（可能已被改名或刪除）！\n受影響檔案：${skippedFiles.join(", ")}`, 15000);
+            new Notice(`🚨 Error：${skippedFiles.length} files can't be synced. (Rename or deleted)\nFiles：${skippedFiles.join(", ")}`, 15000);
         }
     }
 
     // =========================================================
-    // 🔥 全新功能：捨棄草稿 (後悔藥)
+    // 🔥 New Feature: Discard Draft
     // =========================================================
     async discardDraft(draftFile: TFile) {
         let leafToClose = null;
         const view = this.app.workspace.getActiveViewOfType(MarkdownView);
 
-        // 如果當前視窗就係呢份草稿，記低佢等陣關閉
+        // If the current window is this draft, note it down to close later
         if (view && view.file && view.file.path === draftFile.path) {
             leafToClose = view.leaf;
         }
 
-        // 功成身退，關閉分頁
+
         if (leafToClose) leafToClose.detach();
 
-        // 🔥 貼心安全網：使用 app.vault.trash(file, true)
-        // true 代表放入 Mac/Windows 系統的垃圾桶，而不是徹底刪除，讓作家有機會反悔！
+        // After the visual disappears, silently trash the file in the background
         await this.app.vault.trash(draftFile, true);
-        new Notice("🗑️ 草稿已捨棄！原稿維持不變。\n(如需挽回，請到電腦作業系統的垃圾桶找回)");
+        new Notice("🗑️ Draft discarded! Original manuscript remains unchanged.\n(If you need to recover it, check your system's Trash/Recycle Bin)");
 
 
     }

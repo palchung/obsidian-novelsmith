@@ -17,7 +17,7 @@ export class WikiManager {
 
 
     // =================================================================
-    // 🧠 自動百科 (Auto Wiki)
+    // 🧠 AutoWiki
     // =================================================================
     async scanAndCreateWiki(view: MarkdownView) {
         const activeFile = view.file;
@@ -25,49 +25,49 @@ export class WikiManager {
 
         const targetFolder = this.settings.wikiFolderPath;
 
-        // 1. 確保目標資料夾存在
+        // 1. Ensure the target folder exists
         await ensureFolderExists(this.app, targetFolder);
 
-        // 2. 讀取內容
+        // 2. Read content
         const content = view.editor.getValue();
 
-        // 3. Regex 抓取 [[連結]]
-        // 優化版 Regex：忽略 #錨點 和 |別名，只抓檔名
+        // 3. Capture [[Links]] using Regex
+        // Optimized Regex: Ignore #anchors and |aliases, capture only the file name
         const regex = /\[\[([^\]|#^]+)(?:[#^][^\]|]*)?(?:\|[^\]]+)?\]\]/g;
         const matches = [...content.matchAll(regex)];
 
         if (matches.length === 0) {
-            new Notice("👀 這一章無發現任何 [[Internal Link]]。");
+            new Notice("👀 No [[Internal Links]] found in this chapter.");
             return;
         }
 
-        // 去除重複
+        // Remove duplicates
         const uniqueLinks = [...new Set(matches.map(m => m[1].trim()))];
 
         let createdCount = 0;
         let movedCount = 0;
         const activeFileName = activeFile.basename;
 
-        new Notice(`🔍 正在掃描 ${uniqueLinks.length} 個連結...`);
+        new Notice(`🔍 Scanning ${uniqueLinks.length} links...`);
 
         for (const linkName of uniqueLinks) {
-            // 跳過自己
+            // Skip self
             if (linkName === activeFileName) continue;
 
-            // 檢查檔案是否存在
+            // Check if the file exists
             const existingFile = this.app.metadataCache.getFirstLinkpathDest(linkName, "");
 
             if (!existingFile) {
-                // --- 情況 A：未存在 -> 建立新檔 ---
+                // --- Case A: Does not exist -> Create new file ---
                 const newFilePath = `${targetFolder}/${linkName}.md`;
-                // 預設內容：標題 + 標籤
-                const defaultContent = `# ${linkName}\n\n> [!info] 設定資料\n> - Type:: \n> - Tags:: #Wiki\n\n`;
+                // Default content: Title + Tags
+                const defaultContent = `# ${linkName}\n\n> [!info] Lore Data\n> - Type:: \n> - Tags:: #Wiki\n\n`;
 
                 await this.app.vault.create(newFilePath, defaultContent);
                 createdCount++;
             } else {
-                // --- 情況 B：已存在 -> 檢查是否需要搬運 ---
-                // 邏輯：如果檔案在根目錄 ("/" 或 "")，就搬入去設定集
+                // --- Case B: Exists -> Check if relocation is needed ---
+                // Logic: If the file is in the root directory ("/" or ""), move it to the wiki folder
                 if (existingFile.parent.path === "/" || existingFile.parent.path === "") {
                     const newPath = `${targetFolder}/${existingFile.name}`;
                     await this.app.fileManager.renameFile(existingFile, newPath);
@@ -77,9 +77,9 @@ export class WikiManager {
         }
 
         if (createdCount > 0 || movedCount > 0) {
-            new Notice(`✅ 百科整理完成！\n🆕 新建：${createdCount}\n📦 搬運：${movedCount}\n📂 目標：${targetFolder}`, 5000);
+            new Notice(`✅ AutoWiki generation complete!\n🆕 Created: ${createdCount}\n📦 Moved: ${movedCount}\n📂 Target: ${targetFolder}`, 5000);
         } else {
-            new Notice("👌 所有連結都已歸檔。");
+            new Notice("👌 All links have been archived.");
         }
     }
 }

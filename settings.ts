@@ -1,9 +1,9 @@
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
 import NovelSmithPlugin from './main';
 
 export interface NovelSmithSettings {
     bookFolderPath: string;
-    keepDraftOnSync: boolean; // 是否保留串聯草稿
+    keepDraftOnSync: boolean; // Keep drafts during scrivenings sync
     wikiFolderPath: string;
     exportFolderPath: string;
 }
@@ -27,16 +27,16 @@ export class NovelSmithSettingTab extends PluginSettingTab {
         const { containerEl } = this;
 
         containerEl.empty();
-        containerEl.createEl('h2', { text: '⚔️ NovelSmith 系統設定' });
+        containerEl.createEl('h2', { text: '⚔️ NovelSmith Settings' });
 
         // ==========================================
-        // 📚 核心設定
+        // 📚 Core Settings
         // ==========================================
-        containerEl.createEl('h3', { text: '📚 核心寫作區' });
+        containerEl.createEl('h3', { text: '📚 Core Writing Workspace' });
 
         new Setting(containerEl)
-            .setName('專屬寫作資料夾')
-            .setDesc('指定你的小說主目錄 (例如 MyBook)。系統會自動在此目錄下建立 _Backstage (後台) 資料夾來存放所有系統檔案。')
+            .setName('Dedicated Writing Folder')
+            .setDesc('Designate your novel\'s root directory (e.g., MyBook). The system will automatically create a _Backstage folder inside to store all system files.')
             .addText(text => text
                 .setPlaceholder('MyBook')
                 .setValue(this.plugin.settings.bookFolderPath)
@@ -46,29 +46,29 @@ export class NovelSmithSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName("🎉 初始化 NovelSmith")
-            .setDesc("一鍵建立您的專屬寫作資料夾、_Backstage 系統後台，並生成新手劇情卡片範本。")
+            .setName("🎉 Initialize NovelSmith")
+            .setDesc("One-click setup for your dedicated writing folder, the _Backstage system directory, and a default Scene Card template.")
             .addButton(btn => btn
-                .setButtonText("🚀 立即初始化")
-                .setCta() // 變成醒目的主按鈕顏色
+                .setButtonText("🚀 Initialize Now")
+                .setCta() // Turn into a prominent CTA button color
                 .onClick(async () => {
                     const folder = this.plugin.settings.bookFolderPath;
                     if (!folder || folder.trim() === "") {
-                        new Notice("⚠️ 請先在上方輸入您想要的「資料夾名稱」！");
+                        new Notice("⚠️ Please enter your desired 'Folder Name' above first!");
                         return;
                     }
 
-                    // 呼叫 main.ts 裡面的強大生成器！
+                    // Call the powerful generator in main.ts!
                     // forceShowNotice = true, openAfterCreate = true
                     await this.plugin.ensureTemplateFileExists(true, true);
-                    new Notice(`✅ 初始化成功！您的寫作基地 [${folder}] 已準備就緒！`);
+                    new Notice(`✅ Initialization successful! Your writing workspace [${folder}] is ready!`);
                 })
             );
 
 
         new Setting(containerEl)
-            .setName('同步後保留草稿紀錄')
-            .setDesc('開啟後，結束串聯模式時會將草稿備份至 _Backstage/Drafts。')
+            .setName('Keep Draft History After Sync')
+            .setDesc('When enabled, ending Scrivenings Mode will backup the draft to _Backstage/Drafts.')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.keepDraftOnSync)
                 .onChange(async (value) => {
@@ -77,8 +77,8 @@ export class NovelSmithSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName('編譯匯出路徑')
-            .setDesc('一鍵編譯後的完整稿件會儲存在這裡 (例如 Output)。')
+            .setName('Compile Export Path')
+            .setDesc('Fully compiled manuscripts will be saved here (e.g., Output).')
             .addText(text => text
                 .setPlaceholder('Output')
                 .setValue(this.plugin.settings.exportFolderPath)
@@ -88,13 +88,13 @@ export class NovelSmithSettingTab extends PluginSettingTab {
                 }));
 
         // ==========================================
-        // 🧠 自動百科
+        // 🧠 AutoWiki
         // ==========================================
-        containerEl.createEl('h3', { text: '🧠 自動百科 (AutoWiki)' });
+        containerEl.createEl('h3', { text: '🧠 AutoWiki' });
 
         new Setting(containerEl)
-            .setName('百科存放資料夾')
-            .setDesc('新建立的人物/設定卡片會自動放入此資料夾')
+            .setName('Wiki Storage Folder')
+            .setDesc('Newly created Character/Setting cards will automatically be placed in this folder.')
             .addText(text => text
                 .setPlaceholder('MyBook/Wiki')
                 .setValue(this.plugin.settings.wikiFolderPath)
@@ -104,31 +104,31 @@ export class NovelSmithSettingTab extends PluginSettingTab {
                 }));
 
         // ==========================================
-        // 🛠️ 系統修復 (保留手動重新生成按鈕)
+        // 🛠️ System Repair (Keep manual regeneration buttons)
         // ==========================================
-        containerEl.createEl('h3', { text: '🛠️ 系統修復與重建' });
-        containerEl.createEl('p', { text: '如果 _Backstage 中的系統檔案遺失，可點擊下方按鈕重新生成 (不會覆蓋現有檔案)。', cls: 'setting-item-description' });
+        containerEl.createEl('h3', { text: '🛠️ System Repair and Rebuild' });
+        containerEl.createEl('p', { text: 'If system files in _Backstage are lost, click the buttons below to regenerate them (will not overwrite existing files).', cls: 'setting-item-description' });
 
         new Setting(containerEl)
-            .setName('重新生成：劇情卡片範本')
+            .setName('Regenerate: Scene Card Template')
             .addButton(button => button
-                .setButtonText('🔄 重建範本')
+                .setButtonText('🔄 Rebuild Template')
                 .onClick(async () => {
                     await this.plugin.ensureTemplateFileExists(true);
                 }));
 
         new Setting(containerEl)
-            .setName('重新生成：贅字清單')
+            .setName('Regenerate: Redundant Words List')
             .addButton(button => button
-                .setButtonText('🔄 重建贅字表')
+                .setButtonText('🔄 Rebuild Redundant List')
                 .onClick(async () => {
                     await this.plugin.writingManager.ensureRedundantListExists(true);
                 }));
 
         new Setting(containerEl)
-            .setName('重新生成：正字名單')
+            .setName('Regenerate: Correction List')
             .addButton(button => button
-                .setButtonText('🔄 重建正字表')
+                .setButtonText('🔄 Rebuild Correction List')
                 .onClick(async () => {
                     await this.plugin.writingManager.ensureFixListExists(true);
                 }));

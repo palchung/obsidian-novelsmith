@@ -28,52 +28,52 @@ export class WritingManager {
     }
 
 
-    // 修改路徑為常數：
+    // Modify path to constant:
     private getAidsFolderPath() {
         return `${this.settings.bookFolderPath}/${AIDS_DIR}`;
     }
 
     // =================================================================
-    // 📄 智能生成器：贅字清單與正字名單
+    // 📄 Smart Generator: Redundant Words List and Correction List
     // =================================================================
     public async ensureRedundantListExists(forceShowNotice: boolean = false) {
         const configPath = `${this.getAidsFolderPath()}/RedundantList.md`;
-        // ... 下方將 this.settings.redundantListPath 替換成 configPath
+        // ... Below, replace this.settings.redundantListPath with configPath
         let configFile = this.app.vault.getAbstractFileByPath(configPath);
         if (!configFile) {
-            // 🔥 錯誤修復：只傳入資料夾路徑，不要傳入包含 .md 的完整路徑！
+            // 🔥 Bug fix: Pass only the folder path, do not pass the full path including .md!
             await ensureFolderExists(this.app, this.getAidsFolderPath());
             try {
-                await this.app.vault.create(configPath, `// 預設贅字清單\n其實, 基本上, 彷彿`);
-                if (forceShowNotice) new Notice(`✅ 成功生成贅字清單：${configPath}`);
+                await this.app.vault.create(configPath, `// Default Redundant Words List\nactually, basically, seemingly`);
+                if (forceShowNotice) new Notice(`✅ Successfully generated Redundant Words List: ${configPath}`);
             } catch (e) {
-                if (forceShowNotice) new Notice(`❌ 建立失敗，請檢查路徑`);
+                if (forceShowNotice) new Notice(`❌ Creation failed, please check the path.`);
             }
         } else {
-            if (forceShowNotice) new Notice(`⚠️ 檔案已存在 (${configPath})，停止生成。`);
+            if (forceShowNotice) new Notice(`⚠️ File already exists (${configPath}), generation stopped.`);
         }
     }
 
     public async ensureFixListExists(forceShowNotice: boolean = false) {
         const configPath = `${this.getAidsFolderPath()}/FixList.md`;
-        // ... 同樣替換邏輯，將 this.settings.fixListPath 替換成 configPath
+        // ... Same replacement logic, replace this.settings.fixListPath with configPath
         let configFile = this.app.vault.getAbstractFileByPath(configPath);
         if (!configFile) {
-            // 🔥 錯誤修復：只傳入資料夾路徑，不要傳入包含 .md 的完整路徑！
+            // 🔥 Bug fix: Pass only the folder path, do not pass the full path including .md!
             await ensureFolderExists(this.app, this.getAidsFolderPath());
             try {
-                await this.app.vault.create(configPath, `// 正字名單\n主角名 | 錯字1`);
-                if (forceShowNotice) new Notice(`✅ 成功生成正字名單：${configPath}`);
+                await this.app.vault.create(configPath, `// Correction List\nMainCharacterName | Typo1`);
+                if (forceShowNotice) new Notice(`✅ Successfully generated Correction List: ${configPath}`);
             } catch (e) {
-                if (forceShowNotice) new Notice(`❌ 建立失敗，請檢查路徑`);
+                if (forceShowNotice) new Notice(`❌ Creation failed, please check the path.`);
             }
         } else {
-            if (forceShowNotice) new Notice(`⚠️ 檔案已存在 (${configPath})，停止生成。`);
+            if (forceShowNotice) new Notice(`⚠️ File already exists (${configPath}), generation stopped.`);
         }
     }
 
     // =================================================================
-    // 🔍 贅字模式
+    // 🔍 Redundant Words Mode
     // =================================================================
     async toggleRedundantMode(view: MarkdownView) {
         const isModeOn = document.body.classList.contains('mode-redundant');
@@ -82,11 +82,11 @@ export class WritingManager {
             document.body.classList.remove('mode-redundant');
             updateRedundantPatterns(null);
             this.triggerEditorUpdate();
-            new Notice("⚪️ 已關閉：贅字模式");
+            new Notice("⚪️ Disabled: Redundant Words Mode");
         } else {
             document.body.classList.remove('mode-dialogue');
 
-            await this.ensureRedundantListExists(false); // 確保檔案存在
+            await this.ensureRedundantListExists(false); // Ensure the file exists
             const configPath = `${this.getAidsFolderPath()}/RedundantList.md`;
             let configFile = this.app.vault.getAbstractFileByPath(configPath);
 
@@ -96,20 +96,20 @@ export class WritingManager {
                     .map(w => w.trim())
                     .filter(w => w.length > 0 && !w.startsWith("//"));
 
-                if (badWords.length === 0) { new Notice("⚠️ 有效贅字清單為空"); return; }
+                if (badWords.length === 0) { new Notice("⚠️ The active Redundant Words List is empty."); return; }
 
                 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 badWords.sort((a, b) => b.length - a.length);
 
-                // 🔥 大師級修復：中英雙語兼容的 Regex 構建器
+                // 🔥 Masterful fix: Bilingual (Chinese/English) compatible Regex builder
                 const patternString = badWords.map(w => {
                     const escaped = escapeRegExp(w);
-                    // 判斷：如果這個詞的頭尾都是英文字母或數字，就加上 \b (單詞邊界)
+                    // Condition: If the word starts and ends with alphanumeric characters, add \b (word boundary)
                     const isEnglishWord = /^[a-zA-Z0-9].*[a-zA-Z0-9]$|^[a-zA-Z0-9]$/.test(w);
                     if (isEnglishWord) {
                         return `\\b${escaped}\\b`;
                     }
-                    return escaped; // 中文或其他符號保持原樣
+                    return escaped; // Chinese or other symbols remain unchanged
                 }).join("|");
 
                 const combinedRegex = new RegExp(`(${patternString})`, 'g');
@@ -118,13 +118,13 @@ export class WritingManager {
                 updateRedundantPatterns(combinedRegex);
                 document.body.classList.add('mode-redundant');
                 this.triggerEditorUpdate();
-                new Notice(`🔍 贅字模式：監控中 (${badWords.length} 詞)`);
+                new Notice(`🔍 Redundant Words Mode: Monitoring (${badWords.length} words)`);
             }
         }
     }
 
     // =================================================================
-    // 💬 對話模式
+    // 💬 Dialogue Mode
     // =================================================================
     async toggleDialogueMode(view: MarkdownView) {
         const isModeOn = document.body.classList.contains('mode-dialogue');
@@ -132,20 +132,20 @@ export class WritingManager {
         if (isModeOn) {
             document.body.classList.remove('mode-dialogue');
             this.triggerEditorUpdate();
-            new Notice("⚪️ 已關閉：對話模式");
+            new Notice("⚪️ Disabled: Dialogue Mode");
         } else {
             document.body.classList.remove('mode-redundant');
             document.body.classList.add('mode-dialogue');
             this.triggerEditorUpdate();
-            new Notice("💬 對話模式：聚焦中");
+            new Notice("💬 Dialogue Mode: Focused");
         }
     }
 
     // =================================================================
-    // ✍️ 正字刑警
+    // ✍️ Name Corrector
     // =================================================================
     async correctNames(view: MarkdownView) {
-        await this.ensureFixListExists(false); // 確保檔案存在
+        await this.ensureFixListExists(false); // Ensure the file exists
         const dataFileName = `${this.getAidsFolderPath()}/FixList.md`;
         let fileObj = this.app.vault.getAbstractFileByPath(dataFileName);
 
@@ -191,15 +191,15 @@ export class WritingManager {
         }
         allReplacements.sort((a, b) => b.wrong.length - a.wrong.length);
 
-        // 🔥 效能大躍進：預先編譯所有 Regex！加上英文單詞邊界防護！
+        // 🔥 Performance leap: Pre-compile all Regex! Add English word boundary protection!
         const compiledReplacements = allReplacements.map(item => {
             const escapedWrong = item.wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-            // 🔥 防誤傷機制 1：如果錯字係全英文，強制加上單詞邊界 \b
+            // 🔥 Anti-false-positive mechanism 1: If the typo is fully English, force add word boundary \b
             const isEnglishWord = /^[a-zA-Z0-9].*[a-zA-Z0-9]$|^[a-zA-Z0-9]$/.test(item.wrong);
             let pattern = isEnglishWord ? `\\b${escapedWrong}\\b` : escapedWrong;
 
-            // 處理正確名稱包含了錯誤名稱的情況 (例如：錯: 小明 -> 正: 王小明)
+            // Handle cases where the correct name contains the wrong name (e.g., Wrong: John -> Correct: Johnathan)
             if (item.correct.startsWith(item.wrong)) {
                 const suffix = item.correct.slice(item.wrong.length);
                 if (suffix) {
@@ -209,7 +209,7 @@ export class WritingManager {
             }
             return {
                 ...item,
-                regex: new RegExp(pattern, 'g') // 預先造好引擎
+                regex: new RegExp(pattern, 'g') // Pre-built engine
             };
         });
 
@@ -222,39 +222,39 @@ export class WritingManager {
 
         const processedLines = lines.map((line, index) => {
             // ==========================================
-            // 🛡️ 絕對結界 1：大區塊防護 (YAML 與 Code Block)
+            // 🛡️ Absolute Barrier 1: Large block protection (YAML and Code Block)
             // ==========================================
-            // 1. 跳過 YAML 區塊 (通常在檔案最頂部)
+            // 1. Skip YAML block (usually at the top of the file)
             if (index === 0 && line.trim() === "---") { inYaml = true; return line; }
             if (inYaml) { if (line.trim() === "---") inYaml = false; return line; }
 
-            // 2. 跳過 Markdown 程式碼區塊 (```)
+            // 2. Skip Markdown code block (```)
             if (line.trim().startsWith("```")) {
                 inCodeBlock = !inCodeBlock;
                 return line;
             }
             if (inCodeBlock) return line;
 
-            // 3. 略過系統標籤與屬性行
+            // 3. Skip system tags and attribute lines
             if (line.includes("<small>++ FILE_ID") || line.includes("++ FILE_ID:")) return line;
             if (line.trim().startsWith(">") && line.includes("::")) return line;
 
             let newLine = line;
 
             // ==========================================
-            // 🎭 絕對結界 2：「遮罩魔法」(保護同行內的網址/代碼)
+            // 🎭 Absolute Barrier 2: "Mask Magic" (Protect inline URLs/code)
             // ==========================================
             const masks: { token: string, original: string }[] = [];
             let maskCounter = 0;
 
-            // 遮蓋網址 (http / https)
+            // Mask URLs (http / https)
             newLine = newLine.replace(/https?:\/\/[^\s\)]+/g, (match) => {
                 const token = `__NS_MASK_${maskCounter++}__`;
                 masks.push({ token, original: match });
                 return token;
             });
 
-            // 遮蓋行內代碼 (`code`)
+            // Mask inline code (`code`)
             newLine = newLine.replace(/`[^`]+`/g, (match) => {
                 const token = `__NS_MASK_${maskCounter++}__`;
                 masks.push({ token, original: match });
@@ -262,23 +262,23 @@ export class WritingManager {
             });
 
             // ==========================================
-            // ✍️ 執行正字替換
+            // ✍️ Execute text replacement
             // ==========================================
             compiledReplacements.forEach(item => {
                 if (item.regex) {
-                    item.regex.lastIndex = 0; // 保險起見重置指標
+                    item.regex.lastIndex = 0; // Reset index just in case
                     newLine = newLine.replace(item.regex, () => {
-                        totalCount++; // 順便計數
+                        totalCount++; // Count occurrences
                         if (!changesLog.some(log => log.includes(`"${item.wrong}" -> "${item.correct}"`))) {
-                            changesLog.push(`"${item.wrong}" -> "${item.correct}"`); // 順便寫 Log
+                            changesLog.push(`"${item.wrong}" -> "${item.correct}"`); // Write to Log
                         }
-                        return item.correct; // 返回正確字眼進行替換
+                        return item.correct; // Return correct word for replacement
                     });
                 }
             });
 
             // ==========================================
-            // 🪄 解除遮罩：將網址同行內代碼還原！
+            // 🪄 Remove mask: Restore inline URLs and code!
             // ==========================================
             masks.forEach(mask => {
                 newLine = newLine.replace(mask.token, mask.original);
@@ -290,41 +290,40 @@ export class WritingManager {
         if (totalCount > 0) {
             const finalContent = processedLines.join("\n");
             if (finalContent !== content) {
-                // 🔥 P2 優化：呼叫全域無痕替換
+                // 🔥 P2 Optimization: Call global silent replacement
                 replaceEntireDocument(view.editor, finalContent);
 
-                new Notice(`✅ 修正了 ${totalCount} 個錯處。\n` + changesLog.slice(0, 3).join("\n") + (changesLog.length > 3 ? "\n..." : ""), 5000);
+                new Notice(`✅ Corrected ${totalCount} typos.\n` + changesLog.slice(0, 3).join("\n") + (changesLog.length > 3 ? "\n..." : ""), 5000);
             }
         } else {
-            new Notice("🎉 完美！沒有發現錯別字。");
+            new Notice("🎉 Perfect! No typos found.");
         }
     }
 
     // =================================================================
-    // 🧹 一鍵定稿 (升級版：支援選項與內部連結)
+    // 🧹 Clean Draft (Upgraded: Supports options and internal links)
     // =================================================================
     async cleanDraft(view: MarkdownView) {
         new CleanDraftModal(this.app, (options) => {
             let content = view.editor.getValue();
             const originalContent = content;
 
-            // 根據用家的選擇執行清除
+            // Execute cleanup based on user's choice
             if (options.removeComments) content = content.replace(/%%[\s\S]*?%%/g, "");
             if (options.removeStrikethrough) content = content.replace(/~~[\s\S]*?~~/g, "");
             if (options.removeHighlights) content = content.replace(/==/g, "");
 
-            // 🔥 新增：移除內部連結 (保留顯示文字，例如 [[Alias|Display]] 變成 Display)
-            // 🔥 P2 微調：使用 Negative Lookbehind (?<!\!)，完美避開圖片 ![[...]]，只拆除純文字連結！
+            // 🔥 New: Remove internal links (keep display text, e.g., [[Alias|Display]] becomes Display)
+            // 🔥 P2 Tweak: Use Negative Lookbehind (?<!\!), perfectly avoid images ![[...]], remove only plain text links!
             if (options.removeInternalLinks) content = content.replace(/(?<!\!)\[\[(?:[^\]]*\|)?([^\]]+)\]\]/g, "$1");
             if (content !== originalContent) {
-                // 🔥 P2 優化：呼叫全域無痕替換
+                // 🔥 P2 Optimization: Call global silent replacement
                 replaceEntireDocument(view.editor, content);
 
-                new Notice("🧹 一鍵定稿完成！選定的標記已清除。");
+                new Notice("🧹 Clean Draft complete! Selected markers have been removed.");
             } else {
-                new Notice("👌 沒有發現需要清除的標記。");
+                new Notice("👌 No markers found that require cleanup.");
             }
         }).open();
     }
 }
-

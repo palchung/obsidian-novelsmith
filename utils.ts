@@ -1,41 +1,37 @@
 import { TFile, App } from 'obsidian';
 
 // ============================================================
-// 🛠️ 工具箱：負責處理字串與解析
+// 🛠️ Toolbox: Handles string processing and parsing
 // ============================================================
 
 
-// 1. 正規表達式 (Regex)
+// 1. Regular Expressions (Regex)
 export const RE_HEADER_CLEAN = /^[#\s]+|^🎬\s*|^[-\.]\s*/g;
 export const RE_HIGHLIGHT = /==/g;
 export const RE_SEPARATOR = /%% - %%/g;
-// 🔥 替換這三行：
+// 🔥 Replace these three lines:
 export const RE_FILE_ID = /<span class="ns-file-id">\+\+ FILE_ID: (.*?) \+\+<\/span>/;
 export const RE_FILE_ID_HEADING = /<span class="ns-file-id">\+\+ FILE_ID: .*? \+\+<\/span>/g;
 export const ST_FILE_ID_HEADING = '<span class="ns-file-id">++ FILE_ID';
 export const RE_FOLDER_HEADING = /^# 📄 .*$/gm;
 export const RE_SCENE_TAG = /^######\s*/;
 export const RE_SCENE_EMOJI = /^🎬\s*/;
-// 標題 (ID 部分)
-export const RE_SCENE_HEADER_HTML = /###### (.*?)( <!--|$)/;
+// Header (ID part)
+//export const RE_SCENE_HEADER_HTML = /###### (.*?)( /;
 export const RE_EXTRACT_ID = /(?:SCENE_ID:\s*|data-scene-id=")([a-zA-Z0-9-]+)/;
-// 🔥 新增：讓全系統通用的 ID Regex
-// 格式： 
 export const RE_SCENE_INFO = /^###### 🎬 .*[\r\n]+(> .*[\r\n]*)*/gm;
-export const RE_SCENE_ID = /<!-- SCENE_ID: (.*?) \|.*?-->/;
-// 用於匹配標題行 (###### Title )
+// Used to match header lines (###### Title )
 export const RE_SCENE_HEADER = /^(###### .*?)( )?$/;
-// 用於匹配已經有 ID 的標題行
-export const RE_SCENE_HEADER_ID = /^(###### .*?)( <!-- SCENE_ID: .*? -->)?$/;
+// Used to match header lines that already have an ID
+export const RE_SCENE_HEADER_ID = /^(###### .*?)( )?$/;
 // String HTML comment
-export const ST_SCENE_ID_OP = ' <!-- SCENE_ID: ';
-export const ST_SCENE_ID_CL = ' -->';
-export const ST_WARNING = '⛔️ ID (勿改)';
+//export const ST_SCENE_ID_OP = ' ';
+export const ST_WARNING = '⛔️ ID (Do not edit)';
 export const ST_SCENE_TAG = '######';
 export const ST_FILE_ID_HEADER = "++ FILE_ID";
 
 // ============================================================
-// 📂 系統常數 (System Constants) - 統一管理，杜絕魔法字串
+// 📂 System Constants - Unified management, eliminating magic strings
 // ============================================================
 export const DRAFT_FILENAME = "NSmith_Scrivenering.md";
 export const BACKSTAGE_DIR = "_Backstage";
@@ -46,7 +42,7 @@ export const AIDS_DIR = `${BACKSTAGE_DIR}/Aids`;
 export const SCENE_DB_FILE = "_Scene_Database.md";
 
 // ============================================================
-// 🛠️ 共用工具函數 (Shared Utilities)
+// 🛠️ Shared Utilities
 // ============================================================
 export const ensureFolderExists = async (app: App, folderPath: string) => {
     const cleanPath = folderPath.replace(/^\/+|\/+$/g, '');
@@ -64,10 +60,10 @@ export const ensureFolderExists = async (app: App, folderPath: string) => {
     }
 };
 
-// 2. 資料結構介面 (Interface)
+// 2. Data Structure Interface
 export interface DraftCard {
-    key: string;     // 舊：標題 (兼容用)
-    id?: string;     // 🔥 新：唯一 ID
+    key: string;     // Old: Title (for compatibility)
+    id?: string;     // 🔥 New: Unique ID
     rawHeader: string;
     meta: string[];
     body: string;
@@ -78,13 +74,13 @@ export interface ParseResult {
     cards: DraftCard[];
 }
 
-// 3. 標題清洗函數 (移除 Markdown 符號及 ID 標籤)
+// 3. Header Cleaning Function (Removes Markdown symbols and ID tags)
 export const normalizeHeader = (header: string): string => {
-    // 🔥 直接重用我們剛寫好的終極清洗函數，確保全系統邏輯 100% 一致！
+    // 🔥 Reuse our newly written ultimate cleaning function to ensure 100% consistent logic system-wide!
     return cleanSceneTitle(header);
 };
 
-// 4. 核心解析器 (Parser)
+// 4. Core Parser
 export const parseContent = (text: string, isOriginal: boolean = false): ParseResult => {
     const lines = text.split("\n");
     let cards: DraftCard[] = [];
@@ -109,17 +105,17 @@ export const parseContent = (text: string, isOriginal: boolean = false): ParseRe
                 }
                 cleanBody = tempLines.join("\n").trimEnd();
             } else {
-                // 🔥 原稿也改用 trimEnd()
+                // 🔥 Original manuscript also switched to trimEnd()
                 cleanBody = cleanBody.trimEnd();
             }
 
-            // 🔥 嘗試提取 ID
+            // 🔥 Attempt to extract ID
             const idMatch = currentHeaderRaw.match(RE_EXTRACT_ID);
             const id = idMatch ? idMatch[1].trim() : undefined;
 
             cards.push({
                 key: normalizeHeader(currentHeaderRaw),
-                id: id, // 🔥 儲存 ID
+                id: id, // 🔥 Store ID
                 rawHeader: currentHeaderRaw,
                 meta: [...currentMeta],
                 body: cleanBody
@@ -145,11 +141,11 @@ export const parseContent = (text: string, isOriginal: boolean = false): ParseRe
             isCollectingMeta = true;
         } else if (hasHitFirstCard) {
             if (isCollectingMeta) {
-                // 🔥 P0 修復：精準識別屬性，保護正文的 Blockquote！
+                // 🔥 P0 Fix: Accurately identify attributes to protect body text's Blockquote!
                 if (trimLine.startsWith("> [!NSmith") || trimLine.startsWith("> [!info") || trimLine.startsWith("> -") || trimLine === ">") {
                     currentMeta.push(line);
                 } else if (trimLine === "") {
-                    // 略過屬性與正文之間的空白行，但不當作正文
+                    // Skip blank lines between attributes and body text, but do not treat them as body text
                 } else {
                     isCollectingMeta = false;
                     currentBodyLines.push(line);
@@ -166,7 +162,7 @@ export const parseContent = (text: string, isOriginal: boolean = false): ParseRe
 };
 
 // ============================================================
-// 🔥 大師級重構：共用標題清理與 ID 抽取函數
+// 🔥 Masterful Refactoring: Shared header cleaning and ID extraction functions
 // ============================================================
 export function extractSceneId(header: string): string | null {
     const match = header.match(RE_EXTRACT_ID);
@@ -183,19 +179,19 @@ export function cleanSceneTitle(header: string): string {
 }
 
 // ============================================================
-// 🎨 大師級架構：全系統共用調色盤字典 (Single Source of Truth)
+// 🎨 Masterful Architecture: System-wide shared color palette dictionary (Single Source of Truth)
 // ============================================================
 
 export const RE_EXTRACT_COLOR = /data-color="([a-zA-Z0-9-]+)"/;
 
 export const SCENE_COLORS = [
-    { id: "default", icon: "⚪️", name: "預設 (無色)", cssClass: "ns-color-grey" },
-    { id: "red", icon: "🔴", name: "紅色 (衝突/反派)", cssClass: "ns-color-red" },
-    { id: "orange", icon: "🟠", name: "橙色 (日常/懸疑)", cssClass: "ns-color-orange" },
-    { id: "green", icon: "🟢", name: "綠色 (成長/配角)", cssClass: "ns-color-green" },
-    { id: "blue", icon: "🔵", name: "藍色 (冷靜/主角)", cssClass: "ns-color-blue" },
-    { id: "purple", icon: "🟣", name: "紫色 (神秘/魔法)", cssClass: "ns-color-purple" },
-    //{ id: "grey", icon: "🟤", name: "灰色 (回憶/過渡)", cssClass: "ns-color-grey" }
+    { id: "default", icon: "⚪️", name: "Default (Colorless)", cssClass: "ns-color-grey" },
+    { id: "red", icon: "🔴", name: "Red (Conflict/Villain)", cssClass: "ns-color-red" },
+    { id: "orange", icon: "🟠", name: "Orange (Slice of Life/Suspense)", cssClass: "ns-color-orange" },
+    { id: "green", icon: "🟢", name: "Green (Growth/Supporting)", cssClass: "ns-color-green" },
+    { id: "blue", icon: "🔵", name: "Blue (Calm/Protagonist)", cssClass: "ns-color-blue" },
+    { id: "purple", icon: "🟣", name: "Purple (Mystery/Magic)", cssClass: "ns-color-purple" },
+    //{ id: "grey", icon: "🟤", name: "Grey (Memory/Transition)", cssClass: "ns-color-grey" }
 ];
 
 export const getColorById = (colorId: string | null | undefined) => {
@@ -209,15 +205,15 @@ export const extractSceneColor = (header: string): string => {
 };
 
 // ============================================================
-// 🚀 大師級架構：全域共用場景解析器 (Universal Scene Parser)
+// 🚀 Masterful Architecture: Universal Scene Parser
 // ============================================================
 export interface UniversalScene {
-    lineIndex: number;      // 標題所在的行數
-    rawHeader: string;      // 原始標題文字
-    title: string;          // 乾淨的標題名
-    id: string | null;      // 身份證 ID
-    colorId: string;        // 顏色 ID
-    meta: string[];         // Callout 屬性 (例如 Time, POV)
+    lineIndex: number;      // Line index of the header
+    rawHeader: string;      // Raw header text
+    title: string;          // Cleaned header name
+    id: string | null;      // Unique ID
+    colorId: string;        // Color ID
+    meta: string[];         // Callout attributes (e.g., Time, POV)
 }
 
 export const parseUniversalScenes = (textOrLines: string | string[]): UniversalScene[] => {
@@ -228,7 +224,7 @@ export const parseUniversalScenes = (textOrLines: string | string[]): UniversalS
     for (let i = 0; i < lines.length; i++) {
         const trimLine = lines[i].trim();
 
-        // 一旦發現場景標記，立刻用我哋之前寫好嘅工具函數抽齊所有資料！
+        // Once a scene marker is found, immediately use our previously written utility functions to extract all data!
         if (trimLine.startsWith("######")) {
             currentScene = {
                 lineIndex: i,
@@ -240,11 +236,11 @@ export const parseUniversalScenes = (textOrLines: string | string[]): UniversalS
             };
             scenes.push(currentScene);
         }
-        // 收集屬性
+        // Collect attributes
         else if (currentScene && trimLine.startsWith(">")) {
             currentScene.meta.push(trimLine);
         }
-        // 離開屬性區塊，停止收集
+        // Leave the attribute block, stop collecting
         else if (currentScene && !trimLine.startsWith(">") && trimLine !== "") {
             currentScene = null;
         }
@@ -253,22 +249,22 @@ export const parseUniversalScenes = (textOrLines: string | string[]): UniversalS
 };
 
 // ============================================================
-// 🛠️ 全域通用動作 (Universal Action Utilities)
+// 🛠️ Universal Action Utilities
 // ============================================================
 
-// 1. 無痕替換 (保護 Ctrl+Z)
+// 1. Silent replacement (Protects Ctrl+Z)
 export const replaceEntireDocument = (editor: any, newContent: string) => {
     const lastLine = editor.lineCount() - 1;
     const lastCh = editor.getLine(lastLine).length;
     editor.replaceRange(newContent, { line: 0, ch: 0 }, { line: lastLine, ch: lastCh });
 };
 
-// 2. 統一 ID 生成器
+// 2. Unified ID Generator
 export const generateSceneId = (): string => {
     return crypto.randomUUID().substring(0, 12);
 };
 
-// 3. 封存草稿偵測器
+// 3. Archived Draft Detector
 export const isScriveningsDraft = (content: string, fileName: string = ""): boolean => {
     return fileName === DRAFT_FILENAME || content.includes('++ FILE_ID:') || content.includes('## 📜');
 };

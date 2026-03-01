@@ -23,14 +23,14 @@ export default class NovelSmithPlugin extends Plugin {
     compilerManager: CompilerManager;
     sceneManager: SceneManager;
 
-    // 🔥 防呆系統：記錄上次警告的時間 (冷卻期用)
+    // 🔥 Safeguard System: Record the last warning time (for cooldown)
     lastDraftWarningTime: number = 0;
 
-    // 🔥 極致省電：防抖計時器
+    // 🔥 Extreme Power Saving: Debounce Timer
     private draftCheckTimer: number | null = null;
 
     async onload() {
-        console.log('NovelSmith 系統啟動 (Full Suite)');
+        console.log('NovelSmith System Booting (Full Suite)');
 
         await this.loadSettings();
 
@@ -52,14 +52,14 @@ export default class NovelSmithPlugin extends Plugin {
 
 
         // =================================================================
-        // 🔥 貼心 UX 1：在左側邊欄 (Ribbon) 加入一個實體按鈕
+        // 🔥 Thoughtful UX 1: Add a physical button to the left Ribbon
         // =================================================================
-        this.addRibbonIcon('book-open', '開啟 NovelSmith 面板', () => {
+        this.addRibbonIcon('book-open', 'Open NovelSmith Panel', () => {
             this.activateView();
         });
 
         // =================================================================
-        // 🔥 貼心 UX 2：當 Obsidian 畫面載入完成後，自動把面板掛載到右邊！
+        // 🔥 Thoughtful UX 2: Automatically mount the panel to the right when Obsidian is ready!
         // =================================================================
         // this.app.workspace.onLayoutReady(() => {
         //     this.activateView();
@@ -69,16 +69,16 @@ export default class NovelSmithPlugin extends Plugin {
         this.addSettingTab(new NovelSmithSettingTab(this.app, this));
 
         // =================================================================
-        // 🔥 極致省電版防呆監聽器：等你停手先檢查
+        // 🔥 Extreme Power Saving Safeguard Listener: Checks only when you stop typing
         // =================================================================
         this.registerEvent(
             this.app.workspace.on('editor-change', () => {
-                // 如果用家不斷打字，就清除上一次嘅計時器，唔好做嘢
+                // If the user keeps typing, clear the previous timer and do nothing
                 if (this.draftCheckTimer !== null) {
                     window.clearTimeout(this.draftCheckTimer);
                 }
 
-                // 重新設定計時器：等用家停手 1.5 秒後，先至真正執行檢查
+                // Reset the timer: wait until the user stops for 1.5 seconds before executing the check
                 this.draftCheckTimer = window.setTimeout(() => {
                     const activeFile = this.app.workspace.getActiveFile();
                     if (!activeFile) return;
@@ -99,10 +99,10 @@ export default class NovelSmithPlugin extends Plugin {
                     const draftFile = this.app.vault.getAbstractFileByPath(draftPath);
 
                     if (draftFile) {
-                        new Notice("⚠️ 警告：串聯模式進行中！\n在此處的修改可能會在稍後同步時被覆寫。\n請返回草稿檔修改，或先結束串聯。", 8000);
+                        new Notice("⚠️ Warning: Scrivenings Mode is active!\nEdits made here may be overwritten during the next sync.\nPlease return to the draft file to edit, or end Scrivenings Mode first.", 8000);
                         this.lastDraftWarningTime = now;
                     }
-                }, 1500); // 1500 毫秒 = 1.5 秒
+                }, 1500); // 1500 milliseconds = 1.5 seconds
             })
         );
 
@@ -112,11 +112,11 @@ export default class NovelSmithPlugin extends Plugin {
 
 
         // =================================================================
-        // 註冊指令 (加入結界防護與邏輯統一)
+        // Register Commands (Add barrier protection and logic unification)
         // =================================================================
         this.addCommand({
             id: 'smart-save-sync',
-            name: 'System: Smart Save & Sync (智能儲存與同步)',
+            name: 'System: Smart Save & Sync',
             icon: 'save',
             hotkeys: [{ modifiers: ["Mod"], key: "s" }],
             checkCallback: (checking: boolean) => {
@@ -124,9 +124,9 @@ export default class NovelSmithPlugin extends Plugin {
                 if (view) {
                     if (!checking && this.checkInBookFolder(view.file)) {
                         const content = view.editor.getValue();
-                        // 🔥 終極防護網：如果係「封存草稿」，只作普通儲存，絕對不派發 ID！
+                        // 🔥 Ultimate Defense Net: If it's an 'Archived Draft', perform a normal save only, absolutely no ID assignment!
                         if (view.file.name !== DRAFT_FILENAME && (isScriveningsDraft(content))) {
-                            new Notice("💾 封存草稿已儲存 (為保護檔案，系統不會在此重新分配 ID)。");
+                            new Notice("💾 Archived Draft saved. (To protect the file, the system will not reassign IDs here).");
                             return true;
                         }
                         this.executeSmartSave(view);
@@ -139,21 +139,21 @@ export default class NovelSmithPlugin extends Plugin {
 
         this.addCommand({
             id: 'open-structure-view',
-            name: 'Open Structure Outline (打開觸控大綱)',
+            name: 'Open Structure Outline',
             callback: () => { this.activateView(); }
         });
 
         this.addCommand({
             id: 'compile-manuscript',
-            name: 'Export: Compile Clean Manuscript (匯出最終文稿)',
+            name: 'Export: Compile Clean Manuscript',
             icon: 'book-up',
             checkCallback: (checking: boolean) => {
                 const view = this.app.workspace.getActiveViewOfType(MarkdownView);
                 if (view) {
                     if (!checking && this.checkInBookFolder(view.file)) {
-                        // 🔥 防呆海關：檢查是否已設定匯出路徑
+                        // 🔥 Safeguard Checkpoint: Check if the export path is set
                         if (!this.settings.exportFolderPath || this.settings.exportFolderPath.trim() === "") {
-                            new Notice("⚠️ 請先到設定頁面 (Settings) 設定您的「編譯匯出路徑」！");
+                            new Notice("⚠️ Please go to the Settings page to configure your 'Compile Export Path' first!");
                             return true;
                         }
                         this.compilerManager.openCompileModal(view);
@@ -166,7 +166,7 @@ export default class NovelSmithPlugin extends Plugin {
 
         this.addCommand({
             id: 'toggle-scrivenings',
-            name: 'Toggle Scrivenings Mode (串聯模式)',
+            name: 'Toggle Scrivenings Mode',
             checkCallback: (checking: boolean) => {
                 const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
                 if (markdownView) {
@@ -174,15 +174,15 @@ export default class NovelSmithPlugin extends Plugin {
                         const file = markdownView.file;
                         const content = markdownView.editor.getValue();
 
-                        // 🔥 邏輯統一：如果身處「當前臨時草稿」，直接交俾 Smart Save 處理 (同步 + 更新 DB)
+                        // 🔥 Logic Unification: If in the 'Current Temporary Draft', hand over to Smart Save directly (Sync + Update DB)
                         if (file.name === DRAFT_FILENAME) {
                             this.executeSmartSave(markdownView);
                         }
-                        // 🔥 防護網升級：只認最核心字眼，新舊草稿通殺！
+                        // 🔥 Defense Net Upgrade: Recognize only core keywords, handles both new and old drafts!
                         else if (isScriveningsDraft(content)) {
-                            new Notice("⛔ 系統拒絕：這是一份串聯草稿檔（或封存草稿），不能在此處啟動串聯模式以免發生無限迴圈！");
+                            new Notice("⛔ System Rejected: This is a Scrivenings draft file (or archived draft). You cannot activate Scrivenings Mode here to prevent infinite loops!");
                         }
-                        // 正常章節檔案，安全啟動串聯模式
+                        // Normal chapter file, safely activate Scrivenings Mode
                         else {
                             const folder = file.parent;
                             if (folder) {
@@ -200,7 +200,7 @@ export default class NovelSmithPlugin extends Plugin {
 
         this.addCommand({
             id: 'save-scene-version',
-            name: 'Atomic Save: Current Scene (原子存檔)',
+            name: 'Atomic Save: Current Scene',
             icon: 'save',
             checkCallback: (checking: boolean) => {
                 const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -216,7 +216,7 @@ export default class NovelSmithPlugin extends Plugin {
 
         this.addCommand({
             id: 'restore-scene-version',
-            name: 'Atomic Restore: Current Scene (還原版本)',
+            name: 'Atomic Restore: Current Scene',
             icon: 'history',
             checkCallback: (checking: boolean) => {
                 const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -232,7 +232,7 @@ export default class NovelSmithPlugin extends Plugin {
 
         this.addCommand({
             id: 'split-scene',
-            name: 'Plot: Split Scene (情節分拆)',
+            name: 'Plot: Split Scene',
             icon: 'scissors',
             checkCallback: (checking: boolean) => {
                 const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -248,7 +248,7 @@ export default class NovelSmithPlugin extends Plugin {
 
         this.addCommand({
             id: 'merge-scene',
-            name: 'Plot: Merge Scene (吸星大法)',
+            name: 'Plot: Merge Scene',
             icon: 'magnet',
             checkCallback: (checking: boolean) => {
                 const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -263,11 +263,11 @@ export default class NovelSmithPlugin extends Plugin {
         });
 
         // =================================================================
-        // 🛠️ 註冊寫作輔助命令 (贅字、正字、對話模式、一鍵定稿)
+        // 🛠️ Register writing aid commands (Redundant, Corrector, Dialogue, Clean Draft)
         // =================================================================
         this.addCommand({
             id: 'toggle-redundant-mode',
-            name: '🔍 贅字模式 (切換)',
+            name: '🔍 Toggle Redundant Words Mode',
             editorCallback: (editor, view) => {
                 this.writingManager.toggleRedundantMode(view);
             }
@@ -275,7 +275,7 @@ export default class NovelSmithPlugin extends Plugin {
 
         this.addCommand({
             id: 'correct-names',
-            name: '✍️ 正字刑警 (一鍵修正名詞)',
+            name: '✍️ Name Corrector (One-Click Auto-Fix)',
             editorCallback: (editor, view) => {
                 this.writingManager.correctNames(view);
             }
@@ -283,7 +283,7 @@ export default class NovelSmithPlugin extends Plugin {
 
         this.addCommand({
             id: 'toggle-dialogue-mode',
-            name: '💬 對話模式 (切換)',
+            name: '💬 Toggle Dialogue Mode',
             editorCallback: (editor, view) => {
                 this.writingManager.toggleDialogueMode(view);
             }
@@ -291,7 +291,7 @@ export default class NovelSmithPlugin extends Plugin {
 
         this.addCommand({
             id: 'clean-draft',
-            name: '🧹 一鍵定稿 (清除所有標記)',
+            name: '🧹 Clean Draft (Remove all markers)',
             editorCallback: (editor, view) => {
                 this.writingManager.cleanDraft(view);
             }
@@ -299,15 +299,15 @@ export default class NovelSmithPlugin extends Plugin {
 
         this.addCommand({
             id: 'auto-wiki',
-            name: 'Wiki: Auto Scan & Create (自動百科)',
+            name: 'Wiki: Auto Scan & Create',
             icon: 'book',
             checkCallback: (checking: boolean) => {
                 const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
                 if (markdownView) {
                     if (!checking && this.checkInBookFolder(markdownView.file)) {
-                        // 🔥 防呆海關：檢查是否已設定百科路徑
+                        // 🔥 Safeguard Checkpoint: Check if Wiki path is set
                         if (!this.settings.wikiFolderPath || this.settings.wikiFolderPath.trim() === "") {
-                            new Notice("⚠️ 請先到設定頁面 (Settings) 設定您的「百科存放資料夾」！");
+                            new Notice("⚠️ Please go to the Settings page to configure your 'Wiki Storage Folder' first!");
                             return true;
                         }
                         this.wikiManager.scanAndCreateWiki(markdownView);
@@ -319,7 +319,7 @@ export default class NovelSmithPlugin extends Plugin {
         });
 
         // Ribbon Icons
-        // this.addRibbonIcon('save', 'Smart Save (智能儲存)', () => {
+        // this.addRibbonIcon('save', 'Smart Save', () => {
         //     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
         //     if (view && this.checkInBookFolder(view.file)) this.executeSmartSave(view);
         // });
@@ -345,7 +345,7 @@ export default class NovelSmithPlugin extends Plugin {
         const bookFolder = this.settings.bookFolderPath;
         if (!bookFolder || bookFolder.trim() === "") return false;
 
-        // 🔥 絕對結界：靜默攔截所有後台操作
+        // 🔥 Absolute Barrier: Silently block all background operations
         if (file.path.includes(`/${BACKSTAGE_DIR}/`)) return false;
 
         return file.path.startsWith(bookFolder);
@@ -353,28 +353,28 @@ export default class NovelSmithPlugin extends Plugin {
 
     public checkInBookFolder(file: TFile | null): boolean {
         if (!file) {
-            new Notice("❌ 請先打開筆記！");
+            new Notice("❌ Please open a note first!");
             return false;
         }
 
         const bookFolder = this.settings.bookFolderPath;
 
-        // 🔥 修復：如果未設定資料夾，彈出溫馨提示，並阻擋所有操作！
+        // 🔥 Fix: If folder is not set, pop up a friendly reminder and block all operations!
         if (!bookFolder || bookFolder.trim() === "") {
-            new Notice("⚠️ 歡迎使用 NovelSmith！請先到設定頁面 (Settings) 設定您的「專屬寫作資料夾」並進行初始化。");
+            new Notice("⚠️ Welcome to NovelSmith! Please go to the Settings page to configure your 'Dedicated Writing Folder' and initialize it.");
             return false;
         }
 
-        // 🔥 絕對結界：如果路徑包含 _Backstage，一律落閘放狗！
+        // 🔥 Absolute Barrier: If the path contains _Backstage, block completely!
         if (file.path.includes(`/${BACKSTAGE_DIR}/`)) {
-            new Notice(`⛔ 系統拒絕：這裡是被鎖定的系統後台 (_Backstage)，為保護檔案，已禁用所有寫作功能！`);
+            new Notice(`⛔ System Rejected: This is the locked system backstage (_Backstage). To protect your files, all writing functions are disabled here!`);
             return false;
         }
 
         if (file.path.startsWith(bookFolder)) {
             return true;
         } else {
-            new Notice(`⛔ 系統拒絕：此檔案不在您的「專屬寫作資料夾」(${bookFolder}) 內，已禁用插件功能以保護檔案。`);
+            new Notice(`⛔ System Rejected: This file is not inside your 'Dedicated Writing Folder' (${bookFolder}). Plugin functions are disabled to protect the file.`);
             return false;
         }
     }
@@ -386,7 +386,7 @@ export default class NovelSmithPlugin extends Plugin {
         if (!folder) return;
 
         if (activeFile.name === DRAFT_FILENAME) {
-            new Notice("🔄 正在結束串聯並同步...");
+            new Notice("🔄 Ending Scrivenings Mode and Syncing...");
             await this.scrivenerManager.syncBack(activeFile, folder);
             this.sceneManager.scheduleGenerateDatabase();
         } else {
@@ -395,11 +395,11 @@ export default class NovelSmithPlugin extends Plugin {
     }
 
     // =================================================================
-    // 📄 智能範本生成器 (支援手動觸發、防覆蓋與新手引導)
+    // 📄 Smart Template Generator (Supports manual trigger, overwrite protection, and beginner guide)
     // =================================================================
     public async ensureTemplateFileExists(forceShowNotice: boolean = false, openAfterCreate: boolean = false) {
 
-        // 🔥 效能與架構升級：使用中央常數與共用函數，極度簡潔！
+        // 🔥 Performance and Architecture Upgrade: Use central constants and shared functions, extremely clean!
         const folderPath = `${this.settings.bookFolderPath}/${TEMPLATES_DIR}`;
         const tplPath = `${folderPath}/NovelSmith_Template.md`;
 
@@ -408,24 +408,24 @@ export default class NovelSmithPlugin extends Plugin {
 
         const file = this.app.vault.getAbstractFileByPath(tplPath);
         if (!file) {
-            const defaultTemplate = `###### 🎬 {{SceneName}} <span class="ns-id" data-scene-id="{{UUID}}" data-warning="${ST_WARNING}"></span>\n> [!NSmith] 情節資訊\n> - Time:: \n> - POV:: \n> - Status:: #Writing\n> - Note:: \n\n這裡開始寫正文...`;
+            const defaultTemplate = `###### 🎬 {{SceneName}} <span class="ns-id" data-scene-id="{{UUID}}" data-warning="${ST_WARNING}"></span>\n> [!NSmith] Scene Info\n> - Time:: \n> - POV:: \n> - Status:: #Writing\n> - Note:: \n\nWrite your story here...`;
             try {
                 const newFile = await this.app.vault.create(tplPath, defaultTemplate);
 
-                // 🔥 新增：新手引導模式！第一次生成時自動打開畀用家改
+                // 🔥 New: Beginner Guide Mode! Automatically opens for the user to edit upon first generation
                 if (openAfterCreate && newFile instanceof TFile) {
                     const leaf = this.app.workspace.getLeaf('split', 'vertical');
                     await leaf.openFile(newFile);
-                    new Notice("🎉 這是你的專屬劇情卡片範本！\n你可以現在修改它 (例如加減屬性)，設定好之後，再次點擊「插入卡片」就會使用這個新格式喔！", 10000);
+                    new Notice("🎉 This is your exclusive Scene Card template!\nYou can modify it now (e.g., add or remove attributes). Once set, clicking 'Insert Scene Card' will use this new format!", 10000);
                 } else if (forceShowNotice) {
-                    new Notice(`✅ 成功生成範本：${tplPath}`);
+                    new Notice(`✅ Successfully generated template: ${tplPath}`);
                 }
             } catch (e) {
-                console.error("建立範本檔失敗 (請檢查路徑)", e);
-                if (forceShowNotice) new Notice(`❌ 建立範本失敗，請檢查路徑是否合法`);
+                console.error("Failed to create template file (please check the path)", e);
+                if (forceShowNotice) new Notice(`❌ Failed to create template, please check if the path is valid.`);
             }
         } else {
-            if (forceShowNotice) new Notice(`⚠️ 範本已經存在 (${tplPath})，為免覆蓋你的自訂設定，系統停止生成。`);
+            if (forceShowNotice) new Notice(`⚠️ Template already exists (${tplPath}). To avoid overwriting your custom settings, system generation stopped.`);
         }
     }
 
@@ -433,7 +433,7 @@ export default class NovelSmithPlugin extends Plugin {
         const { workspace } = this.app;
         const leaves = workspace.getLeavesOfType(VIEW_TYPE_STRUCTURE);
 
-        // 🔥 防禦升級 1：如果發現有多過一個面板 (因同步或熱更新引起)，剷除多餘嘅分身！
+        // 🔥 Defense Upgrade 1: If more than one panel is found (due to sync or hot-reload), destroy the extra clones!
         if (leaves.length > 1) {
             for (let i = 1; i < leaves.length; i++) {
                 leaves[i].detach();
@@ -450,8 +450,8 @@ export default class NovelSmithPlugin extends Plugin {
     }
 
     onunload() {
-        console.log('NovelSmith 休息中');
-        // 🔥 防禦升級 2：當插件關閉或更新時，必須徹底拆除面板，防止變成幽靈面板無限繁殖！
+        console.log('NovelSmith Shutting Down');
+        // 🔥 Defense Upgrade 2: When the plugin is disabled or updated, completely detach the panel to prevent ghost panels from multiplying infinitely!
         this.app.workspace.detachLeavesOfType(VIEW_TYPE_STRUCTURE);
     }
 

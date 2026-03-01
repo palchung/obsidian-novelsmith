@@ -20,7 +20,7 @@ export class PlotManager {
     }
 
     // ==========================================
-    // 🔥 效能優化：範本快取 (Template Cache)
+    // 🔥 Performance Optimization: Template Cache
     // ==========================================
     private templateCache: string | null = null;
     private templateCacheTime: number = 0;
@@ -31,25 +31,32 @@ export class PlotManager {
         const tplFile = this.app.vault.getAbstractFileByPath(tplPath);
         const uuid = generateSceneId();
 
-        // 智能判斷 Callout 類型 (配合顏色連動)
+        // Smartly determine Callout type (linked with color)
         const calloutType = colorId === "default" ? "NSmith" : `NSmith-${colorId}`;
 
         if (tplFile instanceof TFile) {
-            // 🔥 核心魔法：檢查快取！如果檔案無被修改過，直接使用記憶體版本
+            // 🔥 Core Magic: Check cache! If the file hasn't been modified, use the memory version directly
             if (this.templateCache && tplFile.stat.mtime === this.templateCacheTime) {
                 templateText = this.templateCache;
             } else {
-                // 如果係第一次開，或者用家改過個範本，先至重新讀取硬碟
+                // If it's the first time opening, or the user modified the template, read from the disk again
                 templateText = await this.app.vault.read(tplFile);
                 this.templateCache = templateText;
                 this.templateCacheTime = tplFile.stat.mtime;
             }
 
-            templateText = templateText.replace(/data-scene-id="{{UUID}}">/, `data-scene-id="{{UUID}}" data-color="${colorId}">`);
-            // 動態轉換範本入面的 Callout 顏色
+            templateText = templateText.replace(
+                /^(###### .*?)(?:\s*<span.*<\/span>)?\s*$/m,
+                `$1 <span class="ns-id" data-scene-id="{{UUID}}" data-warning="${ST_WARNING}" data-color="${colorId}"></span>`
+            );
+
+            // Dynamically convert Callout colors inside the template
             templateText = templateText.replace(/> \[!NSmith\]/, `> [!${calloutType}]`);
+
+
+
         } else {
-            templateText = `###### 🎬 {{SceneName}} <span class="ns-id" data-scene-id="${generateSceneId()}" data-warning="${ST_WARNING}" data-color="${colorId}"></span>\n> [!${calloutType}] 情節資訊\n> - Time:: \n> - POV:: \n> - Status:: #Writing\n> - Note:: \n\n`;
+            templateText = `###### 🎬 {{SceneName}} <span class="ns-id" data-scene-id="${generateSceneId()}" data-warning="${ST_WARNING}" data-color="${colorId}"></span>\n> [!${calloutType}] Scene Info\n> - Time:: \n> - POV:: \n> - Status:: #Writing\n> - Note:: \n\n`;
         }
 
         return templateText
@@ -58,15 +65,15 @@ export class PlotManager {
     }
 
     async insertSceneCard(view: MarkdownView) {
-        // 🔥 新增：第一次使用防呆與引導
+        // 🔥 New: First-time use safeguard and guide
         const tplPath = `${this.settings.bookFolderPath}/${TEMPLATES_DIR}/NovelSmith_Template.md`;
         if (!this.app.vault.getAbstractFileByPath(tplPath)) {
-            await this.plugin.ensureTemplateFileExists(false, true); // true = 觸發開檔與新手提示
-            return; // 終止插入流程，等用家改好範本先
+            await this.plugin.ensureTemplateFileExists(false, true); // true = trigger file opening and beginner tips
+            return; // Terminate insertion process, wait for user to finish modifying the template
         }
 
-        // 🔥 升級版：使用豪華卡片建立器
-        new SceneCreateModal(this.app, "➕ 插入劇情卡片", "", async (newSceneName, colorId) => {
+        // 🔥 Upgraded: Use premium card creator
+        new SceneCreateModal(this.app, "➕ Insert Scene Card", "", async (newSceneName, colorId) => {
             if (!newSceneName) return;
 
             const editor = view.editor;
@@ -80,7 +87,7 @@ export class PlotManager {
                 prefix = "\n";
             }
 
-            // 🔥 將 colorId 傳入去
+            // 🔥 Pass in colorId
             const newContent = await this.getTemplateContent(newSceneName, colorId);
             const finalContent = prefix + newContent + "\n";
 
@@ -91,13 +98,13 @@ export class PlotManager {
             editor.setCursor(newCursor);
             editor.scrollIntoView({ from: newCursor, to: newCursor }, true);
 
-            new Notice(`✅ 已插入劇情卡片：${newSceneName}`);
+            new Notice(`✅ Inserted Scene Card: ${newSceneName}`);
             this.plugin.sceneManager.scheduleGenerateDatabase();
         }).open();
     }
 
     async splitScene(view: MarkdownView) {
-        // 🔥 新增：第一次使用防呆與引導
+        // 🔥 New: First-time use safeguard and guide
         const tplPath = `${this.settings.bookFolderPath}/${TEMPLATES_DIR}/NovelSmith_Template.md`;
         if (!this.app.vault.getAbstractFileByPath(tplPath)) {
             await this.plugin.ensureTemplateFileExists(false, true);
@@ -107,25 +114,25 @@ export class PlotManager {
         const cursor = editor.getCursor();
         const lineCount = editor.lineCount();
 
-        // 🔥 P2 架構重構：直接呼叫全域雷達，秒速定位當前游標所在的卡片與屬性！
+        // 🔥 P2 Architecture Refactoring: Call global radar directly to instantly locate the card and attributes at the cursor!
         const parsedScenes = parseUniversalScenes(editor.getValue());
         const currentScene = [...parsedScenes].reverse().find(s => s.lineIndex <= cursor.line);
         let metadataLines: string[] = currentScene ? currentScene.meta : [];
 
-        // 🔥 升級版：分拆時都可以揀色！
-        new SceneCreateModal(this.app, "🔪 分拆新情節", "", async (newSceneName, colorId) => {
+        // 🔥 Upgraded: Color selection available during splitting!
+        new SceneCreateModal(this.app, "🔪 Split Scene", "", async (newSceneName, colorId) => {
             if (!newSceneName) return;
 
             let newContent = "";
             const uuid = generateSceneId();
 
             if (metadataLines.length > 0) {
-                // 🔥 分拆時加入 data-color
+                // 🔥 Add data-color during splitting
                 newContent += `###### 🎬 ${newSceneName} <span class="ns-id" data-scene-id="${generateSceneId()}" data-warning="${ST_WARNING}" data-color="${colorId}"></span>\n`;
                 for (let line of metadataLines) {
                     if (line.includes("Scene::")) continue;
 
-                    // 🔥 終極修復 1：攔截並修改遺傳下來的 Callout 顏色！
+                    // 🔥 Ultimate Fix 1: Intercept and modify the inherited Callout color!
                     if (line.startsWith("> [!NSmith")) {
                         const calloutType = colorId === "default" ? "NSmith" : `NSmith-${colorId}`;
                         line = line.replace(/> \[!NSmith[^\]]*\]/, `> [!${calloutType}]`);
@@ -144,7 +151,7 @@ export class PlotManager {
             editor.setCursor(newCursor);
             editor.scrollIntoView({ from: newCursor, to: newCursor }, true);
 
-            new Notice(`✅ 已從此處分拆出：${newSceneName}`);
+            new Notice(`✅ Splitted from here: ${newSceneName}`);
             this.plugin.sceneManager.scheduleGenerateDatabase();
         }).open();
     }
@@ -154,12 +161,12 @@ export class PlotManager {
         const cursor = editor.getCursor();
         const lineCount = editor.lineCount();
 
-        // 🔥 P2 微調：改用全域雷達定位目標情節，並強制要求 ID！
+        // 🔥 P2 Tweak: Use global radar to locate the target scene, and mandate an ID!
         const parsedScenes = parseUniversalScenes(editor.getValue());
         const currentScene = [...parsedScenes].reverse().find(s => s.lineIndex <= cursor.line);
 
         if (!currentScene || !currentScene.id) {
-            new Notice("⚠️ 請先將游標放在有 ID 的主情節 (A) 範圍內。如果未有 ID，請先點擊「同步」按鈕！");
+            new Notice("⚠️ Please place your cursor within a main scene (A) that has an ID. If there is no ID, click the 'Sync' button first!");
             return;
         }
 
@@ -170,11 +177,11 @@ export class PlotManager {
 
 
         if (targetHeaderLine === -1) {
-            new Notice("⚠️ 請先將游標放在主情節 (A) 範圍內");
+            new Notice("⚠️ Please place your cursor within the main scene (A).");
             return;
         }
 
-        // 🔥 P2 架構重構：呼叫全域雷達，瞬間取得所有乾淨的場景資料！
+        // 🔥 P2 Architecture Refactoring: Call global radar to instantly fetch all clean scene data!
         //const parsedScenes = parseUniversalScenes(editor.getValue());
         const allScenes = parsedScenes
             .filter(s => s.lineIndex !== targetHeaderLine)
@@ -185,7 +192,7 @@ export class PlotManager {
             }));
 
         if (allScenes.length === 0) {
-            new Notice("⚠️ 找不到其他情節可以合併");
+            new Notice("⚠️ No other scenes found to merge.");
             return;
         }
 
@@ -212,8 +219,8 @@ export class PlotManager {
             }
         }
 
-        // 🔥 終極修復 2：預設身軀起點為「結尾」(即預設沒有正文)。
-        // 這樣可以防止完全沒有正文的新卡片，將 Callout 誤當成正文吸走！
+        // 🔥 Ultimate Fix 2: Default body start line to the "end" (i.e., default to no body text).
+        // This prevents new cards with no body text from accidentally sucking the Callout in as body text!
         let bodyStartLine = sourceEndLine;
 
         for (let i = sourceStartLine + 1; i < sourceEndLine; i++) {
@@ -221,7 +228,7 @@ export class PlotManager {
             if (line.startsWith(">") || line === "") {
                 continue;
             } else {
-                bodyStartLine = i; // 找到真正的正文起點
+                bodyStartLine = i; // Find the true body text start point
                 break;
             }
         }
@@ -241,7 +248,7 @@ export class PlotManager {
         let newTargetHeaderLine = -1;
         const newLineCount = editor.lineCount();
 
-        // 🔥 P2 微調：用宇宙唯一的 ID 去認人，就算有 10 個同名情節都絕對唔會認錯！
+        // 🔥 P2 Tweak: Use the universally unique ID to identify, guaranteeing no mistakes even with 10 identically named scenes!
         for (let i = 0; i < newLineCount; i++) {
             if (editor.getLine(i).includes(`data-scene-id="${targetSceneId}"`)) {
                 newTargetHeaderLine = i;
@@ -250,7 +257,7 @@ export class PlotManager {
         }
 
         if (newTargetHeaderLine === -1) {
-            new Notice("⚠️ 發生錯誤：搵唔返主情節，合併中止。");
+            new Notice("⚠️ Error occurred: Could not find the main scene. Merge aborted.");
             return;
         }
 
@@ -267,11 +274,11 @@ export class PlotManager {
             editor.replaceRange("\n\n" + textToMerge, { line: insertLine, ch: 0 });
             const scrollPos = { line: insertLine, ch: 0 };
             editor.scrollIntoView({ from: scrollPos, to: scrollPos }, true);
-            new Notice(`✅ 成功吸取內容！`);
+            new Notice(`✅ Successfully absorbed content!`);
 
             this.plugin.sceneManager.scheduleGenerateDatabase();
         } else {
-            new Notice("⚠️ 被選取的情節係空嘅，冇嘢好吸！");
+            new Notice("⚠️ The selected scene is empty, nothing to absorb!");
         }
     }
 }
