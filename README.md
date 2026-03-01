@@ -115,6 +115,6 @@ NovelSmith respects your data. It relies on minimal, non-intrusive syntax:
 Contributions, issues, and feature requests are highly welcome!
 If this plugin helped you forge your novel and you'd like to support its continued development, consider buying me a coffee:
 
-☕ [Buy Me a Coffee](https://buymecoffee.com/fongleng20e)
+☕ [Buy Me a Coffee]()
 
 This project is licensed under the MIT License.
