@@ -39,7 +39,7 @@ export class WritingManager {
     public async ensureRedundantListExists(forceShowNotice: boolean = false) {
         const configPath = `${this.getAidsFolderPath()}/RedundantList.md`;
         // ... Below, replace this.settings.redundantListPath with configPath
-        let configFile = this.app.vault.getAbstractFileByPath(configPath);
+        const configFile = this.app.vault.getAbstractFileByPath(configPath);
         if (!configFile) {
             // 🔥 Bug fix: Pass only the folder path, do not pass the full path including .md!
             await ensureFolderExists(this.app, this.getAidsFolderPath());
@@ -57,7 +57,7 @@ export class WritingManager {
     public async ensureFixListExists(forceShowNotice: boolean = false) {
         const configPath = `${this.getAidsFolderPath()}/FixList.md`;
         // ... Same replacement logic, replace this.settings.fixListPath with configPath
-        let configFile = this.app.vault.getAbstractFileByPath(configPath);
+        const configFile = this.app.vault.getAbstractFileByPath(configPath);
         if (!configFile) {
             // 🔥 Bug fix: Pass only the folder path, do not pass the full path including .md!
             await ensureFolderExists(this.app, this.getAidsFolderPath());
@@ -88,7 +88,7 @@ export class WritingManager {
 
             await this.ensureRedundantListExists(false); // Ensure the file exists
             const configPath = `${this.getAidsFolderPath()}/RedundantList.md`;
-            let configFile = this.app.vault.getAbstractFileByPath(configPath);
+            const configFile = this.app.vault.getAbstractFileByPath(configPath);
 
             if (configFile instanceof TFile) {
                 const configContent = await this.app.vault.read(configFile);
@@ -147,7 +147,7 @@ export class WritingManager {
     async correctNames(view: MarkdownView) {
         await this.ensureFixListExists(false); // Ensure the file exists
         const dataFileName = `${this.getAidsFolderPath()}/FixList.md`;
-        let fileObj = this.app.vault.getAbstractFileByPath(dataFileName);
+        const fileObj = this.app.vault.getAbstractFileByPath(dataFileName);
 
         if (!(fileObj instanceof TFile)) return;
         const rawList = await this.app.vault.read(fileObj);
@@ -181,7 +181,7 @@ export class WritingManager {
 
 
 
-        let allReplacements: { wrong: string, correct: string, regex?: RegExp }[] = [];
+        const allReplacements: { wrong: string, correct: string, regex?: RegExp }[] = [];
         for (const [correctName, wrongNames] of Object.entries(fixList)) {
             wrongNames.forEach(wrong => {
                 if (wrong !== correctName) {
@@ -213,9 +213,9 @@ export class WritingManager {
             };
         });
 
-        let content = view.editor.getValue();
+        const content = view.editor.getValue();
         let totalCount = 0;
-        let changesLog: string[] = [];
+        const changesLog: string[] = [];
         const lines = content.split("\n");
         let inCodeBlock = false;
         let inYaml = false;

@@ -1,70 +1,46 @@
-import tsparser from "@typescript-eslint/parser";
-import { defineConfig } from "eslint/config";
-import obsidianmd from "eslint-plugin-obsidianmd";
+import tseslint from 'typescript-eslint';
+import obsidianmd from 'eslint-plugin-obsidianmd';
+import tsparser from '@typescript-eslint/parser';
 
-export default defineConfig([
-    {
-        ignores: ["main.js", "node_modules/**", "dist/**"]
-    },
+export default tseslint.config(
+    // 1. 載入 Obsidian 官方專屬規則
     ...obsidianmd.configs.recommended,
+
     {
+        // 只檢查 .ts 檔案，避開 js 設定檔
         files: ["**/*.ts"],
+
+        // 2. 載入 TypeScript 官方嘅「需要類型檢查」嚴格規則 (Type-Aware)
+        extends: [
+            ...tseslint.configs.recommendedTypeChecked,
+        ],
+
+        // 🔥 最重要嘅一步：將 ESLint 同 tsconfig.json 連結！(機器人就係靠呢句)
         languageOptions: {
             parser: tsparser,
             parserOptions: {
-                project: "./tsconfig.json"
+                project: "./tsconfig.json",
+                tsconfigRootDir: import.meta.dirname,
             },
-            // 🔥 終極修復：教機器人認識瀏覽器嘅內建變數 (window, document, console, setTimeout)
-            globals: {
-                window: "readonly",
-                document: "readonly",
-                console: "readonly",
-                setTimeout: "readonly",
-                crypto: "readonly"
-            }
         },
+
         rules: {
-            // 🔥 暫時關閉極度嚴苛、需要完整 Type Checking 嘅「any」警告
-            "@typescript-eslint/no-explicit-any": "off",
-            "@typescript-eslint/no-unsafe-assignment": "off",
-            "@typescript-eslint/no-unsafe-member-access": "off",
-            "@typescript-eslint/no-unsafe-call": "off",
-            "@typescript-eslint/no-unsafe-argument": "off",
-            "@typescript-eslint/no-unsafe-return": "off",
-            // 🔥 容許我哋用 await 省略寫法 (即係冇寫 .catch)
-            "@typescript-eslint/no-floating-promises": "off",
-            "@typescript-eslint/no-misused-promises": "off",
-            "@typescript-eslint/no-unnecessary-type-assertion": "off",
-            // 🔥 容許我哋寫 Regex 嘅時候用多咗 / 符號
-            "no-useless-escape": "off",
+            // 保留你之前設定好嘅合法字眼 (白名單)
             "obsidianmd/ui/sentence-case": [
                 "error",
                 {
-                    // 話畀機器人聽：呢啲係我嘅品牌名同專有名詞，見到大楷唔好嘈！
-                    brands: [
-                        "NovelSmith",
-                        "Scrivenings",
-                        "Scrivenering",
-                        "YAML",
-                        "ID",
-                        "NSmith",
-                        "Heading",
-                        "heading",
-                        "MyBook",
-                        "_Backstage",
-                        "_Backstage/Drafts",
-                        "Output",
-                        "AutoWiki",
-                        "Wiki",
-                        "FILE_ID"
-                    ],
-
-                    ignoreRegex: [
-                        "\\n",
-                        "#"
-                    ]
+                    brands: ["NovelSmith", "Scrivenings", "Scrivenering", "YAML"]
                 }
-            ]
+            ],
+
+            // 明確列出官方機器人最鍾意捉嘅 3 大邏輯 Error：
+            "@typescript-eslint/require-await": "error",           // 捉 Async 無 Await
+            "@typescript-eslint/no-floating-promises": "error",    // 捉漏咗寫 await 或者 .catch()
+            "@typescript-eslint/no-misused-promises": "error"      // 捉錯用 Promise 嘅地方
         }
     },
-]);
+    {
+        // 忽略檢查編譯後嘅檔案
+        ignores: ["main.js", "node_modules/**", "dist/**", "*.mjs", "*.js"]
+    }
+);

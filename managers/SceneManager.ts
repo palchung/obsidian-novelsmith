@@ -123,12 +123,12 @@ export class SceneManager {
         const seenIds = new Set<string>();
 
         for (const file of files) {
-            let content = await this.app.vault.read(file);
+            const content = await this.app.vault.read(file);
             if (isScriveningsDraft(content)) continue;
 
-            let lines = content.split("\n");
+            const lines = content.split("\n");
             let fileHasChanges = false;
-            let newLines = [];
+            const newLines = [];
 
             for (const line of lines) {
                 if (line.trim().startsWith("######")) {
@@ -214,7 +214,7 @@ export class SceneManager {
             const isEditing = (view && view.file === file);
             let fileScenes: SceneData[] = [];
 
-            if (isEditing || !this.fileCache.has(file.path) || this.fileCache.get(file.path)!.mtime !== file.stat.mtime) {
+            if (isEditing || !this.fileCache.has(file.path) || this.fileCache.get(file.path).mtime !== file.stat.mtime) {
                 const content = isEditing ? view.editor.getValue() : await this.app.vault.read(file);
 
                 if (isScriveningsDraft(content)) continue;
@@ -227,7 +227,7 @@ export class SceneManager {
                 }
             } else {
 
-                fileScenes = this.fileCache.get(file.path)!.scenes;
+                fileScenes = this.fileCache.get(file.path).scenes;
             }
 
             if (fileScenes.length > 0) {
@@ -243,7 +243,7 @@ export class SceneManager {
                     }
 
                     for (const metaLine of scene.meta) {
-                        let cleanMeta = metaLine.replace(/^> ?/, "").trim();
+                        const cleanMeta = metaLine.replace(/^> ?/, "").trim();
 
                         if (cleanMeta.startsWith("[!") || cleanMeta.includes("Scene::")) continue;
 

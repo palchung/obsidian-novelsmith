@@ -16,7 +16,7 @@ export class HistoryManager {
         this.settings = newSettings;
     }
 
-    public getSceneInfoAtCursor(editor: any) {
+    public getSceneInfoAtCursor(editor: unknown) {
         const cursor = editor.getCursor();
         const lineCount = editor.lineCount();
 
@@ -54,7 +54,7 @@ export class HistoryManager {
 
         const rawRange = editor.getRange({ line: scene.startLine + 1, ch: 0 }, { line: scene.endLine, ch: 0 });
         const lines = rawRange.split("\n");
-        let bodyLines = [];
+        const bodyLines = [];
         let isMeta = true;
 
         // 🔥 Ultimate Fix: Accurately identify Callout, protecting the Blockquote of the body text!
@@ -80,7 +80,7 @@ export class HistoryManager {
             const finalVerName = sanitizedVerName === "" ? "Auto Backup" : sanitizedVerName;
 
 
-            await this.executeSave(scene.id!, scene.title, cleanContent, finalVerName);
+            await this.executeSave(scene.id, scene.title, cleanContent, finalVerName);
             if (onComplete) onComplete();
         }).open();
     }
@@ -126,7 +126,7 @@ export class HistoryManager {
         const versions = [];
 
         while ((verMatches = verRegex.exec(hContent)) !== null) {
-            let cleanBody = verMatches[2]
+            const cleanBody = verMatches[2]
                 .split("\n")
                 .map(l => l.replace(/^> ?/, ""))
                 .join("\n")
@@ -136,10 +136,10 @@ export class HistoryManager {
         return versions.reverse();
     }
 
-    public performRestore(editor: any, scene: any, newContent: string) {
+    public performRestore(editor: unknown, scene: unknown, newContent: string) {
         const currentRangeText = editor.getRange({ line: scene.startLine + 1, ch: 0 }, { line: scene.endLine, ch: 0 });
         const currentLines = currentRangeText.split("\n");
-        let metaBuffer = [];
+        const metaBuffer = [];
 
         // 🔥 Ultimate Fix: Accurately identify during restoration, without breaking the body text
         for (const line of currentLines) {

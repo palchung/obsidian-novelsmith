@@ -65,7 +65,7 @@ export class ScrivenerManager {
                     return;
                 }
 
-                let targetFileName = activeFile.name;
+                const targetFileName = activeFile.name;
                 let targetSceneRaw = "";
                 const view = this.app.workspace.getActiveViewOfType(MarkdownView);
                 if (view) {
@@ -102,7 +102,7 @@ export class ScrivenerManager {
     }
 
     async compileDraft(folder: TFolder, files: TFile[], targetFileName: string, targetSceneRaw: string) {
-        let contentChunks: string[] = [];
+        const contentChunks: string[] = [];
         contentChunks.push(`## 📜 Scrivenering mode：${folder.name}\n`);
 
         for (const file of files) {
@@ -115,7 +115,7 @@ export class ScrivenerManager {
             let isMeta = false;
             let buffer: string[] = [];
 
-            for (let line of lines) {
+            for (const line of lines) {
                 const l = line.trim();
                 if (l.startsWith("######")) {
                     if (buffer.length > 0) { contentChunks.push(buffer.join("\n").trimEnd() + "\n\n"); buffer = []; }
@@ -192,7 +192,7 @@ export class ScrivenerManager {
 
         const fileContentCache = new Map<string, { file: TFile, text: string }>();
         const globalIdMap = new Map<string, DraftCard>();
-        const parsedOriginalCache = new Map<string, any>();
+        const parsedOriginalCache = new Map<string, unknown>();
 
         await Promise.all(allFolderFiles.map(async (file) => {
             const text = await this.app.vault.read(file);
@@ -227,7 +227,7 @@ export class ScrivenerManager {
 
         for (let i = 1; i < fileBlocks.length; i += 2) {
             const fileName = fileBlocks[i].trim();
-            let blockContent = fileBlocks[i + 1];
+            const blockContent = fileBlocks[i + 1];
 
             if (!blockContent) continue;
             const cachedData = fileContentCache.get(fileName);
@@ -255,7 +255,7 @@ export class ScrivenerManager {
 
             if (originalData.headers.trim()) chunks.push(originalData.headers.trim() + "\n\n");
 
-            for (let draftCard of draftData.cards) {
+            for (const draftCard of draftData.cards) {
                 let originalCard: DraftCard | undefined;
                 if (draftCard.id && globalIdMap.has(draftCard.id)) originalCard = globalIdMap.get(draftCard.id);
                 else if (localTitleMap.has(draftCard.key)) originalCard = localTitleMap.get(draftCard.key);
@@ -274,7 +274,7 @@ export class ScrivenerManager {
                     let uuid = draftCard.id;
                     if (!uuid) uuid = generateSceneId();
                     const idTag = ` <span class="ns-id" data-scene-id="${uuid}" data-warning="${ST_WARNING}"></span>`;
-                    let cleanRawHeader = draftCard.rawHeader.replace(/<span.*?<\/span>/g, "").trimEnd();
+                    const cleanRawHeader = draftCard.rawHeader.replace(/<span.*?<\/span>/g, "").trimEnd();
                     chunks.push(`${cleanRawHeader}${idTag}\n`);
 
                     if (draftCard.meta && draftCard.meta.length > 0) {
@@ -293,7 +293,7 @@ export class ScrivenerManager {
             }
 
 
-            let finalContent = chunks.join("").trim();
+            const finalContent = chunks.join("").trim();
 
 
 

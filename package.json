@@ -22,8 +22,10 @@
     "typescript": "^5.9.3"
   },
   "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.56.1",
     "@typescript-eslint/parser": "^8.56.1",
     "eslint": "^10.0.2",
-    "eslint-plugin-obsidianmd": "^0.1.9"
+    "eslint-plugin-obsidianmd": "^0.1.9",
+    "typescript-eslint": "^8.56.1"
   }
 }

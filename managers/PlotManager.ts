@@ -117,7 +117,7 @@ export class PlotManager {
         // 🔥 P2 Architecture Refactoring: Call global radar directly to instantly locate the card and attributes at the cursor!
         const parsedScenes = parseUniversalScenes(editor.getValue());
         const currentScene = [...parsedScenes].reverse().find(s => s.lineIndex <= cursor.line);
-        let metadataLines: string[] = currentScene ? currentScene.meta : [];
+        const metadataLines: string[] = currentScene ? currentScene.meta : [];
 
         // 🔥 Upgraded: Color selection available during splitting!
         new SceneCreateModal(this.app, "🔪 Split Scene", "", async (newSceneName, colorId) => {

@@ -125,7 +125,7 @@ export class StructureView extends ItemView {
 
         // 🔥 Include try...finally
         try {
-            const container = this.contentEl.querySelector(".ns-structure-container") as HTMLElement;
+            const container = this.contentEl.querySelector(".ns-structure-container");
             if (!container) return;
 
             const view = this.getValidMarkdownView();
@@ -238,7 +238,7 @@ export class StructureView extends ItemView {
                     this.plugin.app,
                     "Are you sure to discard this darft?\n\nWill close & delete this file, all your word will not be synced",
                     async () => {
-                        await this.plugin.scrivenerManager.discardDraft(view.file!);
+                        await this.plugin.scrivenerManager.discardDraft(view.file);
                     }
                 ).open();
             };
@@ -259,7 +259,7 @@ export class StructureView extends ItemView {
         btnRow.setCssStyles({ marginBottom: "5px" });
 
 
-        const isArchivedDraft = (file: any, content: string) => {
+        const isArchivedDraft = (file: unknown, content: string) => {
             return file.name !== DRAFT_FILENAME &&
                 (isScriveningsDraft(content));
         };
@@ -614,9 +614,9 @@ export class StructureView extends ItemView {
             const actions = card.createDiv({ cls: "ns-history-actions" });
 
             const btnPreview = actions.createEl("button", { text: "Preview" });
-            btnPreview.onclick = () => { this.plugin.historyManager.showPreview(this.selectedSceneTitle!, ver.label, ver.content); };
+            btnPreview.onclick = () => { this.plugin.historyManager.showPreview(this.selectedSceneTitle, ver.label, ver.content); };
             const btnRestore = actions.createEl("button", { text: "Recover" });
-            btnRestore.onclick = () => { this.handleRestore(view, this.selectedSceneId!, ver.content); };
+            btnRestore.onclick = () => { this.handleRestore(view, this.selectedSceneId, ver.content); };
         }
     }
 
@@ -654,15 +654,15 @@ export class StructureView extends ItemView {
         titleEl.setCssProps({ paddingBottom: "8px" });
 
 
-        let metaLines: string[] = [];
-        let lineCount = editor.lineCount();
+        const metaLines: string[] = [];
+        const lineCount = editor.lineCount();
         for (let i = startLine + 1; i < lineCount; i++) {
             const line = editor.getLine(i).trim();
 
             if (line.startsWith("######") || line.includes("++ FILE_ID")) break;
 
             if (line.startsWith(">")) {
-                let cleanLine = line.substring(1).trim();
+                const cleanLine = line.substring(1).trim();
 
                 if (cleanLine.startsWith("[!NSmith") || cleanLine.startsWith("[!info]")) continue;
                 metaLines.push(cleanLine);
@@ -936,9 +936,9 @@ export class StructureView extends ItemView {
                 flushScene();
 
 
-                let uuid = extractSceneId(trimLine) || "";
-                let cleanName = cleanSceneTitle(trimLine);
-                let colorId = extractSceneColor(trimLine);
+                const uuid = extractSceneId(trimLine) || "";
+                const cleanName = cleanSceneTitle(trimLine);
+                const colorId = extractSceneColor(trimLine);
 
                 currentScene = { id: uuid, rawHeader: trimLine, name: cleanName.trim(), content: line + "\n", lineNumber: i, type: 'scene', colorId: colorId };
                 buffer = []; continue;

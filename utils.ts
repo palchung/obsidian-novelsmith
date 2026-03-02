@@ -83,11 +83,11 @@ export const normalizeHeader = (header: string): string => {
 // 4. Core Parser
 export const parseContent = (text: string, isOriginal: boolean = false): ParseResult => {
     const lines = text.split("\n");
-    let cards: DraftCard[] = [];
+    const cards: DraftCard[] = [];
     let currentHeaderRaw: string | null = null;
     let currentBodyLines: string[] = [];
     let currentMeta: string[] = [];
-    let fileHeaders: string[] = [];
+    const fileHeaders: string[] = [];
     let isCollectingMeta = false;
     let hasHitFirstCard = false;
 
@@ -97,7 +97,7 @@ export const parseContent = (text: string, isOriginal: boolean = false): ParseRe
 
             if (!isOriginal) {
                 cleanBody = cleanBody.replace(RE_HIGHLIGHT, "").replace(RE_SEPARATOR, "");
-                let tempLines = cleanBody.split("\n");
+                const tempLines = cleanBody.split("\n");
                 while (tempLines.length > 0) {
                     const l = tempLines[0].trim();
                     if (l.startsWith(">")) tempLines.shift();
@@ -253,7 +253,7 @@ export const parseUniversalScenes = (textOrLines: string | string[]): UniversalS
 // ============================================================
 
 // 1. Silent replacement (Protects Ctrl+Z)
-export const replaceEntireDocument = (editor: any, newContent: string) => {
+export const replaceEntireDocument = (editor: unknown, newContent: string) => {
     const lastLine = editor.lineCount() - 1;
     const lastCh = editor.getLine(lastLine).length;
     editor.replaceRange(newContent, { line: 0, ch: 0 }, { line: lastLine, ch: lastCh });
