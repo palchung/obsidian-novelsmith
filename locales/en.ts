@@ -40,7 +40,7 @@
 //     // 📚 Scrivenings Mode
 //     // ==========================================
 //     scrivener_syncing: "⚡️ Preparing to sync back...",
-//     scrivener_compiling: "⚡️ Compiling scrivenings draft...",
+//     scrivener_compiling: "⚡️     ",
 //     scrivener_compile_success: "✅ Compilation complete! {0} chapters loaded.",
 //     scrivener_sync_success: "✅ Sync complete! Updated {0} files.",
 //     scrivener_draft_archived: "✅ Sync complete! Draft archived.",

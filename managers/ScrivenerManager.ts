@@ -4,7 +4,7 @@ import { parseContent, RE_FILE_ID, DraftCard } from '../utils';
 import { NovelSmithSettings } from '../settings';
 import { ChapterSelectionModal, SimpleConfirmModal } from '../modals';
 import { HISTORY_DIR, ST_WARNING, generateSceneId, DRAFT_FILENAME, TEMPLATES_DIR, DRAFTS_DIR, ensureFolderExists } from '../utils';
-import { t } from '../locales';
+
 
 export class ScrivenerManager {
     app: App;
@@ -61,7 +61,7 @@ export class ScrivenerManager {
 
 
                 if (validFiles.length === 0) {
-                    new Notice(t("warn_no_valid_manuscript"), 6000);
+                    new Notice("Access denied: no scene cards (######) found in this folder.\nScrivenings mode can only be launched in folders containing valid manuscript files!", 6000);
                     return;
                 }
 
@@ -79,7 +79,7 @@ export class ScrivenerManager {
 
 
                 new ChapterSelectionModal(this.app, validFiles, async (selectedFiles) => {
-                    new Notice(t("scrivener_compiling"));
+                    new Notice("Compiling Scrivenings draft...");
                     await this.compileDraft(currentFolder, selectedFiles, targetFileName, targetSceneRaw);
                 }).open();
             };

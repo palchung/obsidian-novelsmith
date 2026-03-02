@@ -1,5 +1,4 @@
 import { App, FuzzySuggestModal, Modal, Setting, TFile, Notice } from 'obsidian';
-import { t } from './locales';
 import { SCENE_COLORS, createIconButton } from './utils'; // Ensure path is correct
 
 // ============================================================
@@ -137,8 +136,8 @@ export class CompileModal extends Modal {
         });
 
         new Setting(scrollArea)
-            .setName(t("modal_compile_opt_heading") || "Insert file name as chapter heading")
-            .setDesc(t("modal_compile_opt_heading_desc") || "Insert corresponding level headings at the top of each chapter. To avoid conflicts with Scene Cards (H6), up to H5 is supported.")
+            .setName("Insert file name as chapter heading")
+            .setDesc("Insert corresponding level headings at the top of each chapter. To avoid conflicts with Scene Cards (H6), up to H5 is supported.")
             .addDropdown(drop => drop
                 .addOption('none', 'Do not insert')
                 .addOption('1', 'H1 (# Heading)')
