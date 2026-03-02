@@ -45,12 +45,12 @@ export class WritingManager {
             await ensureFolderExists(this.app, this.getAidsFolderPath());
             try {
                 await this.app.vault.create(configPath, `// Default Redundant Words List\nactually, basically, seemingly`);
-                if (forceShowNotice) new Notice(`✅ Successfully generated Redundant Words List: ${configPath}`);
-            } catch (e) {
-                if (forceShowNotice) new Notice(`❌ Creation failed, please check the path.`);
+                if (forceShowNotice) new Notice(`Successfully generated redundant words list: ${configPath}`);
+            } catch {
+                if (forceShowNotice) new Notice(`Creation failed, please check the path.`);
             }
         } else {
-            if (forceShowNotice) new Notice(`⚠️ File already exists (${configPath}), generation stopped.`);
+            if (forceShowNotice) new Notice(`File already exists (${configPath}), generation stopped.`);
         }
     }
 
@@ -64,11 +64,11 @@ export class WritingManager {
             try {
                 await this.app.vault.create(configPath, `// Correction List\nMainCharacterName | Typo1`);
                 if (forceShowNotice) new Notice(`✅ Successfully generated Correction List: ${configPath}`);
-            } catch (e) {
-                if (forceShowNotice) new Notice(`❌ Creation failed, please check the path.`);
+            } catch {
+                if (forceShowNotice) new Notice(`Creation failed, please check the path.`);
             }
         } else {
-            if (forceShowNotice) new Notice(`⚠️ File already exists (${configPath}), generation stopped.`);
+            if (forceShowNotice) new Notice(`File already exists (${configPath}), generation stopped.`);
         }
     }
 
@@ -82,7 +82,7 @@ export class WritingManager {
             document.body.classList.remove('mode-redundant');
             updateRedundantPatterns(null);
             this.triggerEditorUpdate();
-            new Notice("⚪️ Disabled: Redundant Words Mode");
+            new Notice("Disabled: redundant words mode");
         } else {
             document.body.classList.remove('mode-dialogue');
 
@@ -96,7 +96,7 @@ export class WritingManager {
                     .map(w => w.trim())
                     .filter(w => w.length > 0 && !w.startsWith("//"));
 
-                if (badWords.length === 0) { new Notice("⚠️ The active Redundant Words List is empty."); return; }
+                if (badWords.length === 0) { new Notice("The active redundant words list is empty."); return; }
 
                 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 badWords.sort((a, b) => b.length - a.length);
@@ -132,12 +132,12 @@ export class WritingManager {
         if (isModeOn) {
             document.body.classList.remove('mode-dialogue');
             this.triggerEditorUpdate();
-            new Notice("⚪️ Disabled: Dialogue Mode");
+            new Notice("Disabled: dialogue mode");
         } else {
             document.body.classList.remove('mode-redundant');
             document.body.classList.add('mode-dialogue');
             this.triggerEditorUpdate();
-            new Notice("💬 Dialogue Mode: Focused");
+            new Notice("Dialogue mode: focused");
         }
     }
 
@@ -296,7 +296,7 @@ export class WritingManager {
                 new Notice(`✅ Corrected ${totalCount} typos.\n` + changesLog.slice(0, 3).join("\n") + (changesLog.length > 3 ? "\n..." : ""), 5000);
             }
         } else {
-            new Notice("🎉 Perfect! No typos found.");
+            new Notice("Perfect! No typos found.");
         }
     }
 
@@ -320,9 +320,9 @@ export class WritingManager {
                 // 🔥 P2 Optimization: Call global silent replacement
                 replaceEntireDocument(view.editor, content);
 
-                new Notice("🧹 Clean Draft complete! Selected markers have been removed.");
+                new Notice("Clean draft complete! Selected markers have been removed.");
             } else {
-                new Notice("👌 No markers found that require cleanup.");
+                new Notice("No markers found that require cleanup.");
             }
         }).open();
     }

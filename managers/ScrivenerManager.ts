@@ -22,13 +22,13 @@ export class ScrivenerManager {
 
     async toggleScrivenings() {
         const activeFile = this.app.workspace.getActiveFile();
-        if (!activeFile) { new Notice("❌ Please open a file first!"); return; }
+        if (!activeFile) { new Notice("Please open a file first!"); return; }
 
         const currentFolder = activeFile.parent;
-        if (!currentFolder) { new Notice("❌ Abnormal file location."); return; }
+        if (!currentFolder) { new Notice("Abnormal file location."); return; }
 
         if (activeFile.name === DRAFT_FILENAME) {
-            new Notice("⚡️ Preparing to sync back (Sync)...");
+            new Notice("Preparing to sync back ...");
             await this.syncBack(activeFile, currentFolder);
         } else {
             // 🔥 Anti-self-destruct mechanism
@@ -43,7 +43,7 @@ export class ScrivenerManager {
 
                 rawFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
-                if (rawFiles.length === 0) { new Notice("⚠️ 資料夾內沒有可串聯的檔案。"); return; }
+                if (rawFiles.length === 0) { new Notice("No valid files in this folder "); return; }
 
                 // =======================================================
                 // 🛡️ Draft Radar: Look for file with scenes card
@@ -88,7 +88,7 @@ export class ScrivenerManager {
             if (existingDraft instanceof TFile) {
                 new SimpleConfirmModal(
                     this.app,
-                    "🚨 Warning: non-sync Scrivenering draft is found\n\nScrivenering draft exist in this folder. Start a new scrivenering draft will remove all your previous non-sync draft!\n\nAre you sure to replace it?\n(Suggest you to cancel and open the original draft, then press 💾 Sync and close)",
+                    "Warning: non-sync Scrivenering draft is found.\n\nScrivenering draft exist in this folder. Start a new Scrivenering draft will remove all your previous non-sync draft!\n\nAre you sure to replace it?\n(Suggest you to cancel and open the original draft, then press sync and close)",
                     () => {
 
                         startCompileProcess();
@@ -103,7 +103,7 @@ export class ScrivenerManager {
 
     async compileDraft(folder: TFolder, files: TFile[], targetFileName: string, targetSceneRaw: string) {
         let contentChunks: string[] = [];
-        contentChunks.push(`## 📜 Scrivenering Mode：${folder.name}\n`);
+        contentChunks.push(`## 📜 Scrivenering mode：${folder.name}\n`);
 
         for (const file of files) {
             const content = await this.app.vault.read(file);
@@ -148,7 +148,7 @@ export class ScrivenerManager {
         if (draftFile instanceof TFile) {
             const leaf = this.app.workspace.getLeaf(false);
             await leaf.openFile(draftFile);
-            new Notice(`✅ Compilation complete！Total ${files.length} Chapters`);
+            new Notice(`Compilation complete！Total ${files.length} chapters`);
 
             setTimeout(() => {
                 const newView = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -177,10 +177,10 @@ export class ScrivenerManager {
         const draftContent = await this.app.vault.read(draftFile);
 
         if (!draftContent.includes('<span class="ns-file-id">++ FILE_ID:')) {
-            new Notice("❌ Error：FILE_ID can't be found, Sync abort", 0); return;
+            new Notice("Error: FILE_ID can't be found, sync abort", 0); return;
         }
 
-        new Notice("🚀 Sync in process…");
+        new Notice("Sync in process…");
 
         let leafToClose = null;
         const view = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -331,16 +331,16 @@ export class ScrivenerManager {
             const newPath = `${backstageDrafts}/${timestamp}_${baseName}.md`;
 
             await this.app.fileManager.renameFile(draftFile, newPath);
-            new Notice(`✅ Sync complete, draft saved`);
+            new Notice(`Sync complete, draft saved`);
         } else {
-            await this.app.vault.delete(draftFile);
-            new Notice(`✅ Sync complete, updated ${updatedCount} files.`);
+            await this.app.fileManager.trashFile(draftFile);
+            new Notice(`Sync complete, updated ${updatedCount} files.`);
         }
 
         if (leafToClose) leafToClose.detach();
 
         if (skippedFiles.length > 0) {
-            new Notice(`🚨 Error：${skippedFiles.length} files can't be synced. (Rename or deleted)\nFiles：${skippedFiles.join(", ")}`, 15000);
+            new Notice(`Error：${skippedFiles.length} files can't be synced. (Rename or deleted)\nFiles：${skippedFiles.join(", ")}`, 15000);
         }
     }
 
@@ -360,8 +360,8 @@ export class ScrivenerManager {
         if (leafToClose) leafToClose.detach();
 
         // After the visual disappears, silently trash the file in the background
-        await this.app.vault.trash(draftFile, true);
-        new Notice("🗑️ Draft discarded! Original manuscript remains unchanged.\n(If you need to recover it, check your system's Trash/Recycle Bin)");
+        await this.app.fileManager.trashFile(draftFile);
+        new Notice("Draft discarded! original manuscript remains unchanged.\n(If you need to recover it, check your system's trash/recycle bin)");
 
 
     }

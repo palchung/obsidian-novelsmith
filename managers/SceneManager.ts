@@ -1,7 +1,7 @@
 import { App, Notice, MarkdownView, TFile, TFolder, moment } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 import { SimpleConfirmModal } from '../modals';
-import { replaceEntireDocument, ST_WARNING, isScriveningsDraft, generateSceneId, parseUniversalScenes, extractSceneColor, getColorById, extractSceneId, cleanSceneTitle, RE_EXTRACT_ID, DRAFT_FILENAME, BACKSTAGE_DIR, SCENE_DB_FILE, ensureFolderExists } from '../utils';
+import { replaceEntireDocument, ST_WARNING, isScriveningsDraft, generateSceneId, parseUniversalScenes, getColorById, RE_EXTRACT_ID, DRAFT_FILENAME, BACKSTAGE_DIR, SCENE_DB_FILE, ensureFolderExists } from '../utils';
 
 
 interface SceneData {
@@ -60,7 +60,7 @@ export class SceneManager {
     async assignIDs(view: MarkdownView) {
         new SimpleConfirmModal(this.app, "Confirm to assign ID to all scenes ?", async () => {
             await this.executeAssignIDsSilent(view);
-            new Notice(`✅ Assign ID successfully！`);
+            new Notice(`Assign ID successfully!`);
         }).open();
     }
 
@@ -92,7 +92,7 @@ export class SceneManager {
                         newLines.push(fixedLine);
                         seenIds.add(newId);
                         hasChanges = true;
-                        console.log(`NovelSmith Intercept：Duplicate ID ${currentId}, replaced with ${newId}`);
+                        //console.log(`NovelSmith Intercept：Duplicate ID ${currentId}, replaced with ${newId}`);
                     } else {
                         // Case C：valid ID -> Record it
                         seenIds.add(currentId);
@@ -148,7 +148,7 @@ export class SceneManager {
                             newLines.push(fixedLine);
                             seenIds.add(newId);
                             fileHasChanges = true;
-                            console.log(`NovelSmith Intercept：File ${file.name} was found duplicated ID ${currentId}, replaced with ${newId}`);
+                            //console.log(`NovelSmith Intercept：File ${file.name} was found duplicated ID ${currentId}, replaced with ${newId}`);
                         } else {
                             // Case C: Valid ID -> Record it
                             seenIds.add(currentId);
@@ -198,7 +198,7 @@ export class SceneManager {
         for (const cachePath of this.fileCache.keys()) {
             if (!validPaths.has(cachePath)) {
                 this.fileCache.delete(cachePath); // Kick files that no longer exist out of memory!
-                console.log(`NovelSmith System Optimization: Cleared phantom cache ${cachePath}`);
+                //console.log(`NovelSmith System Optimization: Cleared phantom cache ${cachePath}`);
             }
         }
         // =========================================================

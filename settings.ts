@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
+import { App, PluginSettingTab, Setting, Notice, setIcon } from 'obsidian';
 import NovelSmithPlugin from './main';
 
 export interface NovelSmithSettings {
@@ -27,15 +27,15 @@ export class NovelSmithSettingTab extends PluginSettingTab {
         const { containerEl } = this;
 
         containerEl.empty();
-        containerEl.createEl('h2', { text: '⚔️ NovelSmith Settings' });
+        ;
 
         // ==========================================
         // 📚 Core Settings
         // ==========================================
-        containerEl.createEl('h3', { text: '📚 Core Writing Workspace' });
+        new Setting(containerEl).setName("Core writing workspace").setHeading();
 
         new Setting(containerEl)
-            .setName('Dedicated Writing Folder')
+            .setName('Dedicated writing folder')
             .setDesc('Designate your novel\'s root directory (e.g., MyBook). The system will automatically create a _Backstage folder inside to store all system files.')
             .addText(text => text
                 .setPlaceholder('MyBook')
@@ -46,29 +46,29 @@ export class NovelSmithSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName("🎉 Initialize NovelSmith")
-            .setDesc("One-click setup for your dedicated writing folder, the _Backstage system directory, and a default Scene Card template.")
+            .setName("Initialize NovelSmith")
+            .setDesc("One-click setup for your dedicated writing folder, the _Backstage system directory, and a default scene card template.")
             .addButton(btn => btn
-                .setButtonText("🚀 Initialize Now")
+                .setButtonText("Initialize now")
                 .setCta() // Turn into a prominent CTA button color
                 .onClick(async () => {
                     const folder = this.plugin.settings.bookFolderPath;
                     if (!folder || folder.trim() === "") {
-                        new Notice("⚠️ Please enter your desired 'Folder Name' above first!");
+                        new Notice("Please enter your desired 'folder name' above first!");
                         return;
                     }
 
                     // Call the powerful generator in main.ts!
                     // forceShowNotice = true, openAfterCreate = true
                     await this.plugin.ensureTemplateFileExists(true, true);
-                    new Notice(`✅ Initialization successful! Your writing workspace [${folder}] is ready!`);
+                    new Notice(`Initialization successful! Your writing workspace [${folder}] is ready!`);
                 })
             );
 
 
         new Setting(containerEl)
-            .setName('Keep Draft History After Sync')
-            .setDesc('When enabled, ending Scrivenings Mode will backup the draft to _Backstage/Drafts.')
+            .setName('Keep draft history after sync')
+            .setDesc('When enabled, ending Scrivenings mode will backup the draft to _Backstage/Drafts.')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.keepDraftOnSync)
                 .onChange(async (value) => {
@@ -77,7 +77,7 @@ export class NovelSmithSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName('Compile Export Path')
+            .setName('Compile export path')
             .setDesc('Fully compiled manuscripts will be saved here (e.g., Output).')
             .addText(text => text
                 .setPlaceholder('Output')
@@ -90,11 +90,11 @@ export class NovelSmithSettingTab extends PluginSettingTab {
         // ==========================================
         // 🧠 AutoWiki
         // ==========================================
-        containerEl.createEl('h3', { text: '🧠 AutoWiki' });
+        new Setting(containerEl).setName("AutoWiki").setHeading();
 
         new Setting(containerEl)
-            .setName('Wiki Storage Folder')
-            .setDesc('Newly created Character/Setting cards will automatically be placed in this folder.')
+            .setName('Wiki storage folder')
+            .setDesc('Newly created character/setting cards will automatically be placed in this folder.')
             .addText(text => text
                 .setPlaceholder('MyBook/Wiki')
                 .setValue(this.plugin.settings.wikiFolderPath)
@@ -106,33 +106,55 @@ export class NovelSmithSettingTab extends PluginSettingTab {
         // ==========================================
         // 🛠️ System Repair (Keep manual regeneration buttons)
         // ==========================================
-        containerEl.createEl('h3', { text: '🛠️ System Repair and Rebuild' });
+        new Setting(containerEl).setName("System repair and rebuild").setHeading();
         containerEl.createEl('p', { text: 'If system files in _Backstage are lost, click the buttons below to regenerate them (will not overwrite existing files).', cls: 'setting-item-description' });
 
         new Setting(containerEl)
-            .setName('Regenerate: Scene Card Template')
+            .setName('Regenerate: scene card template')
             .addButton(button => button
-                .setButtonText('🔄 Rebuild Template')
+                .setIcon('refresh-cw')  // 
+                .setButtonText('Rebuild template')
                 .onClick(async () => {
                     await this.plugin.ensureTemplateFileExists(true);
                 }));
 
         new Setting(containerEl)
-            .setName('Regenerate: Redundant Words List')
+            .setName('Regenerate: redundant words list')
             .addButton(button => button
-                .setButtonText('🔄 Rebuild Redundant List')
+                .setIcon('refresh-cw')
+                .setButtonText('Rebuild redundant list')
                 .onClick(async () => {
                     await this.plugin.writingManager.ensureRedundantListExists(true);
                 }));
 
         new Setting(containerEl)
-            .setName('Regenerate: Correction List')
+            .setName('Regenerate: correction list')
             .addButton(button => button
-                .setButtonText('🔄 Rebuild Correction List')
+                .setIcon('refresh-cw')
+                .setButtonText('Rebuild correction list')
                 .onClick(async () => {
                     await this.plugin.writingManager.ensureFixListExists(true);
                 }));
 
-        containerEl.createEl('p', { text: 'By writers, for writers.' });
+
+        const sloganContainer = containerEl.createDiv();
+        sloganContainer.setCssStyles({
+            marginTop: "50px",
+            marginBottom: "20px",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: "8px",
+            color: "var(--text-muted)",
+            fontStyle: "italic",
+            fontSize: "1em",
+            opacity: "0.8"
+        });
+
+
+        const iconSpan = sloganContainer.createSpan();
+        setIcon(iconSpan, "feather");
+
+        sloganContainer.createSpan({ text: "By writers, for writers." });
     }
 }

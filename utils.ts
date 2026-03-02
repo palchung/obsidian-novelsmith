@@ -1,4 +1,4 @@
-import { TFile, App } from 'obsidian';
+import { App, setIcon } from 'obsidian';
 
 // ============================================================
 // 🛠️ Toolbox: Handles string processing and parsing
@@ -55,7 +55,7 @@ export const ensureFolderExists = async (app: App, folderPath: string) => {
         currentPath += (i === 0 ? "" : "/") + folders[i];
         const folder = app.vault.getAbstractFileByPath(currentPath);
         if (!folder) {
-            try { await app.vault.createFolder(currentPath); } catch (e) { /* ignore */ }
+            try { await app.vault.createFolder(currentPath); } catch { /* ignore */ }
         }
     }
 };
@@ -268,3 +268,40 @@ export const generateSceneId = (): string => {
 export const isScriveningsDraft = (content: string, fileName: string = ""): boolean => {
     return fileName === DRAFT_FILENAME || content.includes('++ FILE_ID:') || content.includes('## 📜');
 };
+
+
+/**
+ * Official Icon 
+ * @param parent e.g topBtnRow
+ * @param iconName Lucide Icon 
+ * @param text 
+ * @param extraStyles 
+ * @returns HTMLButtonElement
+ */
+export function createIconButton(
+    parent: HTMLElement,
+    iconName: string,
+    text: string,
+    extraStyles?: Record<string, string>
+): HTMLButtonElement {
+    const btn = parent.createEl("button");
+
+    // Flex center
+    let styles: Record<string, string> = {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "6px"
+    };
+
+    // combine extra style
+    if (extraStyles) {
+        styles = { ...styles, ...extraStyles };
+    }
+
+    btn.setCssStyles(styles);
+    setIcon(btn, iconName);
+    btn.createSpan({ text: text });
+
+    return btn;
+}

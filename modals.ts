@@ -1,6 +1,6 @@
 import { App, FuzzySuggestModal, Modal, Setting, TFile, Notice } from 'obsidian';
 import { t } from './locales';
-import { SCENE_COLORS } from './utils'; // Ensure path is correct
+import { SCENE_COLORS, createIconButton } from './utils'; // Ensure path is correct
 
 // ============================================================
 // 1. Generic Input Modal (Retained: for atomic saving)
@@ -123,22 +123,24 @@ export class CompileModal extends Modal {
     onOpen() {
         const { contentEl } = this;
         contentEl.empty();
-        contentEl.createEl('h2', { text: '📤 Compile & Export Settings' });
-        contentEl.createEl('p', { text: 'Select the content to clean. These actions only affect the output file and will not modify your original manuscript.', cls: 'setting-item-description' });
+        contentEl.createEl('h2', { text: 'Compile & export settings' });
+        contentEl.createEl('p', { text: 'Select the content to clean, these actions only affect the compiled file and will not modify your original manuscript.', cls: 'setting-item-description' });
 
         // ==========================================
         // 🛠️ Mobile UI Rescue: Create a "scrollable" options area
         // ==========================================
         const scrollArea = contentEl.createDiv();
-        scrollArea.style.maxHeight = "55vh"; // Limit maximum height to 55% of the screen height
-        scrollArea.style.overflowY = "auto";
-        scrollArea.style.paddingRight = "10px"; // Leave space for the scrollbar
+        scrollArea.setCssStyles({
+            maxHeight: "55vh", // Limit maximum height to 55% of the screen height
+            overflowY: "auto",
+            paddingRight: "10px" // Leave space for the scrollbar
+        });
 
         new Setting(scrollArea)
-            .setName(t("modal_compile_opt_heading") || "📄 Insert File Name as Chapter Heading")
+            .setName(t("modal_compile_opt_heading") || "Insert file name as chapter heading")
             .setDesc(t("modal_compile_opt_heading_desc") || "Insert corresponding level headings at the top of each chapter. To avoid conflicts with Scene Cards (H6), up to H5 is supported.")
             .addDropdown(drop => drop
-                .addOption('none', 'Do Not Insert (Default)')
+                .addOption('none', 'Do not insert')
                 .addOption('1', 'H1 (# Heading)')
                 .addOption('2', 'H2 (## Heading)')
                 .addOption('3', 'H3 (### Heading)')
@@ -150,61 +152,61 @@ export class CompileModal extends Modal {
 
 
         new Setting(scrollArea)
-            .setName('Remove YAML Frontmatter')
+            .setName('Remove YAML frontmatter')
             .setDesc('Delete the --- configuration block at the beginning of the file.')
             .addToggle(toggle => toggle
                 .setValue(this.options.removeYaml)
                 .onChange(value => this.options.removeYaml = value));
 
         new Setting(scrollArea)
-            .setName('Remove Scene Cards (Callout)')
+            .setName('Remove scene cards (callout)')
             .setDesc('Delete ###### and related callout blocks.')
             .addToggle(toggle => toggle
                 .setValue(this.options.removeSceneInfo)
                 .onChange(value => this.options.removeSceneInfo = value));
 
         new Setting(scrollArea)
-            .setName('Remove Comments')
+            .setName('Remove comments')
             .setDesc('Delete all %% comments %%.')
             .addToggle(toggle => toggle
                 .setValue(this.options.removeComments)
                 .onChange(value => this.options.removeComments = value));
 
         new Setting(scrollArea)
-            .setName('Remove Strikethrough')
+            .setName('Remove strikethrough')
             .setDesc('Delete all ~~strikethrough~~ text.')
             .addToggle(toggle => toggle
                 .setValue(this.options.removeStrikethrough)
                 .onChange(value => this.options.removeStrikethrough = value));
 
         new Setting(scrollArea)
-            .setName('Merge Bold Text (Finalize)')
+            .setName('Merge bold text (finalize)')
             .setDesc('Convert **bold text** into normal text.')
             .addToggle(toggle => toggle
                 .setValue(this.options.mergeBold)
                 .onChange(value => this.options.mergeBold = value));
 
         new Setting(scrollArea)
-            .setName('Remove Highlights')
+            .setName('Remove highlights')
             .setDesc('Remove all ==highlight symbols==.')
             .addToggle(toggle => toggle
                 .setValue(this.options.removeHighlights)
                 .onChange(value => this.options.removeHighlights = value));
 
         new Setting(scrollArea)
-            .setName('Remove Internal Link Symbols')
-            .setDesc('Convert [[Link|Display Name]] to plain text (keeping only the display name).')
+            .setName('Remove internal link symbols')
+            .setDesc('Convert [[link|display name]] to plain text (keeping only the display name).')
             .addToggle(toggle => toggle
                 .setValue(this.options.removeInternalLinks)
                 .onChange(val => this.options.removeInternalLinks = val));
 
         // Below the removeInternalLinks Setting, add this section:
         new Setting(scrollArea)
-            .setName("Hashtag Processing")
+            .setName("Hashtag processing")
             .setDesc("Process #tags in the manuscript (The system identifies accurately and will never accidentally delete # headers).")
             .addDropdown(drop => drop
                 .addOption('none', 'Keep as is')
-                .addOption('remove-hash', 'Remove # symbol only (e.g., #Draft becomes Draft)')
+                .addOption('remove-hash', 'Remove # symbol only (e.g., #draft becomes draft)')
                 .addOption('remove-all', 'Completely remove the tag and text')
                 .setValue(this.options.hashtagAction)
                 .onChange(value => this.options.hashtagAction = value as any)
@@ -214,15 +216,17 @@ export class CompileModal extends Modal {
         // 🛠️ Mobile UI Rescue: Create an "always-at-bottom" button area
         // ==========================================
         const buttonArea = contentEl.createDiv();
-        buttonArea.style.marginTop = "20px";
-        buttonArea.style.paddingTop = "10px";
-        buttonArea.style.borderTop = "1px solid var(--background-modifier-border)";
-        buttonArea.style.display = "flex";
-        buttonArea.style.justifyContent = "flex-end"; // Push buttons to the right
+        buttonArea.setCssStyles({
+            marginTop: "20px",
+            paddingTop: "10px",
+            borderTop: "1px solid var(--background-modifier-border)",
+            display: "flex",
+            justifyContent: "flex-end" // Push buttons to the right
+        });
 
         new Setting(buttonArea)
             .addButton(btn => btn
-                .setButtonText('Start Compilation')
+                .setButtonText('Start compilation')
                 .setCta()
                 .onClick(() => {
                     this.close();
@@ -254,22 +258,24 @@ export class ChapterSelectionModal extends Modal {
     onOpen() {
         const { contentEl } = this;
         contentEl.empty();
-        contentEl.createEl('h2', { text: '📚 Step 1: Select Chapters to Compile' });
+        contentEl.createEl('h2', { text: 'Step 1: select chapters to compile' });
 
 
         // --- Control Row: Select All / Deselect All ---
         const controlDiv = contentEl.createDiv({ cls: 'ns-chapter-controls' });
-        controlDiv.style.marginBottom = '10px';
-        controlDiv.style.display = 'flex';
-        controlDiv.style.gap = '10px';
+        controlDiv.setCssStyles({
+            marginBottom: '10px',
+            display: 'flex',
+            gap: '10px'
+        });
 
-        const btnAll = controlDiv.createEl('button', { text: '✅ Select All' });
+        const btnAll = createIconButton(controlDiv, "check-square", "Select all");
         btnAll.onclick = () => {
             this.allFiles.forEach(f => this.selectedSet.add(f));
             this.refreshList(listDiv);
         };
 
-        const btnNone = controlDiv.createEl('button', { text: '⬜️ Deselect All' });
+        const btnNone = createIconButton(controlDiv, "square", "Deselect all");
         btnNone.onclick = () => {
             this.selectedSet.clear();
             this.refreshList(listDiv);
@@ -277,12 +283,14 @@ export class ChapterSelectionModal extends Modal {
 
         // --- File List Container (Scrollable) ---
         const listDiv = contentEl.createDiv({ cls: 'ns-chapter-list' });
-        listDiv.style.maxHeight = '50vh';
-        listDiv.style.overflowY = 'auto';
-        listDiv.style.border = '1px solid var(--background-modifier-border)';
-        listDiv.style.padding = '10px';
-        listDiv.style.marginBottom = '20px';
-        listDiv.style.borderRadius = '4px';
+        listDiv.setCssStyles({
+            maxHeight: '50vh',
+            overflowY: 'auto',
+            border: '1px solid var(--background-modifier-border)',
+            padding: '10px',
+            marginBottom: '20px',
+            borderRadius: '4px'
+        });
 
         // Render list
         this.refreshList(listDiv);
@@ -291,23 +299,25 @@ export class ChapterSelectionModal extends Modal {
         // 🔥 Mobile UI Rescue: Fixed bottom button area
         // ==========================================
         const buttonArea = contentEl.createDiv();
-        buttonArea.style.borderTop = "1px solid var(--background-modifier-border)";
-        buttonArea.style.paddingTop = "10px";
-        buttonArea.style.display = "flex";
-        buttonArea.style.justifyContent = "flex-end";
+        buttonArea.setCssStyles({
+            borderTop: "1px solid var(--background-modifier-border)",
+            paddingTop: "10px",
+            display: "flex",
+            justifyContent: "flex-end"
+        });
 
 
         // --- Next Step Button ---
         new Setting(buttonArea)
             .addButton(btn => btn
-                .setButtonText('Next Step (Set Cleanup Options) 👉')
+                .setButtonText('Next step (set cleanup options)')
                 .setCta()
                 .onClick(() => {
                     // Filter out selected files (maintaining original order)
                     const finalSelection = this.allFiles.filter(f => this.selectedSet.has(f));
 
                     if (finalSelection.length === 0) {
-                        new Notice("⚠️ Please select at least one chapter!");
+                        new Notice("Please select at least one chapter!");
                         return;
                     }
 
@@ -357,7 +367,7 @@ export class SimpleConfirmModal extends Modal {
         const btnCancel = div.createEl('button', { text: 'Cancel' });
         btnCancel.onclick = () => this.close();
 
-        const btnConfirm = div.createEl('button', { text: 'Confirm Execution', cls: 'mod-cta' });
+        const btnConfirm = div.createEl('button', { text: 'Confirm execution', cls: 'mod-cta' });
         btnConfirm.onclick = () => {
             this.close();
             this.onConfirm();
@@ -394,17 +404,17 @@ export class CleanDraftModal extends Modal {
     onOpen() {
         const { contentEl } = this;
         contentEl.empty();
-        contentEl.createEl("h2", { text: "🧹 Clean Draft" });
+        contentEl.createEl("h2", { text: "Clean draft" });
         contentEl.createEl("p", { text: "Select the markers to clear from the current document (default is select all):", cls: "setting-item-description" });
 
-        new Setting(contentEl).setName("Remove Comments (%%...%%)").addToggle(t => t.setValue(this.options.removeComments).onChange(v => this.options.removeComments = v));
-        new Setting(contentEl).setName("Remove Strikethrough (~~...~~)").addToggle(t => t.setValue(this.options.removeStrikethrough).onChange(v => this.options.removeStrikethrough = v));
-        new Setting(contentEl).setName("Remove Highlights (==...==)").addToggle(t => t.setValue(this.options.removeHighlights).onChange(v => this.options.removeHighlights = v));
-        new Setting(contentEl).setName("Remove Internal Links ([...])").setDesc("Keep display text, remove only the double brackets.").addToggle(t => t.setValue(this.options.removeInternalLinks).onChange(v => this.options.removeInternalLinks = v));
+        new Setting(contentEl).setName("Remove comments (%%...%%)").addToggle(t => t.setValue(this.options.removeComments).onChange(v => this.options.removeComments = v));
+        new Setting(contentEl).setName("Remove strikethrough (~~...~~)").addToggle(t => t.setValue(this.options.removeStrikethrough).onChange(v => this.options.removeStrikethrough = v));
+        new Setting(contentEl).setName("Remove highlights (==...==)").addToggle(t => t.setValue(this.options.removeHighlights).onChange(v => this.options.removeHighlights = v));
+        new Setting(contentEl).setName("Remove internal links ([...])").setDesc("Keep display text, remove only the double brackets.").addToggle(t => t.setValue(this.options.removeInternalLinks).onChange(v => this.options.removeInternalLinks = v));
 
         new Setting(contentEl)
             .addButton(btn => btn
-                .setButtonText("Confirm Cleanup")
+                .setButtonText("Confirm cleanup")
                 .setCta()
                 .onClick(() => {
                     this.close();
@@ -439,7 +449,7 @@ export class SceneCreateModal extends Modal {
         contentEl.createEl("h2", { text: this.titleText });
 
         new Setting(contentEl)
-            .setName("Scene Name")
+            .setName("Scene name")
             .addText(text => {
                 text.setValue(this.defaultName);
                 text.onChange(value => { this.defaultName = value; });
@@ -450,35 +460,39 @@ export class SceneCreateModal extends Modal {
             });
 
         const colorSetting = new Setting(contentEl)
-            .setName("Tag Color")
-            .setDesc("Select a representative color for this scene (Optional).");
+            .setName("Tag color")
+            .setDesc("Select a representative color for this scene (optional).");
 
         // Create color picker container
         const colorContainer = colorSetting.controlEl.createDiv({ cls: "ns-color-picker-container" });
-        colorContainer.style.display = "flex";
-        colorContainer.style.gap = "8px";
+        colorContainer.setCssStyles({
+            display: "flex",
+            gap: "8px"
+        });
 
         SCENE_COLORS.forEach(color => {
             const btn = colorContainer.createEl("button", { text: color.icon, title: color.name });
-            btn.style.width = "32px";
-            btn.style.height = "32px";
-            btn.style.padding = "0";
-            btn.style.borderRadius = "50%";
-            btn.style.border = this.selectedColorId === color.id ? "2px solid var(--interactive-accent)" : "2px solid transparent";
-            btn.style.backgroundColor = "transparent";
-            btn.style.cursor = "pointer";
-            btn.style.fontSize = "16px";
-            btn.style.display = "flex";
-            btn.style.alignItems = "center";
-            btn.style.justifyContent = "center";
+            btn.setCssStyles({
+                width: "32px",
+                height: "32px",
+                padding: "0",
+                borderRadius: "50%",
+                border: this.selectedColorId === color.id ? "2px solid var(--interactive-accent)" : "2px solid transparent",
+                backgroundColor: "transparent",
+                cursor: "pointer",
+                fontSize: "16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center"
+            });
 
             btn.onclick = () => {
                 this.selectedColorId = color.id;
                 // Reset all borders, highlight the selected color
                 Array.from(colorContainer.children).forEach((child: HTMLElement) => {
-                    child.style.border = "2px solid transparent";
+                    child.setCssStyles({ border: "2px solid transparent" });
                 });
-                btn.style.border = "2px solid var(--interactive-accent)";
+                btn.setCssStyles({ border: "2px solid var(--interactive-accent)" });
             };
         });
 

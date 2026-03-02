@@ -30,7 +30,7 @@ export default class NovelSmithPlugin extends Plugin {
     private draftCheckTimer: number | null = null;
 
     async onload() {
-        console.log('NovelSmith System Booting (Full Suite)');
+        //console.log('NovelSmith booting');
 
         await this.loadSettings();
 
@@ -54,7 +54,7 @@ export default class NovelSmithPlugin extends Plugin {
         // =================================================================
         // 🔥 Thoughtful UX 1: Add a physical button to the left Ribbon
         // =================================================================
-        this.addRibbonIcon('book-open', 'Open NovelSmith Panel', () => {
+        this.addRibbonIcon('book-open', 'Open NovelSmith panel', () => {
             this.activateView();
         });
 
@@ -99,7 +99,7 @@ export default class NovelSmithPlugin extends Plugin {
                     const draftFile = this.app.vault.getAbstractFileByPath(draftPath);
 
                     if (draftFile) {
-                        new Notice("⚠️ Warning: Scrivenings Mode is active!\nEdits made here may be overwritten during the next sync.\nPlease return to the draft file to edit, or end Scrivenings Mode first.", 8000);
+                        new Notice("Warning: Scrivenings mode is active!\nEdits made here may be overwritten during the next sync.\nPlease return to the draft file to edit, or end scrivenings mode first.", 8000);
                         this.lastDraftWarningTime = now;
                     }
                 }, 1500); // 1500 milliseconds = 1.5 seconds
@@ -116,9 +116,9 @@ export default class NovelSmithPlugin extends Plugin {
         // =================================================================
         this.addCommand({
             id: 'smart-save-sync',
-            name: 'System: Smart Save & Sync',
+            name: 'System: smart save & sync',
             icon: 'save',
-            hotkeys: [{ modifiers: ["Mod"], key: "s" }],
+            //hotkeys: [{ modifiers: ["Mod"], key: "s" }],
             checkCallback: (checking: boolean) => {
                 const view = this.app.workspace.getActiveViewOfType(MarkdownView);
                 if (view) {
@@ -126,7 +126,7 @@ export default class NovelSmithPlugin extends Plugin {
                         const content = view.editor.getValue();
                         // 🔥 Ultimate Defense Net: If it's an 'Archived Draft', perform a normal save only, absolutely no ID assignment!
                         if (view.file.name !== DRAFT_FILENAME && (isScriveningsDraft(content))) {
-                            new Notice("💾 Archived Draft saved. (To protect the file, the system will not reassign IDs here).");
+                            new Notice("Archived draft saved. (to protect the file, the system will not reassign ID here).");
                             return true;
                         }
                         this.executeSmartSave(view);
@@ -139,13 +139,13 @@ export default class NovelSmithPlugin extends Plugin {
 
         this.addCommand({
             id: 'open-structure-view',
-            name: 'Open Structure Outline',
+            name: 'Open structure outline',
             callback: () => { this.activateView(); }
         });
 
         this.addCommand({
             id: 'compile-manuscript',
-            name: 'Export: Compile Clean Manuscript',
+            name: 'Export: compile clean manuscript',
             icon: 'book-up',
             checkCallback: (checking: boolean) => {
                 const view = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -153,7 +153,7 @@ export default class NovelSmithPlugin extends Plugin {
                     if (!checking && this.checkInBookFolder(view.file)) {
                         // 🔥 Safeguard Checkpoint: Check if the export path is set
                         if (!this.settings.exportFolderPath || this.settings.exportFolderPath.trim() === "") {
-                            new Notice("⚠️ Please go to the Settings page to configure your 'Compile Export Path' first!");
+                            new Notice("Please go to the settings page to configure your 'compile export path' first!");
                             return true;
                         }
                         this.compilerManager.openCompileModal(view);
@@ -166,7 +166,7 @@ export default class NovelSmithPlugin extends Plugin {
 
         this.addCommand({
             id: 'toggle-scrivenings',
-            name: 'Toggle Scrivenings Mode',
+            name: 'Toggle Scrivenings mode',
             checkCallback: (checking: boolean) => {
                 const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
                 if (markdownView) {
@@ -180,7 +180,7 @@ export default class NovelSmithPlugin extends Plugin {
                         }
                         // 🔥 Defense Net Upgrade: Recognize only core keywords, handles both new and old drafts!
                         else if (isScriveningsDraft(content)) {
-                            new Notice("⛔ System Rejected: This is a Scrivenings draft file (or archived draft). You cannot activate Scrivenings Mode here to prevent infinite loops!");
+                            new Notice("System rejected: this is a Scrivenings draft file (or archived draft). You cannot activate Scrivenings mode here to prevent infinite loops!");
                         }
                         // Normal chapter file, safely activate Scrivenings Mode
                         else {
@@ -200,7 +200,7 @@ export default class NovelSmithPlugin extends Plugin {
 
         this.addCommand({
             id: 'save-scene-version',
-            name: 'Atomic Save: Current Scene',
+            name: 'Atomic save: current scene',
             icon: 'save',
             // 🔥 改用 editorCallback，強制鎖定呼叫指令時的游標位置
             editorCallback: (editor, view) => {
@@ -212,7 +212,7 @@ export default class NovelSmithPlugin extends Plugin {
 
         this.addCommand({
             id: 'restore-scene-version',
-            name: 'Atomic Restore: Current Scene',
+            name: 'Atomic restore: current scene',
             icon: 'history',
             editorCallback: (editor, view) => {
                 if (this.checkInBookFolder(view.file)) {
@@ -223,7 +223,7 @@ export default class NovelSmithPlugin extends Plugin {
 
         this.addCommand({
             id: 'split-scene',
-            name: 'Plot: Split Scene',
+            name: 'Plot: split scene',
             icon: 'scissors',
             editorCallback: (editor, view) => {
                 if (this.checkInBookFolder(view.file)) {
@@ -234,7 +234,7 @@ export default class NovelSmithPlugin extends Plugin {
 
         this.addCommand({
             id: 'merge-scene',
-            name: 'Plot: Merge Scene',
+            name: 'Plot: merge scene',
             icon: 'magnet',
             editorCallback: (editor, view) => {
                 if (this.checkInBookFolder(view.file)) {
@@ -248,7 +248,7 @@ export default class NovelSmithPlugin extends Plugin {
         // =================================================================
         this.addCommand({
             id: 'toggle-redundant-mode',
-            name: '🔍 Toggle Redundant Words Mode',
+            name: 'Toggle redundant words mode',
             editorCallback: (editor, view) => {
                 this.writingManager.toggleRedundantMode(view);
             }
@@ -256,7 +256,7 @@ export default class NovelSmithPlugin extends Plugin {
 
         this.addCommand({
             id: 'correct-names',
-            name: '✍️ Name Corrector (One-Click Auto-Fix)',
+            name: 'Name corrector (one-click auto-fix)',
             editorCallback: (editor, view) => {
                 this.writingManager.correctNames(view);
             }
@@ -264,7 +264,7 @@ export default class NovelSmithPlugin extends Plugin {
 
         this.addCommand({
             id: 'toggle-dialogue-mode',
-            name: '💬 Toggle Dialogue Mode',
+            name: 'Toggle dialogue mode',
             editorCallback: (editor, view) => {
                 this.writingManager.toggleDialogueMode(view);
             }
@@ -272,7 +272,7 @@ export default class NovelSmithPlugin extends Plugin {
 
         this.addCommand({
             id: 'clean-draft',
-            name: '🧹 Clean Draft (Remove all markers)',
+            name: 'Clean draft (remove all markers)',
             editorCallback: (editor, view) => {
                 this.writingManager.cleanDraft(view);
             }
@@ -280,7 +280,7 @@ export default class NovelSmithPlugin extends Plugin {
 
         this.addCommand({
             id: 'auto-wiki',
-            name: 'Wiki: Auto Scan & Create',
+            name: 'Wiki: auto scan & create',
             icon: 'book',
             checkCallback: (checking: boolean) => {
                 const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -288,7 +288,7 @@ export default class NovelSmithPlugin extends Plugin {
                     if (!checking && this.checkInBookFolder(markdownView.file)) {
                         // 🔥 Safeguard Checkpoint: Check if Wiki path is set
                         if (!this.settings.wikiFolderPath || this.settings.wikiFolderPath.trim() === "") {
-                            new Notice("⚠️ Please go to the Settings page to configure your 'Wiki Storage Folder' first!");
+                            new Notice("Please go to the settings page to configure your 'Wiki storage folder' first!");
                             return true;
                         }
                         this.wikiManager.scanAndCreateWiki(markdownView);
@@ -334,7 +334,7 @@ export default class NovelSmithPlugin extends Plugin {
 
     public checkInBookFolder(file: TFile | null): boolean {
         if (!file) {
-            new Notice("❌ Please open a note first!");
+            new Notice("Please open a note first!");
             return false;
         }
 
@@ -342,20 +342,20 @@ export default class NovelSmithPlugin extends Plugin {
 
         // 🔥 Fix: If folder is not set, pop up a friendly reminder and block all operations!
         if (!bookFolder || bookFolder.trim() === "") {
-            new Notice("⚠️ Welcome to NovelSmith! Please go to the Settings page to configure your 'Dedicated Writing Folder' and initialize it.");
+            new Notice("Welcome to NovelSmith! Please go to the settings page to configure your 'dedicated writing folder' and initialize it.");
             return false;
         }
 
         // 🔥 Absolute Barrier: If the path contains _Backstage, block completely!
         if (file.path.includes(`/${BACKSTAGE_DIR}/`)) {
-            new Notice(`⛔ System Rejected: This is the locked system backstage (_Backstage). To protect your files, all writing functions are disabled here!`);
+            new Notice(`System rejected: this is the locked system backstage (_Backstage). To protect your files, all writing functions are disabled here!`);
             return false;
         }
 
         if (file.path.startsWith(bookFolder)) {
             return true;
         } else {
-            new Notice(`⛔ System Rejected: This file is not inside your 'Dedicated Writing Folder' (${bookFolder}). Plugin functions are disabled to protect the file.`);
+            new Notice(`System rejected: This file is not inside your 'dedicated writing folder' (${bookFolder}). Plugin functions are disabled to protect the file.`);
             return false;
         }
     }
@@ -367,7 +367,7 @@ export default class NovelSmithPlugin extends Plugin {
         if (!folder) return;
 
         if (activeFile.name === DRAFT_FILENAME) {
-            new Notice("🔄 Ending Scrivenings Mode and Syncing...");
+            new Notice("Ending Scrivenings mode and syncing...");
             await this.scrivenerManager.syncBack(activeFile, folder);
             this.sceneManager.scheduleGenerateDatabase();
         } else {
@@ -397,16 +397,16 @@ export default class NovelSmithPlugin extends Plugin {
                 if (openAfterCreate && newFile instanceof TFile) {
                     const leaf = this.app.workspace.getLeaf('split', 'vertical');
                     await leaf.openFile(newFile);
-                    new Notice("🎉 This is your exclusive Scene Card template!\nYou can modify it now (e.g., add or remove attributes). Once set, clicking 'Insert Scene Card' will use this new format!", 10000);
+                    new Notice("This is your exclusive scene card template!\nYou can modify it now (e.g., add or remove attributes). Once set, clicking 'insert scene card' will use this new format!", 10000);
                 } else if (forceShowNotice) {
                     new Notice(`✅ Successfully generated template: ${tplPath}`);
                 }
             } catch (e) {
                 console.error("Failed to create template file (please check the path)", e);
-                if (forceShowNotice) new Notice(`❌ Failed to create template, please check if the path is valid.`);
+                if (forceShowNotice) new Notice(`Failed to create template, please check if the path is valid.`);
             }
         } else {
-            if (forceShowNotice) new Notice(`⚠️ Template already exists (${tplPath}). To avoid overwriting your custom settings, system generation stopped.`);
+            if (forceShowNotice) new Notice(`Template already exists (${tplPath}). To avoid overwriting your custom settings, system generation stopped.`);
         }
     }
 
@@ -431,9 +431,9 @@ export default class NovelSmithPlugin extends Plugin {
     }
 
     onunload() {
-        console.log('NovelSmith Shutting Down');
+        //console.log('NovelSmith shutting down');
         // 🔥 Defense Upgrade 2: When the plugin is disabled or updated, completely detach the panel to prevent ghost panels from multiplying infinitely!
-        this.app.workspace.detachLeavesOfType(VIEW_TYPE_STRUCTURE);
+
     }
 
     async loadSettings() {

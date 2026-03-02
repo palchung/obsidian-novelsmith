@@ -1,4 +1,4 @@
-import { App, Notice, MarkdownView, TFile } from 'obsidian';
+import { App, Notice, MarkdownView } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 import { ensureFolderExists } from '../utils';
 
@@ -37,7 +37,7 @@ export class WikiManager {
         const matches = [...content.matchAll(regex)];
 
         if (matches.length === 0) {
-            new Notice("👀 No [[Internal Links]] found in this chapter.");
+            new Notice("No [[internal links]] found in this chapter.");
             return;
         }
 
@@ -77,9 +77,9 @@ export class WikiManager {
         }
 
         if (createdCount > 0 || movedCount > 0) {
-            new Notice(`✅ AutoWiki generation complete!\n🆕 Created: ${createdCount}\n📦 Moved: ${movedCount}\n📂 Target: ${targetFolder}`, 5000);
+            new Notice(`AutoWiki generation complete!\nCreated: ${createdCount}\nMoved: ${movedCount}\nTarget: ${targetFolder}`, 5000);
         } else {
-            new Notice("👌 All links have been archived.");
+            new Notice("All links have been archived.");
         }
     }
 }

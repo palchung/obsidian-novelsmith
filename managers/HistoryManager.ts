@@ -1,7 +1,7 @@
 import { App, Notice, TFile, MarkdownView, moment } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 import { InputModal, GenericSuggester } from '../modals';
-import { parseUniversalScenes, HISTORY_DIR, ensureFolderExists, extractSceneId, cleanSceneTitle } from '../utils';
+import { parseUniversalScenes, HISTORY_DIR, ensureFolderExists } from '../utils';
 
 export class HistoryManager {
     app: App;
@@ -16,7 +16,7 @@ export class HistoryManager {
         this.settings = newSettings;
     }
 
-    public getSceneInfoAtCursor(editor: CodeMirror.Editor | any) {
+    public getSceneInfoAtCursor(editor: any) {
         const cursor = editor.getCursor();
         const lineCount = editor.lineCount();
 
@@ -49,8 +49,8 @@ export class HistoryManager {
         const editor = view.editor;
         const scene = this.getSceneInfoAtCursor(editor);
 
-        if (!scene) { new Notice("⚠️ Please place your cursor within a ###### scene block."); return; }
-        if (!scene.id) { new Notice("🚫 This scene does not have an ID yet! Please execute Smart Save first."); return; }
+        if (!scene) { new Notice("Please place your cursor within a ###### scene block."); return; }
+        if (!scene.id) { new Notice("This scene does not have an ID yet! Please execute smart save first."); return; }
 
         const rawRange = editor.getRange({ line: scene.startLine + 1, ch: 0 }, { line: scene.endLine, ch: 0 });
         const lines = rawRange.split("\n");
@@ -69,7 +69,7 @@ export class HistoryManager {
         }
 
         const cleanContent = bodyLines.join("\n").trim();
-        if (!cleanContent) { new Notice("⚠️ The scene body is empty; cannot be saved."); return; }
+        if (!cleanContent) { new Notice("The scene body is empty; cannot be saved."); return; }
 
         new InputModal(this.app, `Backup: ${scene.title}`, async (verName) => {
             if (!verName) return;
@@ -136,7 +136,7 @@ export class HistoryManager {
         return versions.reverse();
     }
 
-    public performRestore(editor: CodeMirror.Editor | any, scene: any, newContent: string) {
+    public performRestore(editor: any, scene: any, newContent: string) {
         const currentRangeText = editor.getRange({ line: scene.startLine + 1, ch: 0 }, { line: scene.endLine, ch: 0 });
         const currentLines = currentRangeText.split("\n");
         let metaBuffer = [];
@@ -153,7 +153,7 @@ export class HistoryManager {
 
         const finalBlock = metaBuffer.join("\n").trim() + "\n\n" + newContent + "\n";
         editor.replaceRange(finalBlock, { line: scene.startLine + 1, ch: 0 }, { line: scene.endLine, ch: 0 });
-        new Notice("✅ Version restored successfully!");
+        new Notice("Version restored successfully!");
     }
 
     public async showPreview(title: string, verLabel: string, content: string) {
@@ -173,17 +173,17 @@ export class HistoryManager {
         let leaf = this.app.workspace.getLeavesOfType("markdown").find(l => l.view.file && l.view.file.path === previewPath);
         if (!leaf) leaf = this.app.workspace.getLeaf('split', 'vertical');
         if (previewFile instanceof TFile) await leaf.openFile(previewFile);
-        new Notice("👀 Preview opened (Right panel)");
+        new Notice("Preview opened (right panel)");
     }
 
     async restoreVersion(view: MarkdownView) {
         const editor = view.editor;
         const scene = this.getSceneInfoAtCursor(editor);
 
-        if (!scene || !scene.id) { new Notice("⚠️ Cannot restore: Please ensure your cursor is inside a scene with an ID."); return; }
+        if (!scene || !scene.id) { new Notice("Cannot restore: please ensure your cursor is inside a scene with an ID."); return; }
 
         const versions = await this.getSceneVersions(scene.id);
-        if (versions.length === 0) { new Notice("⚠️ No version records found."); return; }
+        if (versions.length === 0) { new Notice("No version records found."); return; }
 
         new GenericSuggester(this.app, versions, (item) => item.label, (selectedVersion) => {
             const actions = [

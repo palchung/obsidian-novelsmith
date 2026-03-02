@@ -1,13 +1,13 @@
-import { ItemView, WorkspaceLeaf, MarkdownView, Notice, Menu } from 'obsidian';
+import { ItemView, WorkspaceLeaf, MarkdownView, Notice, Menu, setIcon } from 'obsidian';
 import Sortable from 'sortablejs';
 import NovelSmithPlugin from '../main';
 import { SimpleConfirmModal } from '../modals';
-import { isScriveningsDraft, replaceEntireDocument, extractSceneId, cleanSceneTitle, DRAFT_FILENAME, extractSceneColor, getColorById, SCENE_COLORS } from '../utils';
-import { t } from '../locales';
+import { createIconButton, isScriveningsDraft, replaceEntireDocument, extractSceneId, cleanSceneTitle, DRAFT_FILENAME, extractSceneColor, getColorById, SCENE_COLORS } from '../utils';
+
 
 export const VIEW_TYPE_STRUCTURE = "novelsmith-structure-view";
 
-const RE_EXTRACT_ID = /(?:SCENE_ID:\s*|data-scene-id=")([a-zA-Z0-9-]+)/;
+//const RE_EXTRACT_ID = /(?:SCENE_ID:\s*|data-scene-id=")([a-zA-Z0-9-]+)/;
 
 interface SceneNode {
     id: string;
@@ -78,7 +78,7 @@ export class StructureView extends ItemView {
 
 
     getViewType() { return VIEW_TYPE_STRUCTURE; }
-    getDisplayText() { return "NovelSmith Panel"; }
+    getDisplayText() { return "NovelSmith panel"; }
     getIcon() { return "kanban-square"; }
 
     async onOpen() {
@@ -150,10 +150,10 @@ export class StructureView extends ItemView {
             this.renderHeader(container, view);
 
             const contentDiv = container.createDiv({ cls: "ns-tab-content" });
-            contentDiv.style.marginTop = "10px";
+            contentDiv.setCssStyles({ marginTop: "10px" });
 
             if (!view) {
-                contentDiv.setText("⚠️ Please open a draft");
+                contentDiv.setText("Please open a draft");
                 return;
             }
 
@@ -175,18 +175,30 @@ export class StructureView extends ItemView {
     renderHeader(container: HTMLElement, view: MarkdownView | null) {
         const header = container.createDiv({ cls: "ns-control-header" });
         const topBtnRow = header.createDiv({ cls: "ns-button-row" });
-        topBtnRow.style.marginBottom = "5px";
+        topBtnRow.setCssStyles({ marginBottom: "5px" });
 
 
         const isDraftMode = view && view.file && view.file.name === DRAFT_FILENAME;
 
+        // Scrivenings Button
+        const btnScrivenings = createIconButton(
+            topBtnRow,
+            isDraftMode ? "save" : "book-open",
+            isDraftMode ? "Sync & close" : "Scrivenering",
+            {
+                backgroundColor: "var(--interactive-accent)",
+                color: "var(--text-on-accent)"
+            }
+        );
 
-        const btnScrivenings = topBtnRow.createEl("button", {
-            text: isDraftMode ? "💾 Sync & close" : "📚 Scrivenering"
+
+
+        btnScrivenings.setCssStyles({
+            backgroundColor: "var(--interactive-accent)",
+            color: "var(--text-on-accent)"
         });
 
-        btnScrivenings.style.backgroundColor = "var(--interactive-accent)";
-        btnScrivenings.style.color = "var(--text-on-accent)";
+
         btnScrivenings.onclick = () => {
             if (view && this.plugin.checkInBookFolder(view.file)) {
                 const file = view.file;
@@ -197,7 +209,7 @@ export class StructureView extends ItemView {
                     this.plugin.executeSmartSave(view);
                 }
                 else if (isScriveningsDraft(content)) {
-                    new Notice("⛔ Abort：This is a Archived draft, Scrivenering may cause infinite loop.");
+                    new Notice("Abort: this is a archived draft, Scrivenering may cause infinite loop.");
                 }
                 else {
                     const folder = file.parent;
@@ -213,34 +225,38 @@ export class StructureView extends ItemView {
         // =========================================================
         // 🔥 Discard & Compile button
         // =========================================================
-        if (view && view.file && view.file.name === DRAFT_FILENAME) {
-            const btnDiscard = topBtnRow.createEl("button", { text: "🗑️ Discard" });
-            btnDiscard.style.backgroundColor = "var(--background-modifier-error)";
-            btnDiscard.style.color = "white";
+        if (isDraftMode) {
+
+
+            const btnDiscard = createIconButton(topBtnRow, "trash-2", "Discard", {
+                backgroundColor: "var(--background-modifier-error)",
+                color: "white"
+            });
+
             btnDiscard.onclick = () => {
                 new SimpleConfirmModal(
                     this.plugin.app,
-                    "🚨 Are you sure to discard this darft?\n\nWill close & delete this file, all your word will not be synced",
+                    "Are you sure to discard this darft?\n\nWill close & delete this file, all your word will not be synced",
                     async () => {
                         await this.plugin.scrivenerManager.discardDraft(view.file!);
                     }
                 ).open();
             };
         } else {
-            const btnCompile = topBtnRow.createEl("button", { text: "📤 Compile Draft" });
+            const btnCompile = createIconButton(topBtnRow, "file-output", "Compile draft");
+
+
             btnCompile.onclick = () => {
                 if (view && this.plugin.checkInBookFolder(view.file)) this.plugin.compilerManager.openCompileModal(view);
             };
         }
 
 
-
-
         // =========================================================
         // 🔥 Split & Merge
         // =========================================================
         const btnRow = header.createDiv({ cls: "ns-button-row" });
-        btnRow.style.marginBottom = "5px";
+        btnRow.setCssStyles({ marginBottom: "5px" });
 
 
         const isArchivedDraft = (file: any, content: string) => {
@@ -248,18 +264,21 @@ export class StructureView extends ItemView {
                 (isScriveningsDraft(content));
         };
 
-        const btnInsert = btnRow.createEl("button", { text: "➕ Scene card" });
+        const btnInsert = createIconButton(btnRow, "file-plus", "Scene card");
+
+
+
         btnInsert.onclick = () => {
             if (view && this.plugin.checkInBookFolder(view.file)) {
                 if (isArchivedDraft(view.file, view.editor.getValue())) {
-                    new Notice("⛔ This is a Archived draft, please return to your working file to insert scene card.");
+                    new Notice("This is a archived draft, please return to your working file to insert scene card.");
                     return;
                 }
                 this.plugin.plotManager.insertSceneCard(view);
             }
         };
 
-        const btnSave = btnRow.createEl("button", { text: "💾 Sync" });
+        const btnSave = createIconButton(btnRow, "save", "Sync");
 
         btnSave.onclick = async () => {
             if (view && this.plugin.checkInBookFolder(view.file)) {
@@ -267,17 +286,17 @@ export class StructureView extends ItemView {
 
                 btnSave.classList.add("ns-btn-flash");
                 const originalText = btnSave.innerText;
-                btnSave.innerText = "⏳ Syncing...";
+                btnSave.innerText = "Syncing...";
                 btnSave.disabled = true;
 
                 try {
                     if (isArchivedDraft(view.file, view.editor.getValue())) {
-                        new Notice("💾 Draft saved.");
+                        new Notice("Draft saved.");
                     } else {
                         await this.plugin.executeSmartSave(view);
 
                         if (view.file.name !== DRAFT_FILENAME) {
-                            new Notice("✅ Sync & Smart Save complete!");
+                            new Notice("Sync & smart save complete!");
                         }
                     }
                 } finally {
@@ -296,29 +315,29 @@ export class StructureView extends ItemView {
         // =========================================================
         const btnRow2 = header.createDiv({ cls: "ns-button-row" });
 
-        const btnSplit = btnRow2.createEl("button", { text: "✂️ Split" });
+        const btnSplit = createIconButton(btnRow2, "scissors", "Split");
         btnSplit.onclick = () => {
             if (view && this.plugin.checkInBookFolder(view.file)) {
                 if (isArchivedDraft(view.file, view.editor.getValue())) {
-                    new Notice("⛔ This is archived draft, please don't split scene here.");
+                    new Notice("This is archived draft, please don't split scene here.");
                     return;
                 }
                 this.plugin.plotManager.splitScene(view);
             }
         };
 
-        const btnMerge = btnRow2.createEl("button", { text: "🧲 Merge" });
+        const btnMerge = createIconButton(btnRow2, "combine", "Merge");
         btnMerge.onclick = () => {
             if (view && this.plugin.checkInBookFolder(view.file)) {
                 if (isArchivedDraft(view.file, view.editor.getValue())) {
-                    new Notice("⛔ This is archived draft, please don't merge scene here.");
+                    new Notice("This is archived draft, please don't merge scene here.");
                     return;
                 }
                 this.plugin.plotManager.mergeScene(view);
             }
         };
 
-        const btnTools = btnRow2.createEl("button", { text: "🛠️ Tools" });
+        const btnTools = createIconButton(btnRow2, "wrench", "Tools");
         btnTools.onclick = (e: MouseEvent) => {
             const currentView = this.getValidMarkdownView();
             if (!currentView || !this.plugin.checkInBookFolder(currentView.file)) return;
@@ -327,13 +346,13 @@ export class StructureView extends ItemView {
             const menu = new Menu();
 
             menu.addItem((item) => {
-                item.setTitle("Typo Correction")
+                item.setTitle("Typo correction")
                     .setIcon("pencil")
                     .onClick(() => { this.plugin.writingManager.correctNames(currentView); });
             });
 
             menu.addItem((item) => {
-                item.setTitle("Clean Draft")
+                item.setTitle("Clean draft")
                     .setIcon("eraser")
                     .onClick(() => { this.plugin.writingManager.cleanDraft(currentView); });
             });
@@ -341,13 +360,13 @@ export class StructureView extends ItemView {
             menu.addSeparator();
 
             menu.addItem((item) => {
-                item.setTitle("Dialogue Mode")
+                item.setTitle("Dialogue mode")
                     .setIcon("message-circle")
                     .onClick(() => { this.plugin.writingManager.toggleDialogueMode(currentView); });
             });
 
             menu.addItem((item) => {
-                item.setTitle("Redundant Mode")
+                item.setTitle("Redundant mode")
                     .setIcon("search")
                     .onClick(() => { this.plugin.writingManager.toggleRedundantMode(currentView); });
             });
@@ -355,7 +374,7 @@ export class StructureView extends ItemView {
             menu.addSeparator();
 
             menu.addItem((item) => {
-                item.setTitle("Auto Wiki")
+                item.setTitle("AutoWiki")
                     .setIcon("book")
                     .onClick(() => { this.plugin.wikiManager.scanAndCreateWiki(currentView); });
             });
@@ -372,41 +391,44 @@ export class StructureView extends ItemView {
 
         const tabsRow = header.createDiv({ cls: "ns-tabs-row" });
 
-        let tabClassOutline = "ns-tab-btn" + (this.activeTab === 'outline' ? " is-active" : "");
-        const tabOutline = tabsRow.createEl("button", { text: "📑 Outline", cls: tabClassOutline });
+        // 1. Outline Tab
+        const tabOutline = createIconButton(tabsRow, "list-tree", "Outline");
+        tabOutline.className = "ns-tab-btn" + (this.activeTab === 'outline' ? " is-active" : "");
         tabOutline.onclick = () => { this.activeTab = 'outline'; this.lastOutlineHash = ""; this.parseAndRender(); };
 
-        let tabClassInfo = "ns-tab-btn" + (this.activeTab === 'info' ? " is-active" : "");
-        const tabInfo = tabsRow.createEl("button", { text: "ℹ️ Info", cls: tabClassInfo });
+        // 2. Info Tab
+        const tabInfo = createIconButton(tabsRow, "info", "Info");
+        tabInfo.className = "ns-tab-btn" + (this.activeTab === 'info' ? " is-active" : "");
         tabInfo.onclick = () => { this.activeTab = 'info'; this.parseAndRender(); };
 
-        let tabClassHistory = "ns-tab-btn" + (this.activeTab === 'history' ? " is-active" : "");
-        const tabHistory = tabsRow.createEl("button", { text: "🕰️ Backup", cls: tabClassHistory });
+        // 3. Backup Tab
+        const tabHistory = createIconButton(tabsRow, "history", "Backup");
+        tabHistory.className = "ns-tab-btn" + (this.activeTab === 'history' ? " is-active" : "");
         tabHistory.onclick = () => { this.activeTab = 'history'; this.parseAndRender(); };
     }
 
     async renderOutline(container: HTMLElement, view: MarkdownView) {
         const text = view.editor.getValue();
-        if (!text.trim()) { container.setText("📄 This file is empty"); return; }
+        if (!text.trim()) { container.setText("This file is empty"); return; }
 
         const fileNameEl = container.createEl("h3");
         if (view.file && view.file.name === DRAFT_FILENAME) {
-            fileNameEl.innerText = "📚 Scrivenering draft";
-            fileNameEl.style.color = "var(--interactive-accent)";
+            fileNameEl.innerText = "Scrivenering draft";
+            fileNameEl.setCssStyles({ color: "var(--interactive-accent)" });
         } else if (view.file) {
-            fileNameEl.innerText = `📖 ${view.file.basename}`;
-            fileNameEl.style.color = "var(--text-accent)";
+            fileNameEl.innerText = `${view.file.basename}`;
+            fileNameEl.setCssStyles({ color: "var(--text-accent)" });
         }
-        fileNameEl.style.marginTop = "0";
-        fileNameEl.style.borderBottom = "1px solid var(--background-modifier-border)";
-        fileNameEl.style.paddingBottom = "8px";
-        fileNameEl.style.marginBottom = "10px";
+        fileNameEl.setCssProps({ marginTop: "0" });
+        fileNameEl.setCssProps({ borderBottom: "1px solid var(--background-modifier-border)" });
+        fileNameEl.setCssProps({ paddingBottom: "8px" });
+        fileNameEl.setCssProps({ marginBottom: "10px" });
 
         const tree = this.parseDocument(text);
         this.sortables.forEach(s => s.destroy());
         this.sortables = [];
 
-        if (tree.length === 0) { container.setText("📭 Chapter or scene ID do not found"); return; }
+        if (tree.length === 0) { container.setText("Chapter or scene ID do not found"); return; }
 
         // 🔥 Hanle duplicated scene ID
         const renderNameCount = new Map<string, number>();
@@ -420,7 +442,7 @@ export class StructureView extends ItemView {
 
             if (chapter.name !== "root") {
                 const chCard = chapterBox.createDiv({ cls: "ns-chapter-card" });
-                chCard.innerText = `📂 ${chapter.name}`;
+                chCard.innerText = `${chapter.name}`;
                 chCard.addEventListener("click", (e) => { e.stopPropagation(); e.preventDefault(); this.jumpToLine(chapter.lineNumber); });
             }
 
@@ -449,19 +471,30 @@ export class StructureView extends ItemView {
                 const colorObj = getColorById(scene.colorId);
                 if (colorObj.cssClass) scCard.addClass(colorObj.cssClass);
 
-                scCard.style.display = "flex";
-                scCard.style.justifyContent = "space-between";
-                scCard.style.alignItems = "center";
-
-                const titleSpan = scCard.createSpan({ text: `🎬 ${scene.name}` });
+                scCard.setCssStyles({
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    width: "100%"
+                });
+                scCard.createSpan({ text: `🎬 ${scene.name}` });
 
                 // 🔥 2. Add 🎨 color change button
-                const colorBtn = scCard.createDiv({ text: "🎨" });
-                colorBtn.style.cursor = "pointer";
-                colorBtn.style.opacity = "0.3";
-                colorBtn.style.fontSize = "12px";
-                colorBtn.addEventListener("mouseover", () => colorBtn.style.opacity = "1");
-                colorBtn.addEventListener("mouseout", () => colorBtn.style.opacity = "0.3");
+                const colorBtn = scCard.createDiv();
+                setIcon(colorBtn, "palette");
+                colorBtn.setCssStyles({
+                    cursor: "pointer",
+                    opacity: "0.3",
+                    marginLeft: "auto",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                });
+
+
+
+                colorBtn.addEventListener("mouseover", () => colorBtn.setCssProps({ opacity: "1" }));
+                colorBtn.addEventListener("mouseout", () => colorBtn.setCssProps({ opacity: "0.3" }));
 
                 colorBtn.addEventListener("click", (e) => {
                     e.stopPropagation();
@@ -487,8 +520,8 @@ export class StructureView extends ItemView {
 
                 if (this.selectedSceneId === scene.id) {
 
-                    scCard.style.borderLeftWidth = "4px";
-                    scCard.style.filter = "brightness(0.9)";
+                    scCard.setCssProps({ borderLeftWidth: "4px" });
+                    scCard.setCssProps({ filter: "brightness(0.9)" });
                 }
 
                 scCard.addEventListener("click", (e) => {
@@ -540,26 +573,28 @@ export class StructureView extends ItemView {
 
         if (!this.selectedSceneTitle) {
             const hint = container.createDiv({ cls: "ns-history-card" });
-            hint.style.textAlign = "center"; hint.style.opacity = "0.6";
-            hint.innerText = "👈 Please put cursor on scene content.";
+            hint.setCssProps({ textAlign: "center" }); hint.setCssProps({ opacity: "0.6" });
+            hint.innerText = "Please put cursor on scene content.";
             return;
         }
 
         const titleEl = container.createEl("h4");
-        titleEl.innerText = `📜 Backup of ${this.selectedSceneTitle}'`;
-        titleEl.style.color = "var(--text-accent)"; titleEl.style.marginBottom = "8px";
+        titleEl.innerText = `Backup of ${this.selectedSceneTitle}'`;
+        titleEl.setCssProps({ color: "var(--text-accent)" }); titleEl.setCssProps({ marginBottom: "8px" });
 
-        const btnSaveVersion = container.createEl("button", { text: "💾 Save current version" });
-        btnSaveVersion.style.width = "100%"; btnSaveVersion.style.marginBottom = "15px";
-        btnSaveVersion.style.backgroundColor = "var(--interactive-accent)"; btnSaveVersion.style.color = "var(--text-on-accent)";
-
+        const btnSaveVersion = createIconButton(container, "save", "Save current version", {
+            width: "100%",
+            marginBottom: "15px",
+            backgroundColor: "var(--interactive-accent)",
+            color: "var(--text-on-accent)"
+        });
         btnSaveVersion.onclick = () => {
             this.plugin.historyManager.saveVersion(view, () => { this.parseAndRender(); });
         };
 
         if (!this.selectedSceneId) {
             const hint = container.createDiv({ cls: "ns-history-card" });
-            hint.innerText = `⚠️ 「${this.selectedSceneTitle}」do not have an ID, cannot be load a backup. Please press 💾 Sync button`;
+            hint.innerText = `「${this.selectedSceneTitle}」do not have an ID, cannot be load a backup. Please press sync button`;
             return;
         }
 
@@ -606,17 +641,17 @@ export class StructureView extends ItemView {
 
         if (!foundTitle || startLine === -1) {
             const hint = container.createDiv({ cls: "ns-history-card" });
-            hint.style.textAlign = "center"; hint.style.opacity = "0.6";
-            hint.innerText = "👈 Please put cursor on scene content before scene info to be shown.";
+            hint.setCssProps({ textAlign: "center" }); hint.setCssProps({ opacity: "0.6" });
+            hint.innerText = "Please put cursor on scene content before scene info to be shown.";
             return;
         }
 
         const titleEl = container.createEl("h4");
         titleEl.innerText = `🎬 ${foundTitle}`;
-        titleEl.style.color = "var(--text-accent)";
-        titleEl.style.marginBottom = "12px";
-        titleEl.style.borderBottom = "1px solid var(--background-modifier-border)";
-        titleEl.style.paddingBottom = "8px";
+        titleEl.setCssProps({ color: "var(--text-accent)" });
+        titleEl.setCssProps({ marginBottom: "12px" });
+        titleEl.setCssProps({ borderBottom: "1px solid var(--background-modifier-border)" });
+        titleEl.setCssProps({ paddingBottom: "8px" });
 
 
         let metaLines: string[] = [];
@@ -640,18 +675,18 @@ export class StructureView extends ItemView {
 
         if (metaLines.length === 0 || metaLines.every(l => l === "")) {
             const hint = container.createDiv({ cls: "ns-history-card" });
-            hint.style.textAlign = "center"; hint.style.opacity = "0.6";
+            hint.setCssProps({ textAlign: "center" }); hint.setCssProps({ opacity: "0.6" });
             hint.innerText = "This scene do not have any info.";
             return;
         }
 
 
         const infoBox = container.createDiv({ cls: "ns-chapter-box" });
-        infoBox.style.backgroundColor = "var(--background-primary)";
+        infoBox.setCssProps({ backgroundColor: "var(--background-primary)" });
 
         metaLines.forEach(line => {
             if (line.trim() === "") {
-                infoBox.createDiv({ text: " " }).style.height = "10px";
+                infoBox.createDiv({ text: " " }).setCssProps({ height: "10px" });
                 return;
             }
 
@@ -661,23 +696,23 @@ export class StructureView extends ItemView {
                 const value = parts.slice(1).join("::").trim();
 
                 const row = infoBox.createDiv();
-                row.style.marginBottom = "8px";
-                row.style.lineHeight = "1.5";
+                row.setCssProps({ marginBottom: "8px" });
+                row.setCssProps({ lineHeight: "1.5" });
 
                 const keyEl = row.createSpan();
                 keyEl.innerText = `${key} : `;
-                keyEl.style.fontWeight = "bold";
-                keyEl.style.color = "var(--text-muted)";
+                keyEl.setCssProps({ fontWeight: "bold" });
+                keyEl.setCssProps({ color: "var(--text-muted)" });
 
                 const valEl = row.createSpan();
                 valEl.innerText = value || " -- ";
-                if (!value) valEl.style.opacity = "0.5";
+                if (!value) valEl.setCssProps({ opacity: "0.5" });
             } else {
                 // 普通筆記內容
                 const row = infoBox.createDiv();
                 row.innerText = line.replace(/^- /, "");
-                row.style.marginBottom = "6px";
-                row.style.lineHeight = "1.5";
+                row.setCssProps({ marginBottom: "6px" });
+                row.setCssProps({ lineHeight: "1.5" });
             }
         });
     }
@@ -697,7 +732,7 @@ export class StructureView extends ItemView {
                 break;
             }
         }
-        if (startLine === -1) { new Notice("❌ No scene is found in this file."); return; }
+        if (startLine === -1) { new Notice("No scene is found in this file."); return; }
         for (let i = startLine + 1; i < lineCount; i++) {
             const line = editor.getLine(i);
             if (line.trim().startsWith("######") || line.includes("++ FILE_ID")) { endLine = i; break; }
@@ -717,7 +752,7 @@ export class StructureView extends ItemView {
             editor.scrollIntoView({ from: { line: lineNumber, ch: 0 }, to: { line: lineNumber, ch: 0 } }, true);
             //editor.focus();
         } else {
-            new Notice("⚠️ Can't find the file, please click on the editor zone.");
+            new Notice("Can't find the file, please click on the editor zone.");
         }
     }
 
@@ -735,12 +770,12 @@ export class StructureView extends ItemView {
         const domScenes = container.querySelectorAll(".ns-scene-card");
 
         if (liveSceneCount !== domScenes.length) {
-            new Notice("⚠️ No new content in this draft, cancel this drag to protect draft content.");
+            new Notice("No new content in this draft, cancel this drag to protect draft content.");
             this.parseAndRender();
             return;
         }
 
-        new Notice("💾 re-organizing...");
+        new Notice("Re-organizing...");
 
         // =========================================================
         // 🛡️ Prevention 2B：Safe Key Map
@@ -835,7 +870,7 @@ export class StructureView extends ItemView {
         } else if (lineText.includes('data-scene-id="')) {
             newLine = lineText.replace(/"><\/span>/, `" data-color="${newColorId}"><\/span>`);
         } else {
-            new Notice("⚠️ No Scene ID, color cannot be assigned, Please press Sync.");
+            new Notice("No scene ID, color cannot be assigned. Please press sync.");
             return;
         }
         editor.setLine(lineNumber, newLine);
@@ -852,7 +887,7 @@ export class StructureView extends ItemView {
             }
         }
 
-        new Notice(`🎨 color updated`);
+        new Notice(`Color updated`);
         this.lastOutlineHash = "";
         this.plugin.sceneManager.scheduleGenerateDatabase();
     }
@@ -886,7 +921,6 @@ export class StructureView extends ItemView {
             if (currentChapter.name !== 'root' || currentChapter.scenes.length > 0 || currentChapter.preamble.trim().length > 0) tree.push(currentChapter);
         };
 
-        const htmlCommentStart = "<" + "!--";
 
         for (let i = startLineIndex; i < lines.length; i++) {
             const line = lines[i];

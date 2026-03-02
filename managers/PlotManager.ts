@@ -1,6 +1,6 @@
-import { App, Notice, MarkdownView, EditorPosition, TFile } from 'obsidian';
+import { App, Notice, MarkdownView, TFile } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
-import { InputModal, GenericSuggester, SceneCreateModal } from '../modals';
+import { GenericSuggester, SceneCreateModal } from '../modals';
 import { ST_WARNING, generateSceneId, TEMPLATES_DIR, parseUniversalScenes } from '../utils';
 import NovelSmithPlugin from '../main';
 
@@ -112,7 +112,7 @@ export class PlotManager {
         }
         const editor = view.editor;
         const cursor = editor.getCursor();
-        const lineCount = editor.lineCount();
+        //const lineCount = editor.lineCount();
 
         // 🔥 P2 Architecture Refactoring: Call global radar directly to instantly locate the card and attributes at the cursor!
         const parsedScenes = parseUniversalScenes(editor.getValue());
@@ -124,7 +124,7 @@ export class PlotManager {
             if (!newSceneName) return;
 
             let newContent = "";
-            const uuid = generateSceneId();
+            //const uuid = generateSceneId();
 
             if (metadataLines.length > 0) {
                 // 🔥 Add data-color during splitting
@@ -159,14 +159,14 @@ export class PlotManager {
     async mergeScene(view: MarkdownView) {
         const editor = view.editor;
         const cursor = editor.getCursor();
-        const lineCount = editor.lineCount();
+        //const lineCount = editor.lineCount();
 
         // 🔥 P2 Tweak: Use global radar to locate the target scene, and mandate an ID!
         const parsedScenes = parseUniversalScenes(editor.getValue());
         const currentScene = [...parsedScenes].reverse().find(s => s.lineIndex <= cursor.line);
 
         if (!currentScene || !currentScene.id) {
-            new Notice("⚠️ Please place your cursor within a main scene (A) that has an ID. If there is no ID, click the 'Sync' button first!");
+            new Notice("Please place your cursor within a main scene that has an ID. If there is no ID, click the 'sync' button first!");
             return;
         }
 
@@ -177,7 +177,7 @@ export class PlotManager {
 
 
         if (targetHeaderLine === -1) {
-            new Notice("⚠️ Please place your cursor within the main scene (A).");
+            new Notice("Please place your cursor within the main scene.");
             return;
         }
 
@@ -192,7 +192,7 @@ export class PlotManager {
             }));
 
         if (allScenes.length === 0) {
-            new Notice("⚠️ No other scenes found to merge.");
+            new Notice("No other scenes found to merge.");
             return;
         }
 
@@ -257,7 +257,7 @@ export class PlotManager {
         }
 
         if (newTargetHeaderLine === -1) {
-            new Notice("⚠️ Error occurred: Could not find the main scene. Merge aborted.");
+            new Notice("Error occurred: could not find the main scene. Merge aborted.");
             return;
         }
 
@@ -274,11 +274,11 @@ export class PlotManager {
             editor.replaceRange("\n\n" + textToMerge, { line: insertLine, ch: 0 });
             const scrollPos = { line: insertLine, ch: 0 };
             editor.scrollIntoView({ from: scrollPos, to: scrollPos }, true);
-            new Notice(`✅ Successfully absorbed content!`);
+            new Notice(`Successfully absorbed content!`);
 
             this.plugin.sceneManager.scheduleGenerateDatabase();
         } else {
-            new Notice("⚠️ The selected scene is empty, nothing to absorb!");
+            new Notice("The selected scene is empty, nothing to absorb!");
         }
     }
 }
