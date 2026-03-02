@@ -81,27 +81,31 @@ export class StructureView extends ItemView {
     getDisplayText() { return "NovelSmith panel"; }
     getIcon() { return "kanban-square"; }
 
-    async onOpen() {
-        this.refresh();
+    onOpen() {
+        void this.refresh();
         this.registerEvent(this.app.workspace.on('active-leaf-change', (leaf) => {
             if (leaf && leaf.view instanceof MarkdownView) {
                 this.lastOutlineHash = "";
-                this.parseAndRender();
+                void this.parseAndRender();
             }
         }));
         this.registerEvent(this.app.workspace.on('editor-change', () => {
             if (this.activeTab === 'outline') {
                 // 🔥 Repair：Debounce
                 if (this.renderTimer) window.clearTimeout(this.renderTimer);
-                this.renderTimer = window.setTimeout(() => this.parseAndRender(), 500);
+                this.renderTimer = window.setTimeout(() => { void this.parseAndRender(); }, 500);
             }
         }));
         this.registerDomEvent(document, 'mouseup', () => {
-            if (this.activeTab === 'history' || this.activeTab === 'info') setTimeout(() => this.parseAndRender(), 100);
+            if (this.activeTab === 'history' || this.activeTab === 'info') {
+                window.setTimeout(() => {
+                    void this.parseAndRender();
+                }, 100);
+            }
         });
         this.registerDomEvent(document, 'keyup', (e: KeyboardEvent) => {
             if ((this.activeTab === 'history' || this.activeTab === 'info') && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-                setTimeout(() => this.parseAndRender(), 100);
+                window.setTimeout(() => { void this.parseAndRender(); }, 100);
             }
         });
     }
@@ -157,8 +161,8 @@ export class StructureView extends ItemView {
                 return;
             }
 
-            if (this.activeTab === 'outline') await this.renderOutline(contentDiv, view);
-            else if (this.activeTab === 'info') await this.renderInfo(contentDiv, view);
+            if (this.activeTab === 'outline') this.renderOutline(contentDiv, view);
+            else if (this.activeTab === 'info') this.renderInfo(contentDiv, view);
             else await this.renderHistory(contentDiv, view);
 
         } finally {
@@ -166,7 +170,7 @@ export class StructureView extends ItemView {
             this.isRefreshing = false;
             if (this.pendingRefresh) {
                 this.pendingRefresh = false;
-                this.parseAndRender();
+                void this.parseAndRender();
             }
         }
 
@@ -206,7 +210,7 @@ export class StructureView extends ItemView {
 
 
                 if (file.name === DRAFT_FILENAME) {
-                    this.plugin.executeSmartSave(view);
+                    void this.plugin.executeSmartSave(view);
                 }
                 else if (isScriveningsDraft(content)) {
                     new Notice("Abort: this is a archived draft, Scrivenering may cause infinite loop.");
@@ -214,8 +218,8 @@ export class StructureView extends ItemView {
                 else {
                     const folder = file.parent;
                     if (folder) {
-                        this.plugin.sceneManager.assignIDsToAllFiles(folder).then(() => {
-                            this.plugin.scrivenerManager.toggleScrivenings();
+                        void this.plugin.sceneManager.assignIDsToAllFiles(folder).then(() => {
+                            void this.plugin.scrivenerManager.toggleScrivenings();
                         });
                     }
                 }
@@ -237,8 +241,8 @@ export class StructureView extends ItemView {
                 new SimpleConfirmModal(
                     this.plugin.app,
                     "Are you sure to discard this darft?\n\nWill close & delete this file, all your word will not be synced",
-                    async () => {
-                        await this.plugin.scrivenerManager.discardDraft(view.file);
+                    () => {
+                        void this.plugin.scrivenerManager.discardDraft(view.file);
                     }
                 ).open();
             };
@@ -274,7 +278,7 @@ export class StructureView extends ItemView {
                     new Notice("This is a archived draft, please return to your working file to insert scene card.");
                     return;
                 }
-                this.plugin.plotManager.insertSceneCard(view);
+                void this.plugin.plotManager.insertSceneCard(view);
             }
         };
 
@@ -322,7 +326,7 @@ export class StructureView extends ItemView {
                     new Notice("This is archived draft, please don't split scene here.");
                     return;
                 }
-                this.plugin.plotManager.splitScene(view);
+                void this.plugin.plotManager.splitScene(view);
             }
         };
 
@@ -348,7 +352,7 @@ export class StructureView extends ItemView {
             menu.addItem((item) => {
                 item.setTitle("Typo correction")
                     .setIcon("pencil")
-                    .onClick(() => { this.plugin.writingManager.correctNames(currentView); });
+                    .onClick(() => { void this.plugin.writingManager.correctNames(currentView); });
             });
 
             menu.addItem((item) => {
@@ -368,7 +372,7 @@ export class StructureView extends ItemView {
             menu.addItem((item) => {
                 item.setTitle("Redundant mode")
                     .setIcon("search")
-                    .onClick(() => { this.plugin.writingManager.toggleRedundantMode(currentView); });
+                    .onClick(() => { void this.plugin.writingManager.toggleRedundantMode(currentView); });
             });
 
             menu.addSeparator();
@@ -376,7 +380,7 @@ export class StructureView extends ItemView {
             menu.addItem((item) => {
                 item.setTitle("AutoWiki")
                     .setIcon("book")
-                    .onClick(() => { this.plugin.wikiManager.scanAndCreateWiki(currentView); });
+                    .onClick(() => { void this.plugin.wikiManager.scanAndCreateWiki(currentView); });
             });
 
 
@@ -394,20 +398,20 @@ export class StructureView extends ItemView {
         // 1. Outline Tab
         const tabOutline = createIconButton(tabsRow, "list-tree", "Outline");
         tabOutline.className = "ns-tab-btn" + (this.activeTab === 'outline' ? " is-active" : "");
-        tabOutline.onclick = () => { this.activeTab = 'outline'; this.lastOutlineHash = ""; this.parseAndRender(); };
+        tabOutline.onclick = () => { this.activeTab = 'outline'; this.lastOutlineHash = ""; void this.parseAndRender(); };
 
         // 2. Info Tab
         const tabInfo = createIconButton(tabsRow, "info", "Info");
         tabInfo.className = "ns-tab-btn" + (this.activeTab === 'info' ? " is-active" : "");
-        tabInfo.onclick = () => { this.activeTab = 'info'; this.parseAndRender(); };
+        tabInfo.onclick = () => { this.activeTab = 'info'; void this.parseAndRender(); };
 
         // 3. Backup Tab
         const tabHistory = createIconButton(tabsRow, "history", "Backup");
         tabHistory.className = "ns-tab-btn" + (this.activeTab === 'history' ? " is-active" : "");
-        tabHistory.onclick = () => { this.activeTab = 'history'; this.parseAndRender(); };
+        tabHistory.onclick = () => { this.activeTab = 'history'; void this.parseAndRender(); };
     }
 
-    async renderOutline(container: HTMLElement, view: MarkdownView) {
+    renderOutline(container: HTMLElement, view: MarkdownView) {
         const text = view.editor.getValue();
         if (!text.trim()) { container.setText("This file is empty"); return; }
 
@@ -425,7 +429,8 @@ export class StructureView extends ItemView {
         fileNameEl.setCssProps({ marginBottom: "10px" });
 
         const tree = this.parseDocument(text);
-        this.sortables.forEach(s => s.destroy());
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return
+        this.sortables.forEach((s: unknown) => s.destroy());
         this.sortables = [];
 
         if (tree.length === 0) { container.setText("Chapter or scene ID do not found"); return; }
@@ -536,14 +541,16 @@ export class StructureView extends ItemView {
                     this.selectedSceneTitle = scene.name;
                     this.jumpToLine(scene.lineNumber);
                     this.lastOutlineHash = "";
-                    this.parseAndRender();
+                    void this.parseAndRender();
                 });
             });
-
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- SortableJS constructor
             this.sortables.push(new Sortable(sceneList, {
                 group: 'scenes', animation: 150, ghostClass: 'sortable-ghost', dragClass: 'sortable-drag',
                 delay: 100, delayOnTouchOnly: true,
-                onEnd: (evt) => {
+
+                onEnd: (evt: unknown) => {
+
                     if (evt.newIndex !== evt.oldIndex || evt.from !== evt.to) this.saveChanges(container, view);
                 }
             }));
@@ -589,7 +596,7 @@ export class StructureView extends ItemView {
             color: "var(--text-on-accent)"
         });
         btnSaveVersion.onclick = () => {
-            this.plugin.historyManager.saveVersion(view, () => { this.parseAndRender(); });
+            this.plugin.historyManager.saveVersion(view, () => { void this.parseAndRender(); });
         };
 
         if (!this.selectedSceneId) {
@@ -614,13 +621,13 @@ export class StructureView extends ItemView {
             const actions = card.createDiv({ cls: "ns-history-actions" });
 
             const btnPreview = actions.createEl("button", { text: "Preview" });
-            btnPreview.onclick = () => { this.plugin.historyManager.showPreview(this.selectedSceneTitle, ver.label, ver.content); };
+            btnPreview.onclick = () => { void this.plugin.historyManager.showPreview(this.selectedSceneTitle, ver.label, ver.content); };
             const btnRestore = actions.createEl("button", { text: "Recover" });
             btnRestore.onclick = () => { this.handleRestore(view, this.selectedSceneId, ver.content); };
         }
     }
 
-    async renderInfo(container: HTMLElement, view: MarkdownView) {
+    renderInfo(container: HTMLElement, view: MarkdownView) {
         const editor = view.editor;
         const cursor = editor.getCursor();
         let foundTitle = null;
@@ -756,7 +763,7 @@ export class StructureView extends ItemView {
         }
     }
 
-    async saveChanges(container: HTMLElement, view: MarkdownView) {
+    saveChanges(container: HTMLElement, view: MarkdownView) {
         if (!view) return;
 
         const liveText = view.editor.getValue();
@@ -771,7 +778,7 @@ export class StructureView extends ItemView {
 
         if (liveSceneCount !== domScenes.length) {
             new Notice("No new content in this draft, cancel this drag to protect draft content.");
-            this.parseAndRender();
+            void this.parseAndRender();
             return;
         }
 
@@ -852,7 +859,7 @@ export class StructureView extends ItemView {
         replaceEntireDocument(view.editor, finalText);
 
         this.lastOutlineHash = "";
-        this.parseAndRender();
+        void this.parseAndRender();
     }
 
 
@@ -868,7 +875,7 @@ export class StructureView extends ItemView {
         if (lineText.includes('data-color="')) {
             newLine = lineText.replace(/data-color="[^"]*"/, `data-color="${newColorId}"`);
         } else if (lineText.includes('data-scene-id="')) {
-            newLine = lineText.replace(/"><\/span>/, `" data-color="${newColorId}"><\/span>`);
+            newLine = lineText.replace(/"><\/span>/, `" data-color="${newColorId}"></span>`);
         } else {
             new Notice("No scene ID, color cannot be assigned. Please press sync.");
             return;

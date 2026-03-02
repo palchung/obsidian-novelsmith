@@ -33,14 +33,14 @@ export class SceneManager {
         if (this.dbTimer) window.clearTimeout(this.dbTimer);
         this.dbTimer = window.setTimeout(() => {
             this.dbTimer = null;
-            this.triggerDatabaseGeneration();
+            void this.triggerDatabaseGeneration();
         }, delayMs);
     }
 
 
     // 🔥 Mutex Lock & Queue
     private async triggerDatabaseGeneration() {
-        if (this.dbInFlight) {
+        if (this.dbInFlight !== null) {
             this.dbPending = true;
             return;
         }
@@ -57,14 +57,14 @@ export class SceneManager {
     }
 
 
-    async assignIDs(view: MarkdownView) {
-        new SimpleConfirmModal(this.app, "Confirm to assign ID to all scenes ?", async () => {
-            await this.executeAssignIDsSilent(view);
+    assignIDs(view: MarkdownView) {
+        new SimpleConfirmModal(this.app, "Confirm to assign ID to all scenes ?", () => {
+            this.executeAssignIDsSilent(view);
             new Notice(`Assign ID successfully!`);
         }).open();
     }
 
-    async executeAssignIDsSilent(view: MarkdownView) {
+    executeAssignIDsSilent(view: MarkdownView) {
         const editor = view.editor;
         const lineCount = editor.lineCount();
         const newLines: string[] = [];

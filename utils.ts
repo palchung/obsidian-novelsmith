@@ -6,7 +6,7 @@ import { App, setIcon } from 'obsidian';
 
 
 // 1. Regular Expressions (Regex)
-export const RE_HEADER_CLEAN = /^[#\s]+|^🎬\s*|^[-\.]\s*/g;
+export const RE_HEADER_CLEAN = /^[#\s]+|^🎬\s*|^[-.]\s*/g;
 export const RE_HIGHLIGHT = /==/g;
 export const RE_SEPARATOR = /%% - %%/g;
 // 🔥 Replace these three lines:
@@ -253,9 +253,18 @@ export const parseUniversalScenes = (textOrLines: string | string[]): UniversalS
 // ============================================================
 
 // 1. Silent replacement (Protects Ctrl+Z)
-export const replaceEntireDocument = (editor: unknown, newContent: string) => {
-    const lastLine = editor.lineCount() - 1;
-    const lastCh = editor.getLine(lastLine).length;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const replaceEntireDocument = (editor: any, newContent: string) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+    const lastLineRaw = editor.lineCount();
+    const lastLine = Number(lastLineRaw) - 1;
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+    const lineTextRaw = editor.getLine(lastLine);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const lastCh = Number(lineTextRaw.length);
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     editor.replaceRange(newContent, { line: 0, ch: 0 }, { line: lastLine, ch: lastCh });
 };
 

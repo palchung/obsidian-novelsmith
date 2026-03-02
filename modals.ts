@@ -136,8 +136,8 @@ export class CompileModal extends Modal {
         });
 
         new Setting(scrollArea)
-            .setName("Insert file name as chapter heading")
-            .setDesc("Insert corresponding level headings at the top of each chapter. To avoid conflicts with Scene Cards (H6), up to H5 is supported.")
+            .setName("Insert file name as chapter headings")
+            .setDesc("Insert corresponding level headings at the top of each chapter. To avoid conflicts with scene cards (h6), up to h5 is supported.")
             .addDropdown(drop => drop
                 .addOption('none', 'Do not insert')
                 .addOption('1', 'H1 (# Heading)')

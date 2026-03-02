@@ -51,7 +51,7 @@ export class NovelSmithSettingTab extends PluginSettingTab {
             .addButton(btn => btn
                 .setButtonText("Initialize now")
                 .setCta() // Turn into a prominent CTA button color
-                .onClick(async () => {
+                .onClick(() => {
                     const folder = this.plugin.settings.bookFolderPath;
                     if (!folder || folder.trim() === "") {
                         new Notice("Please enter your desired 'folder name' above first!");
@@ -60,8 +60,10 @@ export class NovelSmithSettingTab extends PluginSettingTab {
 
                     // Call the powerful generator in main.ts!
                     // forceShowNotice = true, openAfterCreate = true
-                    await this.plugin.ensureTemplateFileExists(true, true);
-                    new Notice(`Initialization successful! Your writing workspace [${folder}] is ready!`);
+                    void this.plugin.ensureTemplateFileExists(true, true).then(() => {
+                        new Notice(`Initialization successful! Your writing workspace [${folder}] is ready!`);
+                    });
+
                 })
             );
 
@@ -114,8 +116,8 @@ export class NovelSmithSettingTab extends PluginSettingTab {
             .addButton(button => button
                 .setIcon('refresh-cw')  // 
                 .setButtonText('Rebuild template')
-                .onClick(async () => {
-                    await this.plugin.ensureTemplateFileExists(true);
+                .onClick(() => {
+                    void this.plugin.ensureTemplateFileExists(true);
                 }));
 
         new Setting(containerEl)
@@ -123,8 +125,8 @@ export class NovelSmithSettingTab extends PluginSettingTab {
             .addButton(button => button
                 .setIcon('refresh-cw')
                 .setButtonText('Rebuild redundant list')
-                .onClick(async () => {
-                    await this.plugin.writingManager.ensureRedundantListExists(true);
+                .onClick(() => {
+                    void this.plugin.writingManager.ensureRedundantListExists(true);
                 }));
 
         new Setting(containerEl)
@@ -132,8 +134,8 @@ export class NovelSmithSettingTab extends PluginSettingTab {
             .addButton(button => button
                 .setIcon('refresh-cw')
                 .setButtonText('Rebuild correction list')
-                .onClick(async () => {
-                    await this.plugin.writingManager.ensureFixListExists(true);
+                .onClick(() => {
+                    void this.plugin.writingManager.ensureFixListExists(true);
                 }));
 
 

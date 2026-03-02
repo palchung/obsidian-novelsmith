@@ -55,7 +55,7 @@ export default class NovelSmithPlugin extends Plugin {
         // 🔥 Thoughtful UX 1: Add a physical button to the left Ribbon
         // =================================================================
         this.addRibbonIcon('book-open', 'Open NovelSmith panel', () => {
-            this.activateView();
+            void this.activateView();
         });
 
         // =================================================================
@@ -129,7 +129,7 @@ export default class NovelSmithPlugin extends Plugin {
                             new Notice("Archived draft saved. (to protect the file, the system will not reassign ID here).");
                             return true;
                         }
-                        this.executeSmartSave(view);
+                        void this.executeSmartSave(view);
                     }
                     return true;
                 }
@@ -140,7 +140,7 @@ export default class NovelSmithPlugin extends Plugin {
         this.addCommand({
             id: 'open-structure-view',
             name: 'Open structure outline',
-            callback: () => { this.activateView(); }
+            callback: () => { void this.activateView(); }
         });
 
         this.addCommand({
@@ -176,7 +176,7 @@ export default class NovelSmithPlugin extends Plugin {
 
                         // 🔥 Logic Unification: If in the 'Current Temporary Draft', hand over to Smart Save directly (Sync + Update DB)
                         if (file.name === DRAFT_FILENAME) {
-                            this.executeSmartSave(markdownView);
+                            void this.executeSmartSave(markdownView);
                         }
                         // 🔥 Defense Net Upgrade: Recognize only core keywords, handles both new and old drafts!
                         else if (isScriveningsDraft(content)) {
@@ -186,8 +186,8 @@ export default class NovelSmithPlugin extends Plugin {
                         else {
                             const folder = file.parent;
                             if (folder) {
-                                this.sceneManager.assignIDsToAllFiles(folder).then(() => {
-                                    this.scrivenerManager.toggleScrivenings();
+                                void this.sceneManager.assignIDsToAllFiles(folder).then(() => {
+                                    void this.scrivenerManager.toggleScrivenings();
                                 });
                             }
                         }
@@ -216,7 +216,7 @@ export default class NovelSmithPlugin extends Plugin {
             icon: 'history',
             editorCallback: (editor, view) => {
                 if (this.checkInBookFolder(view.file)) {
-                    this.historyManager.restoreVersion(view);
+                    void this.historyManager.restoreVersion(view);
                 }
             }
         });
@@ -227,7 +227,7 @@ export default class NovelSmithPlugin extends Plugin {
             icon: 'scissors',
             editorCallback: (editor, view) => {
                 if (this.checkInBookFolder(view.file)) {
-                    this.plotManager.splitScene(view);
+                    void this.plotManager.splitScene(view);
                 }
             }
         });
@@ -250,7 +250,7 @@ export default class NovelSmithPlugin extends Plugin {
             id: 'toggle-redundant-mode',
             name: 'Toggle redundant words mode',
             editorCallback: (editor, view) => {
-                this.writingManager.toggleRedundantMode(view);
+                void this.writingManager.toggleRedundantMode(view);
             }
         });
 
@@ -258,7 +258,7 @@ export default class NovelSmithPlugin extends Plugin {
             id: 'correct-names',
             name: 'Name corrector (one-click auto-fix)',
             editorCallback: (editor, view) => {
-                this.writingManager.correctNames(view);
+                void this.writingManager.correctNames(view);
             }
         });
 
@@ -291,7 +291,7 @@ export default class NovelSmithPlugin extends Plugin {
                             new Notice("Please go to the settings page to configure your 'Wiki storage folder' first!");
                             return true;
                         }
-                        this.wikiManager.scanAndCreateWiki(markdownView);
+                        void this.wikiManager.scanAndCreateWiki(markdownView);
                     }
                     return true;
                 }
@@ -371,7 +371,7 @@ export default class NovelSmithPlugin extends Plugin {
             await this.scrivenerManager.syncBack(activeFile, folder);
             this.sceneManager.scheduleGenerateDatabase();
         } else {
-            await this.sceneManager.executeAssignIDsSilent(view);
+            this.sceneManager.executeAssignIDsSilent(view);
         }
     }
 
@@ -427,7 +427,7 @@ export default class NovelSmithPlugin extends Plugin {
             leaf = workspace.getRightLeaf(false);
             if (leaf) await leaf.setViewState({ type: VIEW_TYPE_STRUCTURE, active: true });
         }
-        if (leaf) workspace.revealLeaf(leaf);
+        if (leaf) void workspace.revealLeaf(leaf);
     }
 
     onunload() {
@@ -437,6 +437,7 @@ export default class NovelSmithPlugin extends Plugin {
     }
 
     async loadSettings() {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Accessing internal app config
         this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
     }
 

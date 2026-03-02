@@ -29,7 +29,7 @@ export class CompilerManager {
             new CompileModal(this.app, (options) => {
 
 
-                this.executeCompile(view, selectedFiles, options);
+                void this.executeCompile(view, selectedFiles, options);
 
             }).open();
 
@@ -103,7 +103,7 @@ export class CompilerManager {
 
             // remove internal link
             if (options.removeInternalLinks) {
-                content = content.replace(/(?<!\!)\[\[(?:[^\]]*\|)?([^\]]+)\]\]/g, "$1");
+                content = content.replace(/(?<!!)\[\[(?:[^\]]*\|)?([^\]]+)\]\]/g, "$1");
             }
 
 

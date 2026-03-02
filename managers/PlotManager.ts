@@ -73,6 +73,7 @@ export class PlotManager {
         }
 
         // 🔥 Upgraded: Use premium card creator
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises -- UI callback requires async execution
         new SceneCreateModal(this.app, "➕ Insert Scene Card", "", async (newSceneName, colorId) => {
             if (!newSceneName) return;
 
@@ -120,6 +121,7 @@ export class PlotManager {
         const metadataLines: string[] = currentScene ? currentScene.meta : [];
 
         // 🔥 Upgraded: Color selection available during splitting!
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises -- UI callback requires async execution
         new SceneCreateModal(this.app, "🔪 Split Scene", "", async (newSceneName, colorId) => {
             if (!newSceneName) return;
 
@@ -156,7 +158,7 @@ export class PlotManager {
         }).open();
     }
 
-    async mergeScene(view: MarkdownView) {
+    mergeScene(view: MarkdownView) {
         const editor = view.editor;
         const cursor = editor.getCursor();
         //const lineCount = editor.lineCount();

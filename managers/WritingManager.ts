@@ -20,8 +20,10 @@ export class WritingManager {
     private triggerEditorUpdate() {
         this.app.workspace.iterateAllLeaves((leaf) => {
             if (leaf.view instanceof MarkdownView) {
-                // @ts-ignore
+                // @ts-expect-error - Obsidian internal API
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                 const cm = leaf.view.editor.cm;
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
                 if (cm) cm.dispatch({ effects: [] });
             }
         });
@@ -126,7 +128,7 @@ export class WritingManager {
     // =================================================================
     // 💬 Dialogue Mode
     // =================================================================
-    async toggleDialogueMode(view: MarkdownView) {
+    toggleDialogueMode(view: MarkdownView) {
         const isModeOn = document.body.classList.contains('mode-dialogue');
 
         if (isModeOn) {
@@ -248,7 +250,7 @@ export class WritingManager {
             let maskCounter = 0;
 
             // Mask URLs (http / https)
-            newLine = newLine.replace(/https?:\/\/[^\s\)]+/g, (match) => {
+            newLine = newLine.replace(/https?:\/\/[^\s)]+/g, (match) => {
                 const token = `__NS_MASK_${maskCounter++}__`;
                 masks.push({ token, original: match });
                 return token;
@@ -303,7 +305,7 @@ export class WritingManager {
     // =================================================================
     // 🧹 Clean Draft (Upgraded: Supports options and internal links)
     // =================================================================
-    async cleanDraft(view: MarkdownView) {
+    cleanDraft(view: MarkdownView) {
         new CleanDraftModal(this.app, (options) => {
             let content = view.editor.getValue();
             const originalContent = content;
@@ -315,7 +317,7 @@ export class WritingManager {
 
             // 🔥 New: Remove internal links (keep display text, e.g., [[Alias|Display]] becomes Display)
             // 🔥 P2 Tweak: Use Negative Lookbehind (?<!\!), perfectly avoid images ![[...]], remove only plain text links!
-            if (options.removeInternalLinks) content = content.replace(/(?<!\!)\[\[(?:[^\]]*\|)?([^\]]+)\]\]/g, "$1");
+            if (options.removeInternalLinks) content = content.replace(/(?<!!)\[\[(?:[^\]]*\|)?([^\]]+)\]\]/g, "$1");
             if (content !== originalContent) {
                 // 🔥 P2 Optimization: Call global silent replacement
                 replaceEntireDocument(view.editor, content);

@@ -1,4 +1,4 @@
-import { App, Notice, TFile, MarkdownView, moment } from 'obsidian';
+import { App, Notice, TFile, MarkdownView, moment, Editor } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 import { InputModal, GenericSuggester } from '../modals';
 import { parseUniversalScenes, HISTORY_DIR, ensureFolderExists } from '../utils';
@@ -16,8 +16,10 @@ export class HistoryManager {
         this.settings = newSettings;
     }
 
-    public getSceneInfoAtCursor(editor: unknown) {
+    public getSceneInfoAtCursor(editor: Editor): { id: string | null, title: string, startLine: number, endLine: number, headerRaw: string } | null {
+
         const cursor = editor.getCursor();
+
         const lineCount = editor.lineCount();
 
         // 🔥 P2 Architecture Refactoring: Global radar handles basic data instantly
@@ -29,7 +31,9 @@ export class HistoryManager {
         // Still need to search downwards for the end of this scene (until the next marker or EOF)
         let endLineIndex = lineCount;
         for (let i = currentScene.lineIndex + 1; i < lineCount; i++) {
+
             const line = editor.getLine(i);
+
             if (line.trim().startsWith("######") || line.includes("++ FILE_ID")) {
                 endLineIndex = i;
                 break;
@@ -45,7 +49,7 @@ export class HistoryManager {
         };
     }
 
-    async saveVersion(view: MarkdownView, onComplete?: () => void) {
+    saveVersion(view: MarkdownView, onComplete?: () => void) {
         const editor = view.editor;
         const scene = this.getSceneInfoAtCursor(editor);
 
@@ -70,7 +74,7 @@ export class HistoryManager {
 
         const cleanContent = bodyLines.join("\n").trim();
         if (!cleanContent) { new Notice("The scene body is empty; cannot be saved."); return; }
-
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Modal UI callback needs async execution
         new InputModal(this.app, `Backup: ${scene.title}`, async (verName) => {
             if (!verName) return;
 
@@ -135,15 +139,25 @@ export class HistoryManager {
         }
         return versions.reverse();
     }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    public performRestore(editor: any, scene: any, newContent: string) {
 
-    public performRestore(editor: unknown, scene: unknown, newContent: string) {
-        const currentRangeText = editor.getRange({ line: scene.startLine + 1, ch: 0 }, { line: scene.endLine, ch: 0 });
+
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        const sLine = Number(scene.startLine);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        const eLine = Number(scene.endLine);
+
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        const currentRangeText = editor.getRange({ line: sLine + 1, ch: 0 }, { line: eLine, ch: 0 });
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
         const currentLines = currentRangeText.split("\n");
         const metaBuffer = [];
 
-        // 🔥 Ultimate Fix: Accurately identify during restoration, without breaking the body text
         for (const line of currentLines) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
             const trimLine = line.trim();
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
             if (trimLine.startsWith("> [!NSmith") || trimLine.startsWith("> [!info") || trimLine.startsWith("> -") || trimLine === ">") {
                 metaBuffer.push(line);
             } else if (trimLine === "" && metaBuffer.length > 0) {
@@ -152,7 +166,10 @@ export class HistoryManager {
         }
 
         const finalBlock = metaBuffer.join("\n").trim() + "\n\n" + newContent + "\n";
-        editor.replaceRange(finalBlock, { line: scene.startLine + 1, ch: 0 }, { line: scene.endLine, ch: 0 });
+
+
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        editor.replaceRange(finalBlock, { line: sLine + 1, ch: 0 }, { line: eLine, ch: 0 });
         new Notice("Version restored successfully!");
     }
 
@@ -161,7 +178,7 @@ export class HistoryManager {
         const previewPath = `${this.settings.bookFolderPath}/${HISTORY_DIR}/preview_Temp.md`;
         let previewFile = this.app.vault.getAbstractFileByPath(previewPath);
 
-        const previewText = `# 👀 Preview: ${title}\n> 📅 Version: ${verLabel}\n\n---\n\n${content}`;
+        const previewText = `# Preview: ${title}\n> Version: ${verLabel}\n\n---\n\n${content}`;
 
         if (!(previewFile instanceof TFile)) {
             await this.app.vault.create(previewPath, previewText);
@@ -170,7 +187,11 @@ export class HistoryManager {
             if (previewFile instanceof TFile) await this.app.vault.modify(previewFile, previewText);
         }
 
-        let leaf = this.app.workspace.getLeavesOfType("markdown").find(l => l.view.file && l.view.file.path === previewPath);
+        let leaf = this.app.workspace.getLeavesOfType("markdown").find((l) => {
+            const view = l.view;
+            return view instanceof MarkdownView && view.file?.path === previewPath;
+        });
+
         if (!leaf) leaf = this.app.workspace.getLeaf('split', 'vertical');
         if (previewFile instanceof TFile) await leaf.openFile(previewFile);
         new Notice("Preview opened (right panel)");
@@ -190,9 +211,10 @@ export class HistoryManager {
                 { label: "👀 Preview", id: "preview" },
                 { label: "⏪ Restore", id: "restore" }
             ];
-            new GenericSuggester(this.app, actions, (action) => action.label, async (selectedAction) => {
+            new GenericSuggester(this.app, actions, (action) => action.label, (selectedAction) => {
                 if (selectedAction.id === "preview") {
-                    this.showPreview(scene.title, selectedVersion.label, selectedVersion.content);
+
+                    void this.showPreview(scene.title, selectedVersion.label, selectedVersion.content);
                 } else {
                     this.performRestore(editor, scene, selectedVersion.content);
                 }
