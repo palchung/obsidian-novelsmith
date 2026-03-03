@@ -202,7 +202,7 @@ export class CompileModal extends Modal {
         // Below the removeInternalLinks Setting, add this section:
         new Setting(scrollArea)
             .setName("Hashtag processing")
-            .setDesc("Process #tags in the manuscript (The system identifies accurately and will never accidentally delete # headers).")
+            .setDesc("Process #tags in the manuscript (the system identifies accurately and will never accidentally delete # headers).")
             .addDropdown(drop => drop
                 .addOption('none', 'Keep as is')
                 .addOption('remove-hash', 'Remove # symbol only (e.g., #draft becomes draft)')

@@ -38,7 +38,7 @@ export class NovelSmithSettingTab extends PluginSettingTab {
             .setName('Dedicated writing folder')
             .setDesc('Designate your novel\'s root directory (e.g., mybook). The system will automatically create a _backstage folder inside to store all system files.')
             .addText(text => text
-                .setPlaceholder('MyBook')
+                .setPlaceholder('Mybook')
                 .setValue(this.plugin.settings.bookFolderPath)
                 .onChange(async (value) => {
                     this.plugin.settings.bookFolderPath = value;
@@ -46,7 +46,7 @@ export class NovelSmithSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName("Initialize NovelSmith")
+            .setName("Initialize novelsmith")
             .setDesc("One-click setup for your dedicated writing folder, the _backstage system directory, and a default scene card template.")
             .addButton(btn => btn
                 .setButtonText("Initialize now")
@@ -92,7 +92,7 @@ export class NovelSmithSettingTab extends PluginSettingTab {
         // ==========================================
         // 🧠 AutoWiki
         // ==========================================
-        new Setting(containerEl).setName("AutoWiki").setHeading();
+        new Setting(containerEl).setName("Auto wiki").setHeading();
 
         new Setting(containerEl)
             .setName('Wiki storage folder')

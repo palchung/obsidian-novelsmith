@@ -177,7 +177,8 @@ export class ScrivenerManager {
         const draftContent = await this.app.vault.read(draftFile);
 
         if (!draftContent.includes('<span class="ns-file-id">++ FILE_ID:')) {
-            new Notice("Error: file id can't be found, sync abort", 0); return;
+            // eslint-disable-next-line obsidianmd/ui/sentence-case -- FILE_ID is a technical term
+            new Notice("Error: FILE_ID can't be found, sync abort", 0); return;
         }
 
         new Notice("Sync in process…");
@@ -363,7 +364,7 @@ export class ScrivenerManager {
 
         // After the visual disappears, silently trash the file in the background
         await this.app.fileManager.trashFile(draftFile);
-        new Notice("Draft discarded! original manuscript remains unchanged.\n(If you need to recover it, check your system's trash/recycle bin)");
+        new Notice("Draft discarded! original manuscript remains unchanged.\n(if you need to recover it, check your system's trash/recycle bin)");
 
 
     }

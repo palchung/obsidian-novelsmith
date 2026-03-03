@@ -378,7 +378,7 @@ export class StructureView extends ItemView {
             menu.addSeparator();
 
             menu.addItem((item) => {
-                item.setTitle("AutoWiki")
+                item.setTitle("Auto wiki")
                     .setIcon("book")
                     .onClick(() => { void this.plugin.wikiManager.scanAndCreateWiki(currentView); });
             });
