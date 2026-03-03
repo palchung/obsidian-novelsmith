@@ -139,25 +139,25 @@ export class HistoryManager {
         }
         return versions.reverse();
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    public performRestore(editor: any, scene: any, newContent: string) {
+
+    public performRestore(editor: Editor, scene: { startLine: number, endLine: number }, newContent: string) {
 
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
         const sLine = Number(scene.startLine);
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
         const eLine = Number(scene.endLine);
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+
         const currentRangeText = editor.getRange({ line: sLine + 1, ch: 0 }, { line: eLine, ch: 0 });
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+
         const currentLines = currentRangeText.split("\n");
         const metaBuffer = [];
 
         for (const line of currentLines) {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+
             const trimLine = line.trim();
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+
             if (trimLine.startsWith("> [!NSmith") || trimLine.startsWith("> [!info") || trimLine.startsWith("> -") || trimLine === ">") {
                 metaBuffer.push(line);
             } else if (trimLine === "" && metaBuffer.length > 0) {
@@ -168,7 +168,7 @@ export class HistoryManager {
         const finalBlock = metaBuffer.join("\n").trim() + "\n\n" + newContent + "\n";
 
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+
         editor.replaceRange(finalBlock, { line: sLine + 1, ch: 0 }, { line: eLine, ch: 0 });
         new Notice("Version restored successfully!");
     }

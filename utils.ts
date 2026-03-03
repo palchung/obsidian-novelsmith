@@ -1,4 +1,4 @@
-import { App, setIcon } from 'obsidian';
+import { App, setIcon, Editor } from 'obsidian';
 
 // ============================================================
 // 🛠️ Toolbox: Handles string processing and parsing
@@ -253,18 +253,11 @@ export const parseUniversalScenes = (textOrLines: string | string[]): UniversalS
 // ============================================================
 
 // 1. Silent replacement (Protects Ctrl+Z)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const replaceEntireDocument = (editor: any, newContent: string) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
-    const lastLineRaw = editor.lineCount();
-    const lastLine = Number(lastLineRaw) - 1;
+export const replaceEntireDocument = (editor: Editor, newContent: string) => {
+    const lastLine = editor.lineCount() - 1;
+    const lineText = editor.getLine(lastLine);
+    const lastCh = lineText.length;
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
-    const lineTextRaw = editor.getLine(lastLine);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const lastCh = Number(lineTextRaw.length);
-
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     editor.replaceRange(newContent, { line: 0, ch: 0 }, { line: lastLine, ch: lastCh });
 };
 

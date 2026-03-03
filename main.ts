@@ -437,7 +437,7 @@ export default class NovelSmithPlugin extends Plugin {
     }
 
     async loadSettings() {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Accessing internal app config
+
         this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
     }
 

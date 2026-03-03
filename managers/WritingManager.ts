@@ -20,8 +20,7 @@ export class WritingManager {
     private triggerEditorUpdate() {
         this.app.workspace.iterateAllLeaves((leaf) => {
             if (leaf.view instanceof MarkdownView) {
-                // @ts-expect-error - Obsidian internal API
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
                 const cm = leaf.view.editor.cm;
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
                 if (cm) cm.dispatch({ effects: [] });

@@ -238,7 +238,7 @@ export class ScrivenerManager {
 
 
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Parsing dynamic markdown structure
+
             const originalData: any = parsedOriginalCache.get(fileName);
             if (!originalData) {
                 skippedFiles.push(fileName);
@@ -249,12 +249,12 @@ export class ScrivenerManager {
             const draftData = parseContent(blockContent, false);
 
             const localTitleMap = new Map<string, DraftCard>();
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+
             originalData.cards.forEach((card: unknown) => localTitleMap.set(card.key, card));
 
 
             const chunks: string[] = [];
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+
             if (originalData.headers.trim()) chunks.push(originalData.headers.trim() + "\n\n");
 
             for (const draftCard of draftData.cards) {

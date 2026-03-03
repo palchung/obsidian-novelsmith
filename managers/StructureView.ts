@@ -544,7 +544,7 @@ export class StructureView extends ItemView {
                     void this.parseAndRender();
                 });
             });
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- SortableJS constructor
+
             this.sortables.push(new Sortable(sceneList, {
                 group: 'scenes', animation: 150, ghostClass: 'sortable-ghost', dragClass: 'sortable-drag',
                 delay: 100, delayOnTouchOnly: true,
