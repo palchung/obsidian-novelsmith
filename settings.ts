@@ -36,7 +36,7 @@ export class NovelSmithSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('Dedicated writing folder')
-            .setDesc('Designate your novel\'s root directory (e.g., MyBook). The system will automatically create a _Backstage folder inside to store all system files.')
+            .setDesc('Designate your novel\'s root directory (e.g., mybook). The system will automatically create a _backstage folder inside to store all system files.')
             .addText(text => text
                 .setPlaceholder('MyBook')
                 .setValue(this.plugin.settings.bookFolderPath)
@@ -47,7 +47,7 @@ export class NovelSmithSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName("Initialize NovelSmith")
-            .setDesc("One-click setup for your dedicated writing folder, the _Backstage system directory, and a default scene card template.")
+            .setDesc("One-click setup for your dedicated writing folder, the _backstage system directory, and a default scene card template.")
             .addButton(btn => btn
                 .setButtonText("Initialize now")
                 .setCta() // Turn into a prominent CTA button color
@@ -70,7 +70,7 @@ export class NovelSmithSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('Keep draft history after sync')
-            .setDesc('When enabled, ending Scrivenings mode will backup the draft to _Backstage/Drafts.')
+            .setDesc('When enabled, ending scrivenings mode will backup the draft to _backstage/drafts.')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.keepDraftOnSync)
                 .onChange(async (value) => {
@@ -80,7 +80,7 @@ export class NovelSmithSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('Compile export path')
-            .setDesc('Fully compiled manuscripts will be saved here (e.g., Output).')
+            .setDesc('Fully compiled manuscripts will be saved here (e.g., output).')
             .addText(text => text
                 .setPlaceholder('Output')
                 .setValue(this.plugin.settings.exportFolderPath)
@@ -98,7 +98,7 @@ export class NovelSmithSettingTab extends PluginSettingTab {
             .setName('Wiki storage folder')
             .setDesc('Newly created character/setting cards will automatically be placed in this folder.')
             .addText(text => text
-                .setPlaceholder('MyBook/Wiki')
+                .setPlaceholder('Mybook/wiki')
                 .setValue(this.plugin.settings.wikiFolderPath)
                 .onChange(async (value) => {
                     this.plugin.settings.wikiFolderPath = value;
@@ -109,7 +109,7 @@ export class NovelSmithSettingTab extends PluginSettingTab {
         // 🛠️ System Repair (Keep manual regeneration buttons)
         // ==========================================
         new Setting(containerEl).setName("System repair and rebuild").setHeading();
-        containerEl.createEl('p', { text: 'If system files in _Backstage are lost, click the buttons below to regenerate them (will not overwrite existing files).', cls: 'setting-item-description' });
+        containerEl.createEl('p', { text: 'If system files in _backstage are lost, click the buttons below to regenerate them (will not overwrite existing files).', cls: 'setting-item-description' });
 
         new Setting(containerEl)
             .setName('Regenerate: scene card template')

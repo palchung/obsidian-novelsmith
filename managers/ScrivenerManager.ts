@@ -1,6 +1,6 @@
-// 整個 ScrivenerManager.ts
+// ScrivenerManager.ts
 import { App, Notice, TFile, TFolder, MarkdownView, moment } from 'obsidian';
-import { parseContent, RE_FILE_ID, DraftCard } from '../utils';
+import { parseContent, RE_FILE_ID, DraftCard, ParseResult } from '../utils';
 import { NovelSmithSettings } from '../settings';
 import { ChapterSelectionModal, SimpleConfirmModal } from '../modals';
 import { HISTORY_DIR, ST_WARNING, generateSceneId, DRAFT_FILENAME, TEMPLATES_DIR, DRAFTS_DIR, ensureFolderExists } from '../utils';
@@ -79,7 +79,7 @@ export class ScrivenerManager {
 
                 // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Modal UI callback needs async execution
                 new ChapterSelectionModal(this.app, validFiles, async (selectedFiles) => {
-                    new Notice("Compiling Scrivenings draft...");
+                    new Notice("Compiling scrivenings draft...");
                     await this.compileDraft(currentFolder, selectedFiles, targetFileName, targetSceneRaw);
                 }).open();
             };
@@ -177,7 +177,7 @@ export class ScrivenerManager {
         const draftContent = await this.app.vault.read(draftFile);
 
         if (!draftContent.includes('<span class="ns-file-id">++ FILE_ID:')) {
-            new Notice("Error: FILE_ID can't be found, sync abort", 0); return;
+            new Notice("Error: file id can't be found, sync abort", 0); return;
         }
 
         new Notice("Sync in process…");
@@ -192,7 +192,7 @@ export class ScrivenerManager {
 
         const fileContentCache = new Map<string, { file: TFile, text: string }>();
         const globalIdMap = new Map<string, DraftCard>();
-        const parsedOriginalCache = new Map<string, unknown>();
+        const parsedOriginalCache = new Map<string, ParseResult>();
 
         await Promise.all(allFolderFiles.map(async (file) => {
             const text = await this.app.vault.read(file);
@@ -239,7 +239,7 @@ export class ScrivenerManager {
 
 
 
-            const originalData: any = parsedOriginalCache.get(fileName);
+            const originalData = parsedOriginalCache.get(fileName);
             if (!originalData) {
                 skippedFiles.push(fileName);
                 continue;

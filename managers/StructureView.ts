@@ -78,7 +78,7 @@ export class StructureView extends ItemView {
 
 
     getViewType() { return VIEW_TYPE_STRUCTURE; }
-    getDisplayText() { return "NovelSmith panel"; }
+    getDisplayText() { return "Novelsmith panel"; }
     getIcon() { return "kanban-square"; }
 
     onOpen() {
@@ -213,7 +213,7 @@ export class StructureView extends ItemView {
                     void this.plugin.executeSmartSave(view);
                 }
                 else if (isScriveningsDraft(content)) {
-                    new Notice("Abort: this is a archived draft, Scrivenering may cause infinite loop.");
+                    new Notice("Abort: this is a archived draft, scrivenering may cause infinite loop.");
                 }
                 else {
                     const folder = file.parent;
@@ -429,7 +429,7 @@ export class StructureView extends ItemView {
         fileNameEl.setCssProps({ marginBottom: "10px" });
 
         const tree = this.parseDocument(text);
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return
+
         this.sortables.forEach((s: unknown) => s.destroy());
         this.sortables = [];
 

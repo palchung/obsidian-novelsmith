@@ -54,7 +54,7 @@ export default class NovelSmithPlugin extends Plugin {
         // =================================================================
         // 🔥 Thoughtful UX 1: Add a physical button to the left Ribbon
         // =================================================================
-        this.addRibbonIcon('book-open', 'Open NovelSmith panel', () => {
+        this.addRibbonIcon('book-open', 'Open novelsmith panel', () => {
             void this.activateView();
         });
 
@@ -99,7 +99,7 @@ export default class NovelSmithPlugin extends Plugin {
                     const draftFile = this.app.vault.getAbstractFileByPath(draftPath);
 
                     if (draftFile) {
-                        new Notice("Warning: Scrivenings mode is active!\nEdits made here may be overwritten during the next sync.\nPlease return to the draft file to edit, or end scrivenings mode first.", 8000);
+                        new Notice("Warning: scrivenings mode is active!\nEdits made here may be overwritten during the next sync.\nPlease return to the draft file to edit, or end scrivenings mode first.", 8000);
                         this.lastDraftWarningTime = now;
                     }
                 }, 1500); // 1500 milliseconds = 1.5 seconds
@@ -166,7 +166,7 @@ export default class NovelSmithPlugin extends Plugin {
 
         this.addCommand({
             id: 'toggle-scrivenings',
-            name: 'Toggle Scrivenings mode',
+            name: 'Toggle scrivenings mode',
             checkCallback: (checking: boolean) => {
                 const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
                 if (markdownView) {
@@ -180,7 +180,7 @@ export default class NovelSmithPlugin extends Plugin {
                         }
                         // 🔥 Defense Net Upgrade: Recognize only core keywords, handles both new and old drafts!
                         else if (isScriveningsDraft(content)) {
-                            new Notice("System rejected: this is a Scrivenings draft file (or archived draft). You cannot activate Scrivenings mode here to prevent infinite loops!");
+                            new Notice("System rejected: this is a scrivenings draft file (or archived draft). You cannot activate scrivenings mode here to prevent infinite loops!");
                         }
                         // Normal chapter file, safely activate Scrivenings Mode
                         else {
@@ -288,7 +288,7 @@ export default class NovelSmithPlugin extends Plugin {
                     if (!checking && this.checkInBookFolder(markdownView.file)) {
                         // 🔥 Safeguard Checkpoint: Check if Wiki path is set
                         if (!this.settings.wikiFolderPath || this.settings.wikiFolderPath.trim() === "") {
-                            new Notice("Please go to the settings page to configure your 'Wiki storage folder' first!");
+                            new Notice("Please go to the settings page to configure your 'wiki storage folder' first!");
                             return true;
                         }
                         void this.wikiManager.scanAndCreateWiki(markdownView);
@@ -342,13 +342,13 @@ export default class NovelSmithPlugin extends Plugin {
 
         // 🔥 Fix: If folder is not set, pop up a friendly reminder and block all operations!
         if (!bookFolder || bookFolder.trim() === "") {
-            new Notice("Welcome to NovelSmith! Please go to the settings page to configure your 'dedicated writing folder' and initialize it.");
+            new Notice("Welcome to novelsmith! Please go to the settings page to configure your 'dedicated writing folder' and initialize it.");
             return false;
         }
 
         // 🔥 Absolute Barrier: If the path contains _Backstage, block completely!
         if (file.path.includes(`/${BACKSTAGE_DIR}/`)) {
-            new Notice(`System rejected: this is the locked system backstage (_Backstage). To protect your files, all writing functions are disabled here!`);
+            new Notice(`System rejected: this is the locked system backstage (_backstage). To protect your files, all writing functions are disabled here!`);
             return false;
         }
 
@@ -367,7 +367,7 @@ export default class NovelSmithPlugin extends Plugin {
         if (!folder) return;
 
         if (activeFile.name === DRAFT_FILENAME) {
-            new Notice("Ending Scrivenings mode and syncing...");
+            new Notice("Ending scrivenings mode and syncing...");
             await this.scrivenerManager.syncBack(activeFile, folder);
             this.sceneManager.scheduleGenerateDatabase();
         } else {

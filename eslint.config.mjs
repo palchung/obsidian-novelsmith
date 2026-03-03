@@ -29,23 +29,23 @@ export default tseslint.config(
             "obsidianmd/ui/sentence-case": [
                 "error",
                 {
-                    brands: [
-                        "NovelSmith",
-                        "Scrivenings",
-                        "Scrivenering",
-                        "YAML",
-                        "ID",
-                        "NSmith",
-                        "Heading",
-                        "heading",
-                        "MyBook",
-                        "_Backstage",
-                        "_Backstage/Drafts",
-                        "Output",
-                        "AutoWiki",
-                        "Wiki",
-                        "FILE_ID"
-                    ],
+                    // brands: [
+                    //     "NovelSmith",
+                    //     "Scrivenings",
+                    //     "Scrivenering",
+                    //     "YAML",
+                    //     "ID",
+                    //     "NSmith",
+                    //     "Heading",
+                    //     "heading",
+                    //     "MyBook",
+                    //     "_Backstage",
+                    //     "_Backstage/Drafts",
+                    //     "Output",
+                    //     "AutoWiki",
+                    //     "Wiki",
+                    //     "FILE_ID"
+                    // ],
 
                     ignoreRegex: [
                         "\\n",
