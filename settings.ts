@@ -139,6 +139,43 @@ export class NovelSmithSettingTab extends PluginSettingTab {
                 }));
 
 
+
+
+
+        // ==========================================
+        // Donation Section (Buy Me A Coffee)
+        // ==========================================
+        const donationDiv = containerEl.createDiv({
+            attr: {
+                style: 'margin-top: 50px; text-align: center; padding: 20px; background: var(--background-secondary); border-radius: 8px; border: 1px solid var(--background-modifier-border);'
+            }
+        });
+
+        donationDiv.createEl('p', {
+            text: "If NovelSmith has smoothed out your writing workflow and you'd like to support its continuous development, consider buying me a coffee! No pressure at all—your support means the world to me. ✍️❤️",
+            attr: { style: 'color: var(--text-muted); font-size: 0.9em; margin-bottom: 15px; line-height: 1.5;' }
+        });
+
+        // 建立 Buy Me A Coffee 嘅圖片連結
+        const bmacLink = donationDiv.createEl('a', {
+            href: 'https://buymeacoffee.com/palchung',
+            target: '_blank'
+        });
+
+        bmacLink.createEl('img', {
+            attr: {
+                // 呢個係 BMC 官方嘅靚靚黃色 Logo 圖片
+                src: 'https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png',
+                alt: 'Buy Me A Coffee',
+                style: 'height: 40px; border-radius: 5px;'
+            }
+        });
+
+
+
+        // ==========================================
+        // Slogan 
+        // ==========================================
         const sloganContainer = containerEl.createDiv();
         sloganContainer.setCssStyles({
             marginTop: "50px",

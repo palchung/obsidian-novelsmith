@@ -482,7 +482,27 @@ export class StructureView extends ItemView {
                     alignItems: "center",
                     width: "100%"
                 });
-                scCard.createSpan({ text: `🎬 ${scene.name}` });
+                const titleContainer = scCard.createDiv({ cls: "ns-scene-title-container" });
+                titleContainer.setCssStyles({
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                });
+
+                const iconEl = titleContainer.createSpan({ cls: "ns-scene-icon" });
+                setIcon(iconEl, "clapperboard"); // "file-text", "pen-tool", "clapperboard" 
+                iconEl.setCssStyles({
+                    opacity: "0.6",
+                    display: "flex",
+                    alignItems: "center"
+                });
+
+                titleContainer.createSpan({ text: scene.name });
+
+
+
+
+
 
                 // 🔥 2. Add 🎨 color change button
                 const colorBtn = scCard.createDiv();
@@ -654,11 +674,29 @@ export class StructureView extends ItemView {
         }
 
         const titleEl = container.createEl("h4");
-        titleEl.innerText = `🎬 ${foundTitle}`;
-        titleEl.setCssProps({ color: "var(--text-accent)" });
-        titleEl.setCssProps({ marginBottom: "12px" });
-        titleEl.setCssProps({ borderBottom: "1px solid var(--background-modifier-border)" });
-        titleEl.setCssProps({ paddingBottom: "8px" });
+
+        titleEl.setCssStyles({
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            color: "var(--text-accent)",
+            marginBottom: "12px",
+            borderBottom: "1px solid var(--background-modifier-border)",
+            paddingBottom: "8px"
+        });
+
+
+        const iconSpan = titleEl.createSpan();
+
+        setIcon(iconSpan, "clapperboard");
+        iconSpan.setCssStyles({
+            display: "flex",
+            alignItems: "center",
+            opacity: "0.8"
+        });
+
+
+        titleEl.createSpan({ text: foundTitle });
 
 
         const metaLines: string[] = [];

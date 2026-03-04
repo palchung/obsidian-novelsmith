@@ -65,11 +65,16 @@ To ensure the absolute safety of your manuscript, please keep these rules in min
 1. **Do NOT Copy-Paste Scene Cards:** Every scene has a unique invisible ID (e.g., `<span class="ns-id" data-scene-id="..."/>`). If you copy and paste a whole scene card, you will duplicate the ID. 
    * *Best Practice:* Always use the **"Insert Scene Card"** or **"Split Scene"** command to generate new scenes. If you must copy text, only copy the body text, not the `######` header. (NovelSmith has an auto-linting feature to catch duplicated IDs, but it's best to avoid doing it manually).
 2. **Lockdown during Scrivenings Mode:** When you are editing a merged draft (Scrivenings Mode), **do not rename, move, or edit the original chapter files** in your file explorer. Finish your edits in the draft, click **"Sync"**, and *then* manage your other files.
-3. **Use "Smart Save" (Ctrl+S / Cmd+S):**
+3. When you activate **Scrivenings Mode**, NovelSmith seamlessly combines your scenes into a single, continuous temporary draft for uninterrupted writing. To ensure your edits sync back perfectly to their original files, the plugin inserts specific markers.
+**DO NOT DELETE OR MODIFY these structural markers in the temporary draft:**
+- **Chapter Headings** (e.g., `# 📄 Chapter 1`)
+- **File ID Markers** (e.g., `<span class="ns-file-id">++ FILE_ID: ... ++</span>`)
+You are free to edit all the text *between* these markers. NovelSmith relies strictly on these IDs as anchors to split the draft and save your brilliant words back to the correct files safely. Modifying them will cause the sync process to fail!
+4. **Use "Smart Save" (Ctrl+S / Cmd+S):**
    NovelSmith provides a "Smart Save" command. Use it often! It automatically assigns IDs to newly written scenes and updates your shadow database in the background.
-4. **Respect the `_Backstage` Folder:**
+5. **Respect the `_Backstage` Folder:**
    NovelSmith creates a `_Backstage` folder to store your templates, backups, and databases. Do not manually edit the files inside `History` or the `_Scene_Database.md`. Let the system manage them!
-5. **Keep Novel Text outside of Callouts:**
+6. **Keep Novel Text outside of Callouts:**
    Your scene metadata lives inside a blockquote callout (e.g., `> [!NSmith]`). Ensure your actual novel text is written *below* this block, not inside it, or it will be stripped out during compilation! Standard blockquotes for letters or dialogues (`> "Hello!"`) in your body text are perfectly safe.
 
 ---
