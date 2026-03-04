@@ -152,11 +152,11 @@ export class NovelSmithSettingTab extends PluginSettingTab {
         });
 
         donationDiv.createEl('p', {
-            text: "If NovelSmith has smoothed out your writing workflow and you'd like to support its continuous development, consider buying me a coffee! No pressure at all—your support means the world to me. ✍️❤️",
+            text: "If NovelSmith has smoothed out your writing workflow and you'd like to support its continuous development, consider buying me a coffee! Your support means the world to me.",
             attr: { style: 'color: var(--text-muted); font-size: 0.9em; margin-bottom: 15px; line-height: 1.5;' }
         });
 
-        // 建立 Buy Me A Coffee 嘅圖片連結
+
         const bmacLink = donationDiv.createEl('a', {
             href: 'https://buymeacoffee.com/palchung',
             target: '_blank'
@@ -164,7 +164,6 @@ export class NovelSmithSettingTab extends PluginSettingTab {
 
         bmacLink.createEl('img', {
             attr: {
-                // 呢個係 BMC 官方嘅靚靚黃色 Logo 圖片
                 src: 'https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png',
                 alt: 'Buy Me A Coffee',
                 style: 'height: 40px; border-radius: 5px;'

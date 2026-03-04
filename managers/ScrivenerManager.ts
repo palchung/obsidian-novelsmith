@@ -178,7 +178,7 @@ export class ScrivenerManager {
 
         if (!draftContent.includes('<span class="ns-file-id">++ FILE_ID:')) {
 
-            new Notice("Error: file id can't be found, sync abort"); return;
+            new Notice("File id can't be found, sync abort", 0); return;
         }
 
         new Notice("Sync in process…");
