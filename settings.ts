@@ -152,7 +152,7 @@ export class NovelSmithSettingTab extends PluginSettingTab {
         });
 
         donationDiv.createEl('p', {
-            text: "If NovelSmith has smoothed out your writing workflow and you'd like to support its continuous development, consider buying me a coffee! Your support means the world to me.",
+            text: "If novelsmith has smoothed out your writing workflow and you'd like to support its continuous development, consider buying me a coffee! Your support means the world to me.",
             attr: { style: 'color: var(--text-muted); font-size: 0.9em; margin-bottom: 15px; line-height: 1.5;' }
         });
 
