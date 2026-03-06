@@ -1,5 +1,5 @@
 import { App, PluginSettingTab, Setting, Notice, setIcon } from 'obsidian';
-import NovelSmithPlugin from './main';
+import NovelSmithPlugin from './../main';
 
 export interface NovelSmithSettings {
     bookFolderPath: string;

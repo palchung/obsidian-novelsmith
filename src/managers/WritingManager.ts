@@ -20,8 +20,8 @@ export class WritingManager {
     private triggerEditorUpdate() {
         this.app.workspace.iterateAllLeaves((leaf) => {
             if (leaf.view instanceof MarkdownView) {
-
-                const cm = leaf.view.editor.cm;
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const cm = (leaf.view.editor as any).cm;
 
                 if (cm) cm.dispatch({ effects: [] });
             }
@@ -85,7 +85,7 @@ export class WritingManager {
             this.triggerEditorUpdate();
             new Notice("Disabled: redundant words mode");
         } else {
-            document.body.classList.remove('mode-dialogue');
+            document.body.classList.remove('ns-mode-dialogue');
 
             await this.ensureRedundantListExists(false); // Ensure the file exists
             const configPath = `${this.getAidsFolderPath()}/RedundantList.md`;
@@ -128,15 +128,15 @@ export class WritingManager {
     // 💬 Dialogue Mode
     // =================================================================
     toggleDialogueMode(view: MarkdownView) {
-        const isModeOn = document.body.classList.contains('mode-dialogue');
+        const isModeOn = document.body.classList.contains('ns-mode-dialogue');
 
         if (isModeOn) {
-            document.body.classList.remove('mode-dialogue');
+            document.body.classList.remove('ns-mode-dialogue');
             this.triggerEditorUpdate();
             new Notice("Disabled: dialogue mode");
         } else {
             document.body.classList.remove('mode-redundant');
-            document.body.classList.add('mode-dialogue');
+            document.body.classList.add('ns-mode-dialogue');
             this.triggerEditorUpdate();
             new Notice("Dialogue mode: focused");
         }

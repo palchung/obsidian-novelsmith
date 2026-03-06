@@ -2,7 +2,7 @@ import { App, Notice, MarkdownView, TFile } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 import { GenericSuggester, SceneCreateModal } from '../modals';
 import { ST_WARNING, generateSceneId, TEMPLATES_DIR, parseUniversalScenes } from '../utils';
-import NovelSmithPlugin from '../main';
+import NovelSmithPlugin from '../../main';
 
 export class PlotManager {
     app: App;

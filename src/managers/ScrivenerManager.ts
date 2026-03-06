@@ -1,5 +1,5 @@
 // ScrivenerManager.ts
-import { App, Notice, TFile, TFolder, MarkdownView, moment } from 'obsidian';
+import { App, Notice, TFile, TFolder, MarkdownView } from 'obsidian';
 import { parseContent, RE_FILE_ID, DraftCard, ParseResult } from '../utils';
 import { NovelSmithSettings } from '../settings';
 import { ChapterSelectionModal, SimpleConfirmModal } from '../modals';
@@ -208,7 +208,7 @@ export class ScrivenerManager {
         const skippedFiles: string[] = [];
 
         // 🔥 Draft protection 1A：prepare a snapshots before scrivenering
-        const syncTimestamp = moment().format("YYYYMMDD_HHmmss");
+        const syncTimestamp = window.moment().format("YYYYMMDD_HHmmss");
         const snapshotDir = `${this.settings.bookFolderPath}/${HISTORY_DIR}/Sync_Snapshots/${syncTimestamp}`;
         let snapshotDirCreated = false;
         const snapshotPromises: Promise<TFile>[] = [];
@@ -329,7 +329,7 @@ export class ScrivenerManager {
         // 🔥 Execute draft saving
         // =========================================================
         if (this.settings.keepDraftOnSync) {
-            const timestamp = moment().format("YYYYMMDD_HHmmss");
+            const timestamp = window.moment().format("YYYYMMDD_HHmmss");
             const backstageDrafts = `${this.settings.bookFolderPath}/${DRAFTS_DIR}`;
             await ensureFolderExists(this.app, backstageDrafts);
 

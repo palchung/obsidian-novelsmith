@@ -1,6 +1,6 @@
 import { ItemView, WorkspaceLeaf, MarkdownView, Notice, Menu, setIcon } from 'obsidian';
 import Sortable from 'sortablejs';
-import NovelSmithPlugin from '../main';
+import NovelSmithPlugin from '../../main';
 import { SimpleConfirmModal } from '../modals';
 import { createIconButton, isScriveningsDraft, replaceEntireDocument, extractSceneId, cleanSceneTitle, DRAFT_FILENAME, extractSceneColor, getColorById, SCENE_COLORS } from '../utils';
 
@@ -566,7 +566,7 @@ export class StructureView extends ItemView {
             });
 
             this.sortables.push(new Sortable(sceneList, {
-                group: 'scenes', animation: 150, ghostClass: 'sortable-ghost', dragClass: 'sortable-drag',
+                group: 'scenes', animation: 150, ghostClass: 'ns-sortable-ghost', dragClass: 'ns-sortable-drag',
                 delay: 100, delayOnTouchOnly: true,
 
                 onEnd: (evt: unknown) => {

@@ -1,4 +1,4 @@
-import { App, setIcon, Editor } from 'obsidian';
+import { App, setIcon, Editor, TFile } from 'obsidian';
 
 // ============================================================
 // 🛠️ Toolbox: Handles string processing and parsing

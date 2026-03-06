@@ -40,10 +40,10 @@ export const dialogueHighlighter = ViewPlugin.fromClass(class {
     decorations: DecorationSet;
     constructor(view: EditorView) {
         // 🔥 Ultimate Fix: Default to none, create only upon activation to save initial memory
-        this.decorations = document.body.classList.contains('mode-dialogue') ? dialogueMatcher.createDeco(view) : Decoration.none;
+        this.decorations = document.body.classList.contains('ns-mode-dialogue') ? dialogueMatcher.createDeco(view) : Decoration.none;
     }
     update(update: ViewUpdate) {
-        const isModeOn = document.body.classList.contains('mode-dialogue');
+        const isModeOn = document.body.classList.contains('ns-mode-dialogue');
         // If Dialogue Mode is off, hibernate immediately, zero computation cost!
         if (!isModeOn) {
             this.decorations = Decoration.none;
@@ -74,14 +74,14 @@ const structureMatcher = new MatchDecorator({
         if (text.startsWith("# 📄")) {
             // Use mark to change styling (smaller, colored)
             return Decoration.mark({
-                class: "cm-small-header"
+                class: "ns-small-header"
             });
         }
 
         // Case B: ID (<small>++ FILE_ID...)
         // Use mark to change styling (tiny, grey)
         return Decoration.mark({
-            class: "cm-small-id"
+            class: "ns-small-id"
         });
     }
 });

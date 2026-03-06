@@ -1,4 +1,4 @@
-import { App, Notice, TFile, MarkdownView, moment, Editor } from 'obsidian';
+import { App, Notice, TFile, MarkdownView, Editor } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 import { InputModal, GenericSuggester } from '../modals';
 import { parseUniversalScenes, HISTORY_DIR, ensureFolderExists } from '../utils';
@@ -97,7 +97,7 @@ export class HistoryManager {
         await ensureFolderExists(this.app, historyFolder);
 
         let historyFile = this.app.vault.getAbstractFileByPath(targetFilePath);
-        const timestamp = moment().format("YYYY-MM-DD HH:mm");
+        const timestamp = window.moment().format("YYYY-MM-DD HH:mm");
 
         if (!(historyFile instanceof TFile)) {
             // 🔥 YAML Bomb Defusal: Safely handle double quotes in titles, and switch to a more standard list format

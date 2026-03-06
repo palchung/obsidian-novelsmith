@@ -8,13 +8,13 @@
     padding: 0 2px;
 }
 
-body.mode-dialogue .cm-content,
-body.mode-dialogue .markdown-preview-view {
+body.ns-mode-dialogue .cm-content,
+body.ns-mode-dialogue .markdown-preview-view {
     color: var(--text-faint) !important;
     transition: color 0.1s ease;
 }
 
-body.mode-dialogue .cm-dialogue-text {
+body.ns-mode-dialogue .cm-dialogue-text {
     color: var(--text-normal) !important;
     font-weight: 600;
     text-shadow: 0 0 1px var(--text-normal);
@@ -26,7 +26,7 @@ body.mode-dialogue .cm-dialogue-text {
    ============================================================ */
 
 /* 1. File Main Header (# 📄 File name): Elegantly centered, like a physical book chapter */
-.cm-small-header {
+.ns-small-header {
     display: block !important;
     text-align: center !important;
     font-size: var(--h2-size) !important;
@@ -39,7 +39,7 @@ body.mode-dialogue .cm-dialogue-text {
 }
 
 /* 2. Ensure CodeMirror decorators do not interfere with our sacred barriers */
-.cm-small-id {
+.ns-small-id {
     display: none !important;
 }
 
@@ -121,12 +121,12 @@ body.mode-dialogue .cm-dialogue-text {
 }
 
 /* Drag and drop visual effects */
-.sortable-ghost {
+.ns-sortable-ghost {
     opacity: 0.4;
     background-color: var(--interactive-accent);
 }
 
-.sortable-drag {
+.ns-sortable-drag {
     cursor: grabbing;
     transform: scale(1.02);
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);

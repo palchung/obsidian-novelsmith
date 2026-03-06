@@ -1,4 +1,4 @@
-import { App, Notice, MarkdownView, TFile, TFolder, moment } from 'obsidian';
+import { App, Notice, MarkdownView, TFile, TFolder } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 import { SimpleConfirmModal } from '../modals';
 import { replaceEntireDocument, ST_WARNING, isScriveningsDraft, generateSceneId, parseUniversalScenes, getColorById, RE_EXTRACT_ID, DRAFT_FILENAME, BACKSTAGE_DIR, SCENE_DB_FILE, ensureFolderExists } from '../utils';
@@ -207,7 +207,7 @@ export class SceneManager {
 
 
 
-        let dbContent = `---\nTry: Dataview_Target\nUpdated: ${moment().format("YYYY-MM-DD HH:mm:ss")}\n---\n\n# 📊 Scenes Database (Auto-generated)\n> [!warning] Please don't modify this mardown file manually \n\n`;
+        let dbContent = `---\nTry: Dataview_Target\nUpdated: ${window.moment().format("YYYY-MM-DD HH:mm:ss")}\n---\n\n# 📊 Scenes Database (Auto-generated)\n> [!warning] Please don't modify this mardown file manually \n\n`;
         const view = this.app.workspace.getActiveViewOfType(MarkdownView);
 
         for (const file of files) {

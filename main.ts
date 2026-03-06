@@ -1,16 +1,16 @@
 import { MarkdownView, Notice, Plugin, TFile } from 'obsidian';
 import { WorkspaceLeaf } from 'obsidian';
-import { NovelSmithSettings, DEFAULT_SETTINGS, NovelSmithSettingTab } from './settings';
-import { ScrivenerManager } from './managers/ScrivenerManager';
-import { HistoryManager } from './managers/HistoryManager';
-import { WritingManager } from './managers/WritingManager';
-import { PlotManager } from './managers/PlotManager';
-import { WikiManager } from './managers/WikiManager';
-import { CompilerManager } from './managers/CompilerManager';
-import { SceneManager } from './managers/SceneManager';
-import { redundantHighlighter, dialogueHighlighter, structureHighlighter } from './decorators';
-import { StructureView, VIEW_TYPE_STRUCTURE } from './managers/StructureView';
-import { ST_WARNING, DRAFT_FILENAME, BACKSTAGE_DIR, TEMPLATES_DIR, ensureFolderExists, isScriveningsDraft } from './utils';
+import { NovelSmithSettings, DEFAULT_SETTINGS, NovelSmithSettingTab } from './src/settings';
+import { ScrivenerManager } from './src/managers/ScrivenerManager';
+import { HistoryManager } from './src/managers/HistoryManager';
+import { WritingManager } from './src/managers/WritingManager';
+import { PlotManager } from './src/managers/PlotManager';
+import { WikiManager } from './src/managers/WikiManager';
+import { CompilerManager } from './src/managers/CompilerManager';
+import { SceneManager } from './src/managers/SceneManager';
+import { redundantHighlighter, dialogueHighlighter, structureHighlighter } from './src/decorators';
+import { StructureView, VIEW_TYPE_STRUCTURE } from './src/managers/StructureView';
+import { ST_WARNING, DRAFT_FILENAME, BACKSTAGE_DIR, TEMPLATES_DIR, ensureFolderExists, isScriveningsDraft } from './src/utils';
 
 export default class NovelSmithPlugin extends Plugin {
     settings: NovelSmithSettings;
