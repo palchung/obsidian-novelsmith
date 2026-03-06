@@ -197,6 +197,8 @@ export class HistoryManager {
         new Notice("Preview opened (right panel)");
     }
 
+
+
     async restoreVersion(view: MarkdownView) {
         const editor = view.editor;
         const scene = this.getSceneInfoAtCursor(editor);
@@ -208,8 +210,8 @@ export class HistoryManager {
 
         new GenericSuggester(this.app, versions, (item) => item.label, (selectedVersion) => {
             const actions = [
-                { label: "👀 Preview", id: "preview" },
-                { label: "⏪ Restore", id: "restore" }
+                { label: "Preview", id: "preview" },
+                { label: "Restore", id: "restore" }
             ];
             new GenericSuggester(this.app, actions, (action) => action.label, (selectedAction) => {
                 if (selectedAction.id === "preview") {
@@ -221,6 +223,35 @@ export class HistoryManager {
             }).open();
         }).open();
     }
+    // ==========================================
+    // Delete scene version
+    // ==========================================
+    public async deleteVersion(sceneId: string, timestampLabel: string, callback?: () => void) {
+        const historyPath = `${this.settings.bookFolderPath}/${HISTORY_DIR}/${sceneId}.md`;
+        const historyFile = this.app.vault.getAbstractFileByPath(historyPath);
 
+        if (!(historyFile instanceof TFile)) {
+            new Notice(`Backup file not found.`);
+            return;
+        }
+
+        const hContent = await this.app.vault.read(historyFile);
+
+        const escapedLabel = timestampLabel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const verRegex = new RegExp(`> \\[!save\\]- 💾 Ver: ${escapedLabel}\\n(?:> .*\\n?)*`, 'g');
+
+        if (!verRegex.test(hContent)) {
+            new Notice(`Version [${timestampLabel}] not found in backup file.`);
+            return;
+        }
+
+
+        const newContent = hContent.replace(verRegex, '').replace(/\n{3,}/g, '\n\n').trim() + "\n";
+
+        await this.app.vault.modify(historyFile, newContent);
+        new Notice(`Backup deleted: ${timestampLabel}`);
+
+        if (callback) callback();
+    }
 
 }

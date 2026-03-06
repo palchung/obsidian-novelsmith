@@ -640,10 +640,47 @@ export class StructureView extends ItemView {
             header.innerText = ver.label;
             const actions = card.createDiv({ cls: "ns-history-actions" });
 
-            const btnPreview = actions.createEl("button", { text: "Preview" });
-            btnPreview.onclick = () => { void this.plugin.historyManager.showPreview(this.selectedSceneTitle, ver.label, ver.content); };
-            const btnRestore = actions.createEl("button", { text: "Recover" });
-            btnRestore.onclick = () => { this.handleRestore(view, this.selectedSceneId, ver.content); };
+
+
+
+            const btnPreview = createIconButton(actions, "eye", "Preview");
+            btnPreview.addClass("ns-history-btn", "ns-btn-preview");
+            btnPreview.onclick = () => {
+
+                void this.plugin.historyManager.showPreview(this.selectedSceneTitle, ver.label, ver.content);
+            };
+
+
+            const btnRestore = createIconButton(actions, "history", "Recover");
+            btnRestore.addClass("ns-history-btn", "ns-btn-recover");
+            btnRestore.onclick = () => {
+                new SimpleConfirmModal(
+                    this.plugin.app,
+                    `Are you sure to recover version [${ver.label}]?\n\nThis will overwrite the current scene content in your editor. You can always use ctrl+z to undo if you make a mistake.`,
+                    () => {
+                        this.handleRestore(view, this.selectedSceneId, ver.content);
+                    }
+                ).open();
+            };
+
+
+            const btnDelete = createIconButton(actions, "trash-2", "");
+            btnDelete.addClass("ns-history-btn", "ns-btn-delete");
+            btnDelete.setAttribute("aria-label", "Delete backup");
+            btnDelete.onclick = () => {
+                new SimpleConfirmModal(
+                    this.plugin.app,
+                    `Are you sure to delete this backup version [${ver.label}]?\n\nThis action cannot be undone.`,
+                    async () => {
+                        await this.plugin.historyManager.deleteVersion(this.selectedSceneId, ver.label, () => {
+
+                            void this.parseAndRender();
+                        });
+                    }
+                ).open();
+            };
+
+
         }
     }
 

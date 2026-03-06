@@ -107,35 +107,24 @@ export class ScrivenerManager {
 
         for (const file of files) {
             const content = await this.app.vault.read(file);
-            const lines = content.split("\n");
+
+
+            const parsedData = parseContent(content, true, this.app, file);
 
             contentChunks.push(`\n\n# 📄 ${file.name}\n`);
-            contentChunks.push(`<span class="ns-file-id">++ FILE_ID: ${file.name} ++</span>\n`);
+            contentChunks.push(`<span class="ns-file-id">++ FILE_ID: ${file.name} ++</span>\n\n`);
 
-            let isMeta = false;
-            let buffer: string[] = [];
 
-            for (const line of lines) {
-                const l = line.trim();
-                if (l.startsWith("######")) {
-                    if (buffer.length > 0) { contentChunks.push(buffer.join("\n").trimEnd() + "\n\n"); buffer = []; }
-                    contentChunks.push(`${l}\n\n`);
-                    isMeta = true;
-                } else if (isMeta) {
-                    // 🔥 P0 Repair：Prevent removing Blockquote！
-                    if (l.startsWith("> [!NSmith") || l.startsWith("> [!info") || l.startsWith("> -") || l === ">") {
-                        continue;
-                    } else if (l === "") {
-                        continue;
-                    } else {
-                        isMeta = false;
-                        buffer.push(line);
-                    }
-                } else {
-                    buffer.push(line);
-                }
+            if (parsedData.preamble) {
+                contentChunks.push(`${parsedData.preamble}\n\n`);
             }
-            if (buffer.length > 0) contentChunks.push(buffer.join("\n").trimEnd() + "\n");
+
+
+            for (const card of parsedData.cards) {
+                contentChunks.push(`${card.rawHeader}\n`);
+                if (card.meta.length > 0) contentChunks.push(`${card.meta.join("\n")}\n`);
+                contentChunks.push(`\n${card.body}\n\n`);
+            }
         }
 
         const fullContent = contentChunks.join("");
@@ -198,7 +187,7 @@ export class ScrivenerManager {
         await Promise.all(allFolderFiles.map(async (file) => {
             const text = await this.app.vault.read(file);
             fileContentCache.set(file.name, { file: file, text: text });
-            const data = parseContent(text, true);
+            const data = parseContent(text, true, this.app, file);
             parsedOriginalCache.set(file.name, data);
             data.cards.forEach(card => { if (card.id) globalIdMap.set(card.id, card); });
         }));
@@ -251,12 +240,27 @@ export class ScrivenerManager {
 
             const localTitleMap = new Map<string, DraftCard>();
 
-            originalData.cards.forEach((card: unknown) => localTitleMap.set(card.key, card));
+            originalData.cards.forEach((card) => localTitleMap.set(card.key, card));
 
 
             const chunks: string[] = [];
 
-            if (originalData.headers.trim()) chunks.push(originalData.headers.trim() + "\n\n");
+            // =======================================================
+            // Combine YAML + preamble + scene content
+            // =======================================================
+
+
+            if (originalData.yaml) {
+                chunks.push(originalData.yaml + "\n\n");
+            }
+
+
+            if (draftData.preamble) {
+                chunks.push(draftData.preamble + "\n\n");
+            }
+
+
+
 
             for (const draftCard of draftData.cards) {
                 let originalCard: DraftCard | undefined;

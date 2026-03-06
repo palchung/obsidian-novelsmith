@@ -70,7 +70,8 @@ export interface DraftCard {
 }
 
 export interface ParseResult {
-    headers: string;
+    yaml: string;
+    preamble: string;
     cards: DraftCard[];
 }
 
@@ -81,23 +82,50 @@ export const normalizeHeader = (header: string): string => {
 };
 
 // 4. Core Parser
-export const parseContent = (text: string, isOriginal: boolean = false): ParseResult => {
-    const lines = text.split("\n");
-    const cards: DraftCard[] = [];
+export const parseContent = (text: string, isOriginal: boolean = false, app?: App, file?: TFile): ParseResult => {
+    let yamlBlock = "";
+    let contentAfterYaml = text;
+
+    // =======================================================
+    // call Obsidian API to split YAML out from draft
+    // =======================================================
+    if (app && file) {
+        const cache = app.metadataCache.getFileCache(file);
+        if (cache && cache.frontmatterPosition) {
+            const startPos = cache.frontmatterPosition.start.offset;
+            const endPos = cache.frontmatterPosition.end.offset;
+
+            yamlBlock = text.substring(startPos, endPos);
+            contentAfterYaml = text.substring(endPos).trimStart();
+        }
+    } else {
+
+        const yamlMatch = text.match(/^---\n[\s\S]*?\n---\n/);
+        if (yamlMatch) {
+            yamlBlock = yamlMatch[0].trimEnd();
+            contentAfterYaml = text.substring(yamlMatch[0].length).trimStart();
+        }
+    }
+
+    // =======================================================
+    // Split Preamble and scene card content
+    // =======================================================
+    const lines = contentAfterYaml.split("\n");
+    let cards: DraftCard[] = [];
     let currentHeaderRaw: string | null = null;
     let currentBodyLines: string[] = [];
     let currentMeta: string[] = [];
-    const fileHeaders: string[] = [];
+    let preambleLines: string[] = [];
+
     let isCollectingMeta = false;
     let hasHitFirstCard = false;
 
     const flushCard = () => {
         if (currentHeaderRaw) {
             let cleanBody = currentBodyLines.join("\n").trim();
-
             if (!isOriginal) {
                 cleanBody = cleanBody.replace(RE_HIGHLIGHT, "").replace(RE_SEPARATOR, "");
-                const tempLines = cleanBody.split("\n");
+                let tempLines = cleanBody.split("\n");
                 while (tempLines.length > 0) {
                     const l = tempLines[0].trim();
                     if (l.startsWith(">")) tempLines.shift();
@@ -105,17 +133,12 @@ export const parseContent = (text: string, isOriginal: boolean = false): ParseRe
                 }
                 cleanBody = tempLines.join("\n").trimEnd();
             } else {
-                // 🔥 Original manuscript also switched to trimEnd()
                 cleanBody = cleanBody.trimEnd();
             }
-
-            // 🔥 Attempt to extract ID
             const idMatch = currentHeaderRaw.match(RE_EXTRACT_ID);
-            const id = idMatch ? idMatch[1].trim() : undefined;
-
             cards.push({
                 key: normalizeHeader(currentHeaderRaw),
-                id: id, // 🔥 Store ID
+                id: idMatch ? idMatch[1].trim() : undefined,
                 rawHeader: currentHeaderRaw,
                 meta: [...currentMeta],
                 body: cleanBody
@@ -141,12 +164,9 @@ export const parseContent = (text: string, isOriginal: boolean = false): ParseRe
             isCollectingMeta = true;
         } else if (hasHitFirstCard) {
             if (isCollectingMeta) {
-                // 🔥 P0 Fix: Accurately identify attributes to protect body text's Blockquote!
                 if (trimLine.startsWith("> [!NSmith") || trimLine.startsWith("> [!info") || trimLine.startsWith("> -") || trimLine === ">") {
                     currentMeta.push(line);
-                } else if (trimLine === "") {
-                    // Skip blank lines between attributes and body text, but do not treat them as body text
-                } else {
+                } else if (trimLine !== "") {
                     isCollectingMeta = false;
                     currentBodyLines.push(line);
                 }
@@ -154,11 +174,17 @@ export const parseContent = (text: string, isOriginal: boolean = false): ParseRe
                 currentBodyLines.push(line);
             }
         } else {
-            if (trimLine !== "") fileHeaders.push(line);
+
+            preambleLines.push(line);
         }
     }
     flushCard();
-    return { headers: fileHeaders.join("\n"), cards: cards };
+
+    return {
+        yaml: yamlBlock,
+        preamble: preambleLines.join("\n").trimEnd(),
+        cards: cards
+    };
 };
 
 // ============================================================

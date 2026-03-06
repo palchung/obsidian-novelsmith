@@ -1,5 +1,5 @@
 /* ============================================================
-   🔍 Redundant words and Dialogue mode (remains unchanged)
+   Redundant words and Dialogue mode (remains unchanged)
    ============================================================ */
 .cm-redundant-text {
     background-color: rgba(255, 80, 80, 0.25);
@@ -242,6 +242,32 @@ body.mode-dialogue .cm-dialogue-text {
     padding: 2px 5px;
 }
 
+/* ============================================================ */
+/* History Panel Buttons (Preview, Recover, Delete)         */
+/* ============================================================ */
+
+.ns-history-btn {
+    background-color: transparent !important;
+    box-shadow: none !important;
+    color: var(--text-muted) !important;
+    padding: 4px 8px !important;
+    cursor: pointer;
+    transition: color 0.15s ease-in-out;
+}
+
+.ns-history-btn.ns-btn-preview:hover {
+    color: var(--text-normal) !important;
+}
+
+.ns-history-btn.ns-btn-recover:hover {
+    color: var(--text-accent) !important;
+}
+
+.ns-history-btn.ns-btn-delete:hover {
+    color: var(--text-error) !important;
+}
+
+
 /* ============================================================
    🏷️ Exclusive Scene Card Callout: [!NSmith]
    ============================================================ */
@@ -278,7 +304,7 @@ body.mode-dialogue .cm-dialogue-text {
 
 /* 4. Use CSS pseudo-elements to magically conjure a warning divider! */
 .ns-file-id::before {
-    content: "━━━━━━━━ ✂️ System File Boundary ‧ Do Not Delete ✂️ ━━━━━━━━";
+    content: "━━━━━━━━ System File Boundary ‧ Do Not Delete ━━━━━━━━";
     font-size: 12px;
     color: var(--text-faint);
     letter-spacing: 2px;
