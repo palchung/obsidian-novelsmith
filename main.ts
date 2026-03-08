@@ -8,9 +8,11 @@ import { PlotManager } from './src/managers/PlotManager';
 import { WikiManager } from './src/managers/WikiManager';
 import { CompilerManager } from './src/managers/CompilerManager';
 import { SceneManager } from './src/managers/SceneManager';
+import { DashboardManager } from './src/managers/DashboardManager';
 import { redundantHighlighter, dialogueHighlighter, structureHighlighter } from './src/decorators';
 import { StructureView, VIEW_TYPE_STRUCTURE } from './src/managers/StructureView';
 import { ST_WARNING, DRAFT_FILENAME, BACKSTAGE_DIR, TEMPLATES_DIR, ensureFolderExists, isScriveningsDraft } from './src/utils';
+import { DashboardBuilderModal } from './src/modals';
 
 export default class NovelSmithPlugin extends Plugin {
     settings: NovelSmithSettings;
@@ -22,6 +24,7 @@ export default class NovelSmithPlugin extends Plugin {
     wikiManager: WikiManager;
     compilerManager: CompilerManager;
     sceneManager: SceneManager;
+    dashboardManager: DashboardManager;
 
     // 🔥 Safeguard System: Record the last warning time (for cooldown)
     lastDraftWarningTime: number = 0;
@@ -42,6 +45,7 @@ export default class NovelSmithPlugin extends Plugin {
         this.wikiManager = new WikiManager(this.app, this.settings);
         this.compilerManager = new CompilerManager(this.app, this.settings);
         this.sceneManager = new SceneManager(this.app, this.settings);
+        this.dashboardManager = new DashboardManager(this.app, this.settings);
 
         this.registerEditorExtension([redundantHighlighter, dialogueHighlighter, structureHighlighter]);
 
@@ -106,7 +110,33 @@ export default class NovelSmithPlugin extends Plugin {
             })
         );
 
+        // =================================================================
+        // 📊 Dashboard Widget Generator Command
+        // =================================================================
+        this.addCommand({
+            id: 'insert-dashboard-widget',
+            name: 'Analytics: insert data dashboard chart',
+            icon: 'bar-chart-3',
+            editorCallback: async (editor, view) => {
+                // 1. Scan Database for attributes
+                const availableAttributes = await this.dashboardManager.getAvailableAttributes();
 
+                if (availableAttributes.length === 0) return;
+
+                // 2. Show modal
+                new DashboardBuilderModal(this.app, availableAttributes, (config) => {
+
+                    // 3. generate code of chart
+                    const generatedCode = this.dashboardManager.generateDashboardCode(config);
+
+                    // 4. insert the chart
+                    editor.replaceSelection(generatedCode + "\n\n");
+
+                    new Notice("Success, please enable dataview in setting.");
+
+                }).open();
+            }
+        });
 
 
 
@@ -202,7 +232,7 @@ export default class NovelSmithPlugin extends Plugin {
             id: 'save-scene-version',
             name: 'Atomic save: current scene',
             icon: 'save',
-            // 🔥 改用 editorCallback，強制鎖定呼叫指令時的游標位置
+
             editorCallback: (editor, view) => {
                 if (this.checkInBookFolder(view.file)) {
                     this.historyManager.saveVersion(view);
@@ -399,7 +429,7 @@ export default class NovelSmithPlugin extends Plugin {
                     await leaf.openFile(newFile);
                     new Notice("This is your exclusive scene card template!\nYou can modify it now (e.g., add or remove attributes). Once set, clicking 'insert scene card' will use this new format!", 10000);
                 } else if (forceShowNotice) {
-                    new Notice(`✅ Successfully generated template: ${tplPath}`);
+                    new Notice(`Successfully generated template: ${tplPath}`);
                 }
             } catch (e) {
                 console.error("Failed to create template file (please check the path)", e);
@@ -407,6 +437,46 @@ export default class NovelSmithPlugin extends Plugin {
             }
         } else {
             if (forceShowNotice) new Notice(`Template already exists (${tplPath}). To avoid overwriting your custom settings, system generation stopped.`);
+        }
+    }
+
+    // =================================================================
+    // AutoWiki Template Generator (Phase 1)
+    // =================================================================
+    // =================================================================
+    // AutoWiki Template Generator
+    // =================================================================
+    public async ensureWikiTemplateExists(categoryName: string, forceShowNotice: boolean = true) {
+        if (!categoryName || categoryName.trim() === "") {
+            new Notice("Please enter a 'category name' first before generating template!");
+            return;
+        }
+
+
+        const primaryName = categoryName.split(/[,，、]/)[0].trim();
+
+        const folderPath = `${this.settings.bookFolderPath}/${TEMPLATES_DIR}`;
+        const tplPath = `${folderPath}/${primaryName}.md`;
+
+        await ensureFolderExists(this.app, folderPath);
+
+        const file = this.app.vault.getAbstractFileByPath(tplPath);
+        if (!file) {
+            const defaultTemplate = `# {{WikiName}}\n\n> [!info] ${primaryName} Info\n> - Tags:: #${primaryName}\n> - Note:: \n\nWrite the details of this ${primaryName} here...`;
+            try {
+                const newFile = await this.app.vault.create(tplPath, defaultTemplate);
+
+                if (newFile instanceof TFile) {
+                    const leaf = this.app.workspace.getLeaf('split', 'vertical');
+                    await leaf.openFile(newFile);
+                    if (forceShowNotice) new Notice(`Generated template for [${primaryName}]!`, 8000);
+                }
+            } catch (e) {
+                console.error(`Failed to create template for ${primaryName}`, e);
+                if (forceShowNotice) new Notice(`Failed to create template, please check if the vault path is valid.`);
+            }
+        } else {
+            if (forceShowNotice) new Notice(`Template already exists (${tplPath}). System generation stopped to prevent overwrite.`);
         }
     }
 

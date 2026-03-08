@@ -2,6 +2,7 @@
 import tsparser from "@typescript-eslint/parser";
 import { defineConfig } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
+import globals from "globals";
 
 export default defineConfig([
     ...obsidianmd.configs.recommended,
@@ -10,12 +11,18 @@ export default defineConfig([
         languageOptions: {
             parser: tsparser,
             parserOptions: { project: "./tsconfig.json" },
+            globals: {
+                ...globals.browser,
+                ...globals.node,
+                myCustomGlobal: "readonly",
+            },
         },
 
         // You can add your own configuration to override or add rules
         rules: {
 
         },
+
     },
     {
         // 忽略檢查編譯後嘅檔案

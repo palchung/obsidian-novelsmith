@@ -1,18 +1,28 @@
 import { App, PluginSettingTab, Setting, Notice, setIcon } from 'obsidian';
 import NovelSmithPlugin from './../main';
 
+
+
+export interface WikiCategory {
+    name: string;       // e.g Location
+    folderPath: string; // path to Location
+}
+
+
 export interface NovelSmithSettings {
     bookFolderPath: string;
     keepDraftOnSync: boolean; // Keep drafts during scrivenings sync
     wikiFolderPath: string;
     exportFolderPath: string;
+    wikiCategories: WikiCategory[];
 }
 
 export const DEFAULT_SETTINGS: NovelSmithSettings = {
     bookFolderPath: '',
     keepDraftOnSync: false,
+    exportFolderPath: '',
     wikiFolderPath: '',
-    exportFolderPath: ''
+    wikiCategories: []
 }
 
 export class NovelSmithSettingTab extends PluginSettingTab {
@@ -90,19 +100,80 @@ export class NovelSmithSettingTab extends PluginSettingTab {
                 }));
 
         // ==========================================
-        // 🧠 AutoWiki
+        // AutoWiki (Dynamic World Bible)
         // ==========================================
-        new Setting(containerEl).setName("Auto wiki").setHeading();
+        new Setting(containerEl).setName("Auto wiki categories").setHeading();
+        containerEl.createEl('p', {
+            text: 'Configure your worldbuilding categories here. The "category name" must match exactly the attribute key in your scene cards (e.g., "player" or "character").',
+            cls: 'setting-item-description'
+        });
+
+
+        this.plugin.settings.wikiCategories.forEach((category, index) => {
+            const box = containerEl.createDiv({ cls: "ns-wiki-category-box" });
+            box.setCssStyles({
+                border: "1px solid var(--background-modifier-border)",
+                padding: "15px",
+                marginBottom: "15px",
+                borderRadius: "8px",
+                backgroundColor: "var(--background-secondary-alt)"
+            });
+
+            const headerRow = box.createDiv();
+            headerRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" });
+            new Setting(headerRow).setName("").setHeading();
+
+            const btnDelete = headerRow.createEl("button");
+            setIcon(btnDelete, "trash-2");
+            btnDelete.setCssStyles({ color: "var(--text-error)", backgroundColor: "transparent", boxShadow: "none" });
+            btnDelete.onclick = async () => {
+                this.plugin.settings.wikiCategories.splice(index, 1);
+                await this.plugin.saveSettings();
+                this.display();
+            };
+
+            // input field
+            new Setting(box)
+                .setName('Category name')
+                .setDesc('E.g., characters, location, magic')
+                .addText(text => text
+                    .setPlaceholder('Characters')
+                    .setValue(category.name)
+                    .onChange(async (value) => {
+                        category.name = value;
+                        await this.plugin.saveSettings();
+                    }));
+
+
+            new Setting(box)
+                .setName('Storage folder')
+                .setDesc('Any path in your vault (e.g., mybook/characters)')
+                .addText(text => text
+                    .setPlaceholder('Mybook/characters')
+                    .setValue(category.folderPath)
+                    .onChange(async (value) => {
+                        category.folderPath = value;
+                        await this.plugin.saveSettings();
+                    }));
+
+
+            const btnRow = box.createDiv();
+            btnRow.setCssStyles({ display: "flex", justifyContent: "flex-end", marginTop: "10px" });
+            const btnTemplate = btnRow.createEl("button", { text: "Generate template" });
+            btnTemplate.onclick = () => {
+                void this.plugin.ensureWikiTemplateExists(category.name);
+            };
+        });
+
 
         new Setting(containerEl)
-            .setName('Wiki storage folder')
-            .setDesc('Newly created character/setting cards will automatically be placed in this folder.')
-            .addText(text => text
-                .setPlaceholder('Mybook/wiki')
-                .setValue(this.plugin.settings.wikiFolderPath)
-                .onChange(async (value) => {
-                    this.plugin.settings.wikiFolderPath = value;
+            .addButton(btn => btn
+                .setButtonText('Add wiki category')
+                .setCta()
+                .onClick(async () => {
+                    this.plugin.settings.wikiCategories.push({ name: "", folderPath: "" });
                     await this.plugin.saveSettings();
+                    this.display();
                 }));
 
         // ==========================================

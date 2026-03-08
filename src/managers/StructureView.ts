@@ -1,7 +1,7 @@
-import { ItemView, WorkspaceLeaf, MarkdownView, Notice, Menu, setIcon } from 'obsidian';
+import { ItemView, WorkspaceLeaf, MarkdownView, Notice, Menu, setIcon, MarkdownRenderer, TFolder, TFile } from 'obsidian';
 import Sortable from 'sortablejs';
 import NovelSmithPlugin from '../../main';
-import { SimpleConfirmModal } from '../modals';
+import { SimpleConfirmModal, DashboardBuilderModal } from '../modals';
 import { createIconButton, isScriveningsDraft, replaceEntireDocument, extractSceneId, cleanSceneTitle, DRAFT_FILENAME, extractSceneColor, getColorById, SCENE_COLORS } from '../utils';
 
 
@@ -44,12 +44,24 @@ export class StructureView extends ItemView {
 
 
 
-    // 🔥 Performance Optimization：record outline hash
+
     private lastOutlineHash: string = "";
 
-    // 🔥 Prevent Ghost Click
+
     private isMenuClicking: boolean = false;
     private renderTimer: number | null = null;
+
+
+    private currentWikiFile: TFile | null = null;
+    private wikiUpdateTimer: number | null = null;
+
+
+    private activeWikiNoteToRestore: { name: string, folder: string } | null = null;
+
+
+    private lastInfoTitle: string | null = null;
+    private lastInfoHash: string = "";
+
 
     private activeTab: 'outline' | 'history' | 'info' = 'outline';
     private selectedSceneId: string | null = null;
@@ -96,7 +108,37 @@ export class StructureView extends ItemView {
                 this.renderTimer = window.setTimeout(() => { void this.parseAndRender(); }, 500);
             }
         }));
-        this.registerDomEvent(document, 'mouseup', () => {
+
+        this.registerEvent(this.app.vault.on('modify', (file) => {
+
+            if (file instanceof TFile && this.activeTab === 'info' && this.currentWikiFile && file.path === this.currentWikiFile.path) {
+
+
+                if (this.wikiUpdateTimer) window.clearTimeout(this.wikiUpdateTimer);
+
+
+                this.wikiUpdateTimer = window.setTimeout(() => {
+                    void (async () => {
+                        const container = this.contentEl.querySelector(".ns-wiki-content-wrapper");
+                        if (container && this.currentWikiFile) {
+                            container.empty();
+
+                            const content = await this.app.vault.read(this.currentWikiFile);
+                            const contentDiv = container.createDiv("markdown-rendered");
+                            contentDiv.setCssStyles({ padding: "0 5px", fontSize: "0.95em" });
+
+                            void MarkdownRenderer.render(this.app, content, contentDiv, this.currentWikiFile.path, this);
+                        }
+                    })();
+                }, 1000);
+            }
+        }));
+        this.registerDomEvent(document, 'mouseup', (e: MouseEvent) => {
+
+            if (this.contentEl.contains(e.target as Node)) {
+                return;
+            }
+
             if (this.activeTab === 'history' || this.activeTab === 'info') {
                 window.setTimeout(() => {
                     void this.parseAndRender();
@@ -129,7 +171,14 @@ export class StructureView extends ItemView {
 
         // 🔥 Include try...finally
         try {
-            const container = this.contentEl.querySelector(".ns-structure-container") as HTMLElement;
+            const activeFile = this.app.workspace.getActiveFile();
+
+
+            if (this.activeTab === 'info' && this.currentWikiFile && activeFile && activeFile.path === this.currentWikiFile.path) {
+                return;
+            }
+
+            const container = this.contentEl.querySelector(".ns-structure-container");
             if (!container) return;
 
             const view = this.getValidMarkdownView();
@@ -137,20 +186,72 @@ export class StructureView extends ItemView {
             if (view && this.activeTab === 'outline') {
                 const editor = view.editor;
 
-                // 🚀 秘技 1：一次過抽晒全文，快過逐行 getLine 幾十倍
+
                 const text = editor.getValue();
 
-                // 🚀 秘技 2：用 Regex 精準捕捉「章節」、「場景」同「屬性 Callout」
-                // 條件解說：開頭係 `# 📄` 或者 `######` 或者 `> [!NSmith` 或者 `> -` 嘅行
+
                 const matches = text.match(/^(?:# 📄|######|> \[!NSmith|> -).*$/gm);
 
-                // 將所有捉到嘅結構文字連埋一齊做指紋
+
                 const hashBuilder = matches ? matches.join("|") : "";
 
-                // 🛡️ 智能攔截：如果指紋無變，代表只係改咗正文，即刻截停 DOM 重繪！
+
                 if (hashBuilder === this.lastOutlineHash) return;
                 this.lastOutlineHash = hashBuilder;
             }
+
+
+
+            if (view && this.activeTab === 'info') {
+                const editor = view.editor;
+                const cursor = editor.getCursor();
+                let foundTitle = null;
+                let startLine = -1;
+
+                // look for title
+                for (let i = cursor.line; i >= 0; i--) {
+                    const line = editor.getLine(i);
+                    if (line.trim().startsWith("######")) {
+                        foundTitle = cleanSceneTitle(line);
+                        startLine = i;
+                        break;
+                    }
+                }
+
+                // look for attributes
+                if (foundTitle && startLine !== -1) {
+                    const metaLines: string[] = [];
+                    for (let i = startLine + 1; i < editor.lineCount(); i++) {
+                        const line = editor.getLine(i).trim();
+                        if (line.startsWith("######") || line.includes("++ FILE_ID")) break;
+                        if (line.startsWith(">")) {
+                            const cleanLine = line.substring(1).trim();
+                            if (cleanLine.startsWith("[!NSmith") || cleanLine.startsWith("[!info]")) continue;
+                            metaLines.push(cleanLine);
+                        } else if (line !== "" && metaLines.length > 0) {
+                            break;
+                        }
+                    }
+                    const currentInfoHash = metaLines.join("|");
+
+
+                    if (this.lastInfoTitle === foundTitle && this.lastInfoHash === currentInfoHash) {
+                        return;
+                    }
+                    this.lastInfoTitle = foundTitle;
+                    this.lastInfoHash = currentInfoHash;
+                } else {
+                    if (this.lastInfoTitle === null) return;
+                    this.lastInfoTitle = null;
+                    this.lastInfoHash = "";
+                }
+            }
+
+
+
+
+
+
 
             container.empty();
             this.renderHeader(container, view);
@@ -343,48 +444,73 @@ export class StructureView extends ItemView {
             }
         };
 
+
         const btnTools = createIconButton(btnRow2, "wrench", "Tools");
         btnTools.onclick = (e: MouseEvent) => {
             const currentView = this.getValidMarkdownView();
-            if (!currentView || !this.plugin.checkInBookFolder(currentView.file)) return;
 
-            // Create Obsidian option list
+
+            if (!currentView) return;
+
+
+            const isInBookFolder = this.plugin.checkInBookFolderSilent(currentView.file);
+
             const menu = new Menu();
 
-            menu.addItem((item) => {
-                item.setTitle("Typo correction")
-                    .setIcon("pencil")
-                    .onClick(() => { void this.plugin.writingManager.correctNames(currentView); });
-            });
+
+            if (isInBookFolder) {
+                menu.addItem((item) => {
+                    item.setTitle("Typo correction")
+                        .setIcon("pencil")
+                        .onClick(() => { void this.plugin.writingManager.correctNames(currentView); });
+                });
+
+                menu.addItem((item) => {
+                    item.setTitle("Clean draft")
+                        .setIcon("eraser")
+                        .onClick(() => { this.plugin.writingManager.cleanDraft(currentView); });
+                });
+
+                menu.addSeparator();
+
+                menu.addItem((item) => {
+                    item.setTitle("Dialogue mode")
+                        .setIcon("message-circle")
+                        .onClick(() => { this.plugin.writingManager.toggleDialogueMode(currentView); });
+                });
+
+                menu.addItem((item) => {
+                    item.setTitle("Redundant mode")
+                        .setIcon("search")
+                        .onClick(() => { void this.plugin.writingManager.toggleRedundantMode(currentView); });
+                });
+
+                menu.addSeparator();
+
+                menu.addItem((item) => {
+                    item.setTitle("Auto wiki")
+                        .setIcon("book")
+                        .onClick(() => { void this.plugin.wikiManager.scanAndCreateWiki(currentView); });
+                });
+
+                menu.addSeparator();
+            }
+
 
             menu.addItem((item) => {
-                item.setTitle("Clean draft")
-                    .setIcon("eraser")
-                    .onClick(() => { this.plugin.writingManager.cleanDraft(currentView); });
+                item.setTitle("Insert dashboard")
+                    .setIcon("bar-chart-3")
+                    .onClick(async () => {
+                        const availableAttributes = await this.plugin.dashboardManager.getAvailableAttributes();
+                        if (availableAttributes.length === 0) return;
+
+                        new DashboardBuilderModal(this.plugin.app, availableAttributes, (config) => {
+                            const generatedCode = this.plugin.dashboardManager.generateDashboardCode(config);
+                            currentView.editor.replaceSelection(generatedCode + "\n\n");
+                            new Notice("Dashboard inserted! (ensure dataview is enabled to see the render)");
+                        }).open();
+                    });
             });
-
-            menu.addSeparator();
-
-            menu.addItem((item) => {
-                item.setTitle("Dialogue mode")
-                    .setIcon("message-circle")
-                    .onClick(() => { this.plugin.writingManager.toggleDialogueMode(currentView); });
-            });
-
-            menu.addItem((item) => {
-                item.setTitle("Redundant mode")
-                    .setIcon("search")
-                    .onClick(() => { void this.plugin.writingManager.toggleRedundantMode(currentView); });
-            });
-
-            menu.addSeparator();
-
-            menu.addItem((item) => {
-                item.setTitle("Auto wiki")
-                    .setIcon("book")
-                    .onClick(() => { void this.plugin.wikiManager.scanAndCreateWiki(currentView); });
-            });
-
 
             menu.showAtMouseEvent(e);
         };
@@ -405,8 +531,17 @@ export class StructureView extends ItemView {
         // 2. Info Tab
         const tabInfo = createIconButton(tabsRow, "info", "Info");
         tabInfo.className = "ns-tab-btn" + (this.activeTab === 'info' ? " is-active" : "");
-        tabInfo.onclick = () => { this.activeTab = 'info'; void this.parseAndRender(); };
+        tabInfo.onclick = () => {
+            this.activeTab = 'info';
 
+            this.activeWikiNoteToRestore = null;
+            this.currentWikiFile = null;
+
+            this.lastInfoTitle = null;
+            this.lastInfoHash = "";
+
+            void this.parseAndRender();
+        };
         // 3. Backup Tab
         const tabHistory = createIconButton(tabsRow, "history", "Backup");
         tabHistory.className = "ns-tab-btn" + (this.activeTab === 'history' ? " is-active" : "");
@@ -572,7 +707,7 @@ export class StructureView extends ItemView {
                 group: 'scenes', animation: 150, ghostClass: 'ns-sortable-ghost', dragClass: 'ns-sortable-drag',
                 delay: 100, delayOnTouchOnly: true,
 
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
                 onEnd: (evt: unknown) => {
 
                     if (evt.newIndex !== evt.oldIndex || evt.from !== evt.to) this.saveChanges(container, view);
@@ -688,91 +823,75 @@ export class StructureView extends ItemView {
         }
     }
 
+    // =========================================================
+    // Info Tab
+    // =========================================================
     renderInfo(container: HTMLElement, view: MarkdownView) {
         const editor = view.editor;
         const cursor = editor.getCursor();
         let foundTitle = null;
         let startLine = -1;
 
+        // 1. search current scene
         for (let i = cursor.line; i >= 0; i--) {
             const line = editor.getLine(i);
             if (line.trim().startsWith("######")) {
-
-
                 foundTitle = cleanSceneTitle(line);
-
-
                 startLine = i;
                 break;
             }
         }
 
         if (!foundTitle || startLine === -1) {
-            const hint = container.createDiv({ cls: "ns-history-card" });
-            hint.setCssProps({ textAlign: "center" }); hint.setCssProps({ opacity: "0.6" });
-            hint.innerText = "Please put cursor on scene content before scene info to be shown.";
+            container.createDiv({ text: "Please put cursor on scene content before scene info to be shown.", cls: "ns-history-card", attr: { style: "text-align: center; opacity: 0.6;" } });
             return;
         }
 
-        const titleEl = container.createEl("h4");
-
-        titleEl.setCssStyles({
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            color: "var(--text-accent)",
-            marginBottom: "12px",
-            borderBottom: "1px solid var(--background-modifier-border)",
-            paddingBottom: "8px"
-        });
-
-
-        const iconSpan = titleEl.createSpan();
-
-        setIcon(iconSpan, "clapperboard");
-        iconSpan.setCssStyles({
-            display: "flex",
-            alignItems: "center",
-            opacity: "0.8"
-        });
-
-
-        titleEl.createSpan({ text: foundTitle });
-
-
+        // 2. extract current scene Metadata
         const metaLines: string[] = [];
         const lineCount = editor.lineCount();
         for (let i = startLine + 1; i < lineCount; i++) {
             const line = editor.getLine(i).trim();
-
             if (line.startsWith("######") || line.includes("++ FILE_ID")) break;
 
             if (line.startsWith(">")) {
                 const cleanLine = line.substring(1).trim();
-
                 if (cleanLine.startsWith("[!NSmith") || cleanLine.startsWith("[!info]")) continue;
                 metaLines.push(cleanLine);
-            } else if (line === "" && metaLines.length > 0) {
-                metaLines.push("");
             } else if (line !== "" && metaLines.length > 0) {
                 break;
             }
         }
 
+
+
+
+
+        // ==========================================
+        // 🏗️ Info page layer
+        // ==========================================
+        const layer1 = container.createDiv({ cls: "ns-info-layer-list" });
+        const layer2 = container.createDiv({ cls: "ns-info-layer-reader" });
+        layer2.hide();
+
+        // --- draw Layer 1：attribute layer ---
+        const titleEl = layer1.createEl("h4");
+        titleEl.setCssStyles({ display: "flex", alignItems: "center", gap: "8px", color: "var(--text-accent)", marginBottom: "12px", borderBottom: "1px solid var(--background-modifier-border)", paddingBottom: "8px" });
+        const iconSpan = titleEl.createSpan();
+        setIcon(iconSpan, "clapperboard");
+        titleEl.createSpan({ text: foundTitle });
+
+        const infoBox = layer1.createDiv({ cls: "ns-chapter-box" });
+        infoBox.setCssStyles({ backgroundColor: "var(--background-secondary)", padding: "12px", borderRadius: "6px", border: "1px solid var(--background-modifier-border)" });
+
         if (metaLines.length === 0 || metaLines.every(l => l === "")) {
-            const hint = container.createDiv({ cls: "ns-history-card" });
-            hint.setCssProps({ textAlign: "center" }); hint.setCssProps({ opacity: "0.6" });
-            hint.innerText = "This scene do not have any info.";
+            infoBox.createDiv({ text: "No scene info to display", attr: { style: "opacity: 0.6; text-align: center; font-style: italic;" } });
             return;
         }
 
-
-        const infoBox = container.createDiv({ cls: "ns-chapter-box" });
-        infoBox.setCssProps({ backgroundColor: "var(--background-primary)" });
-
         metaLines.forEach(line => {
             if (line.trim() === "") {
-                infoBox.createDiv({ text: " " }).setCssProps({ height: "10px" });
+                infoBox.createDiv({ text: " " }).setCssStyles({ height: "10px" });
                 return;
             }
 
@@ -782,25 +901,167 @@ export class StructureView extends ItemView {
                 const value = parts.slice(1).join("::").trim();
 
                 const row = infoBox.createDiv();
-                row.setCssProps({ marginBottom: "8px" });
-                row.setCssProps({ lineHeight: "1.5" });
+                row.setCssStyles({ marginBottom: "8px", lineHeight: "1.5", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px" });
+
 
                 const keyEl = row.createSpan();
                 keyEl.innerText = `${key} : `;
-                keyEl.setCssProps({ fontWeight: "bold" });
-                keyEl.setCssProps({ color: "var(--text-muted)" });
+                keyEl.setCssStyles({ fontWeight: "bold", color: "var(--text-muted)" });
 
-                const valEl = row.createSpan();
-                valEl.innerText = value || " -- ";
-                if (!value) valEl.setCssProps({ opacity: "0.5" });
+
+                const wikiCategory = this.plugin.settings.wikiCategories?.find(c => c.name.split(/[,，、]/).map(s => s.trim()).includes(key));
+
+                if (wikiCategory && value) {
+
+                    const rawItems = value.replace(/[\[\]]/g, '').split(/[,，、/|\\;；]+/).map(i => i.trim()).filter(i => i);
+
+                    rawItems.forEach(item => {
+                        const chip = row.createSpan({ text: item });
+                        chip.setCssStyles({ padding: "2px 8px", backgroundColor: "var(--interactive-accent)", color: "var(--text-on-accent)", borderRadius: "10px", fontSize: "0.85em", cursor: "pointer", fontWeight: "bold", transition: "filter 0.2s" });
+                        chip.addEventListener("mouseover", () => chip.setCssProps({ filter: "brightness(1.2)" }));
+                        chip.addEventListener("mouseout", () => chip.setCssProps({ filter: "brightness(1)" }));
+
+
+                        chip.onclick = () => this.openWikiNote(item, wikiCategory.folderPath, layer1, layer2);
+                    });
+
+
+                    const btnAll = row.createSpan();
+                    setIcon(btnAll, "folder-open");
+                    btnAll.setCssStyles({ cursor: "pointer", opacity: "0.5", marginLeft: "4px", display: "flex", alignItems: "center", padding: "2px" });
+                    const primaryName = wikiCategory.name.split(/[,，、]/)[0].trim();
+                    btnAll.title = `Search all ${primaryName}`;
+
+                    btnAll.addEventListener("mouseover", () => { btnAll.setCssProps({ opacity: "1", color: "var(--interactive-accent)" }); });
+                    btnAll.addEventListener("mouseout", () => { btnAll.setCssProps({ opacity: "0.5", color: "initial" }); });
+
+
+                    btnAll.onclick = () => this.renderAllWikiItems(primaryName, wikiCategory.folderPath, layer1, layer2);
+
+                } else {
+
+                    const valEl = row.createSpan();
+                    valEl.innerText = value || " -- ";
+                    if (!value) valEl.setCssStyles({ opacity: "0.5" });
+                }
             } else {
-                // 普通筆記內容
+
                 const row = infoBox.createDiv();
                 row.innerText = line.replace(/^- /, "");
-                row.setCssProps({ marginBottom: "6px" });
-                row.setCssProps({ lineHeight: "1.5" });
+                row.setCssStyles({ marginBottom: "6px", lineHeight: "1.5" });
             }
         });
+
+
+        if (this.activeWikiNoteToRestore) {
+            void this.openWikiNote(this.activeWikiNoteToRestore.name, this.activeWikiNoteToRestore.folder, layer1, layer2);
+        }
+
+
+    }
+
+
+
+    // =========================================================
+    // Lazy Loading 
+    // =========================================================
+    async openWikiNote(noteName: string, folderPath: string, layer1: HTMLElement, layer2: HTMLElement) {
+
+        this.activeWikiNoteToRestore = { name: noteName, folder: folderPath };
+
+        layer1.hide();
+        layer2.show();
+        layer2.empty();
+
+        const headerRow = layer2.createDiv();
+        headerRow.setCssStyles({ display: "flex", alignItems: "center", gap: "10px", marginBottom: "15px", borderBottom: "1px solid var(--background-modifier-border)", paddingBottom: "10px" });
+
+        const btnBack = createIconButton(headerRow, "arrow-left", "");
+        btnBack.setCssStyles({ padding: "4px 8px" });
+        btnBack.onclick = () => {
+            layer2.hide();
+            layer1.show();
+            this.currentWikiFile = null;
+
+            this.activeWikiNoteToRestore = null;
+
+
+        };
+
+        headerRow.createEl("h3", { text: noteName, attr: { style: "margin: 0; color: var(--interactive-accent);" } });
+
+        const file = this.app.metadataCache.getFirstLinkpathDest(noteName, folderPath || "");
+
+
+        if (file) {
+            const btnEdit = createIconButton(headerRow, "pencil", "");
+            btnEdit.title = "在編輯器中修改此設定";
+            btnEdit.setCssStyles({ padding: "4px 8px", opacity: "0.6" });
+
+
+            btnEdit.addEventListener("mouseover", () => btnEdit.setCssProps({ opacity: "1", color: "var(--interactive-accent)" }));
+            btnEdit.addEventListener("mouseout", () => btnEdit.setCssProps({ opacity: "0.6", color: "initial" }));
+
+
+            btnEdit.onclick = () => {
+                const leaf = this.app.workspace.getLeaf('split', 'vertical');
+                void leaf.openFile(file);
+            };
+        }
+
+        if (file) {
+            this.currentWikiFile = file;
+
+
+            const contentWrapper = layer2.createDiv({ cls: "ns-wiki-content-wrapper" });
+
+
+            const content = await this.app.vault.read(file);
+            const contentDiv = contentWrapper.createDiv("markdown-rendered");
+            contentDiv.setCssStyles({ padding: "0 5px", fontSize: "0.95em" });
+            void MarkdownRenderer.render(this.app, content, contentDiv, file.path, this);
+        } else {
+            this.currentWikiFile = null;
+            layer2.createDiv({ text: `Cannot find「${noteName}」, please press Autowiki first.`, attr: { style: "color: var(--text-error);" } });
+        }
+    }
+
+    // =========================================================
+    // 📂 View all categories
+    // =========================================================
+    async renderAllWikiItems(categoryName: string, folderPath: string, layer1: HTMLElement, layer2: HTMLElement) {
+        layer1.hide();
+        layer2.show();
+        layer2.empty();
+
+        const headerRow = layer2.createDiv();
+        headerRow.setCssStyles({ display: "flex", alignItems: "center", gap: "10px", marginBottom: "15px", borderBottom: "1px solid var(--background-modifier-border)", paddingBottom: "10px" });
+
+        const btnBack = createIconButton(headerRow, "arrow-left", "");
+        btnBack.onclick = () => { layer2.hide(); layer1.show(); };
+
+        headerRow.createEl("h4", { text: `All ${categoryName}`, attr: { style: "margin: 0;" } });
+
+        const folder = this.app.vault.getAbstractFileByPath(folderPath);
+        if (folder && folder instanceof TFolder) {
+            const files = folder.children.filter(f => f instanceof TFile && f.extension === "md");
+
+            if (files.length === 0) {
+                layer2.createDiv({ text: "Empty folder" });
+                return;
+            }
+
+            const list = layer2.createDiv();
+            files.forEach(f => {
+                const item = list.createDiv({ text: `📄 ${f.basename}` });
+                item.setCssStyles({ padding: "8px", borderBottom: "1px solid var(--background-modifier-border)", cursor: "pointer", transition: "background-color 0.2s" });
+                item.addEventListener("mouseover", () => item.setCssProps({ backgroundColor: "var(--background-secondary)" }));
+                item.addEventListener("mouseout", () => item.setCssProps({ backgroundColor: "transparent" }));
+                item.onclick = () => this.openWikiNote(f.basename, folderPath, layer1, layer2); // 點擊深入閱讀
+            });
+        } else {
+            layer2.createDiv({ text: "cannot find folder, please confirm folder path in setting." });
+        }
     }
 
 

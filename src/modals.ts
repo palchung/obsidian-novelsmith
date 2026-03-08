@@ -516,4 +516,191 @@ export class SceneCreateModal extends Modal {
     onClose() {
         this.contentEl.empty();
     }
+
+}
+
+// ============================================================
+// 📊 Dashboard Builder Modal ()
+// ============================================================
+export interface DashboardConfig {
+    attributes: string[];
+    chartType: 'table' | 'pie' | 'bar';
+    tableStyle: 'stats' | 'progress';
+    limit: number; // 0 mean All data
+    flatten: boolean; // split array ? (e.g. [[A]], [[B]])
+}
+
+export class DashboardBuilderModal extends Modal {
+    availableAttributes: string[];
+    config: DashboardConfig = {
+        attributes: [],
+        chartType: 'table',
+        tableStyle: 'progress',
+        limit: 0,
+        flatten: true
+    };
+    onSubmit: (config: DashboardConfig) => void;
+
+
+    optionsContainer: HTMLElement;
+    summaryContainer: HTMLElement;
+
+    constructor(app: App, availableAttributes: string[], onSubmit: (config: DashboardConfig) => void) {
+        super(app);
+        this.availableAttributes = availableAttributes;
+        this.onSubmit = onSubmit;
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.empty();
+        contentEl.createEl('h2', { text: 'Insert chart (dashboard builder)' });
+
+        // ==========================================
+        // 🏷️ Step 1：Select attributes (Chips)
+        // ==========================================
+        contentEl.createEl('h4', { text: '1. What scene card data to be included? (can choose more than one)' });
+        const chipsContainer = contentEl.createDiv({ cls: 'ns-chips-container' });
+        chipsContainer.setCssStyles({ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px' });
+
+        this.availableAttributes.forEach(attr => {
+            const chip = chipsContainer.createEl('button', { text: attr });
+
+            // default format
+            const updateChipStyle = () => {
+                const isSelected = this.config.attributes.includes(attr);
+                chip.setCssStyles({
+                    borderRadius: '16px', padding: '4px 12px', cursor: 'pointer', transition: 'all 0.2s',
+                    backgroundColor: isSelected ? 'var(--interactive-accent)' : 'var(--background-secondary)',
+                    color: isSelected ? 'var(--text-on-accent)' : 'var(--text-normal)',
+                    border: isSelected ? '1px solid var(--interactive-accent)' : '1px solid var(--background-modifier-border)'
+                });
+            };
+            updateChipStyle();
+
+            chip.onclick = () => {
+                if (this.config.attributes.includes(attr)) {
+                    this.config.attributes = this.config.attributes.filter(a => a !== attr); // exclude
+                } else {
+                    this.config.attributes.push(attr); // include
+                }
+                updateChipStyle();
+                this.refreshUI();
+            };
+        });
+
+        // ==========================================
+        // ⚙️ Step 2：Chart type
+        // ==========================================
+        contentEl.createEl('h4', { text: '2. Select a chart?' });
+        this.optionsContainer = contentEl.createDiv();
+
+        // ==========================================
+        // 📝 Step 3：Speak in English (Mad Libs UI)
+        // ==========================================
+        contentEl.createEl('h4', { text: '3. Confirm your choice' });
+        this.summaryContainer = contentEl.createDiv();
+        this.summaryContainer.setCssStyles({
+            padding: '15px', backgroundColor: 'var(--background-secondary-alt)',
+            borderRadius: '8px', borderLeft: '4px solid var(--interactive-accent)',
+            marginBottom: '20px', lineHeight: '1.6', fontSize: '1.05em'
+        });
+
+        // ==========================================
+        // 🚀 底部按鈕
+        // ==========================================
+        const btnRow = contentEl.createDiv();
+        btnRow.setCssStyles({ display: 'flex', justifyContent: 'flex-end', gap: '10px' });
+
+        btnRow.createEl('button', { text: 'Cancel' }).onclick = () => this.close();
+
+        const btnSubmit = btnRow.createEl('button', { text: 'Insert chart here', cls: 'mod-cta' });
+        btnSubmit.onclick = () => {
+            if (this.config.attributes.length === 0) {
+                new Notice("Please at least pick one.");
+                return;
+            }
+            this.close();
+            this.onSubmit(this.config);
+        };
+
+
+        this.refreshUI();
+    }
+
+
+    refreshUI() {
+        this.optionsContainer.empty();
+
+        // 1. Chart options
+        new Setting(this.optionsContainer)
+            .setName('Chart type')
+            .addDropdown(drop => drop
+                .addOption('table', 'Table')
+                .addOption('bar', 'Bar chart')
+                .addOption('pie', 'Pie chart')
+                .setValue(this.config.chartType)
+                .onChange(val => {
+                    this.config.chartType = val as 'table' | 'pie' | 'bar';
+                    this.refreshUI();
+                })
+            );
+
+        // Table
+        if (this.config.chartType === 'table') {
+            new Setting(this.optionsContainer)
+                .setName('Table style')
+                .setDesc('Process table (group by chapters; stats table (group by scene card data).')
+                .addDropdown(drop => drop
+                    .addOption('progress', 'Progress table (group by chapters)')
+                    .addOption('stats', 'Stats table (group by scene card data)')
+                    .setValue(this.config.tableStyle)
+                    .onChange(val => {
+                        this.config.tableStyle = val as 'stats' | 'progress';
+                        this.refreshUI();
+                    })
+                );
+        }
+
+        // 2. Split items
+        new Setting(this.optionsContainer)
+            .setName('Split scene card data')
+            .setDesc('Split scene card items automatically, e.g character:: alice, bob.')
+            .addToggle(toggle => toggle
+                .setValue(this.config.flatten)
+                .onChange(val => { this.config.flatten = val; this.refreshUI(); })
+            );
+
+        // 3. Table and Bar chart only
+        if (this.config.chartType === 'bar' || (this.config.chartType === 'table' && this.config.tableStyle === 'stats')) {
+            new Setting(this.optionsContainer)
+                .setName('How scenes to track')
+                .addDropdown(drop => drop
+                    .addOption('0', 'All')
+                    .addOption('3', 'Last 3 scenes')
+                    .addOption('5', 'Last 5 scenes')
+                    .addOption('10', 'Last 10 scenes')
+                    .setValue(this.config.limit.toString())
+                    .onChange(val => { this.config.limit = parseInt(val); this.refreshUI(); })
+                );
+        }
+
+        // 4. 📝 Plain English
+        const attrText = this.config.attributes.length > 0 ? `**[${this.config.attributes.join(', ')}]**` : '**[null]**';
+        let chartText = '**[Table]**';
+        if (this.config.chartType === 'pie') chartText = '**[Pie chart]**';
+        if (this.config.chartType === 'bar') chartText = '**[Bar chart]**';
+        if (this.config.chartType === 'table' && this.config.tableStyle === 'progress') chartText = '**[progress table (group by chapters)]**';
+
+        // eslint-disable-next-line @microsoft/sdl/no-inner-html
+        this.summaryContainer.innerHTML = `
+            💡 <b>A chart to be insert:</b><br>
+            novelsmith will read all scene data from ${attrText}, and shown as ${chartText}<br>
+            ${this.config.chartType === 'table' ? '<span style="color:var(--text-accent)">Hint: it is DQL code, try customize yourself.</span>' : ''}
+        `;
+    }
+
+    onClose() {
+        this.contentEl.empty();
+    }
 }

@@ -1,6 +1,6 @@
-import { App, Notice, MarkdownView } from 'obsidian';
+import { App, Notice, MarkdownView, TFile } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
-import { ensureFolderExists } from '../utils';
+import { ensureFolderExists, TEMPLATES_DIR } from '../utils';
 
 export class WikiManager {
     app: App;
@@ -15,71 +15,128 @@ export class WikiManager {
         this.settings = newSettings;
     }
 
-
     // =================================================================
-    // 🧠 AutoWiki
+    // 🧠 AutoWiki 
     // =================================================================
     async scanAndCreateWiki(view: MarkdownView) {
         const activeFile = view.file;
         if (!activeFile) return;
 
-        const targetFolder = this.settings.wikiFolderPath;
-
-        // 1. Ensure the target folder exists
-        await ensureFolderExists(this.app, targetFolder);
-
-        // 2. Read content
-        const content = view.editor.getValue();
-
-        // 3. Capture [[Links]] using Regex
-        // Optimized Regex: Ignore #anchors and |aliases, capture only the file name
-        const regex = /\[\[([^\]|#^]+)(?:[#^][^\]|]*)?(?:\|[^\]]+)?\]\]/g;
-        const matches = [...content.matchAll(regex)];
-
-        if (matches.length === 0) {
-            new Notice("No [[internal links]] found in this chapter.");
+        const categories = this.settings.wikiCategories;
+        if (!categories || categories.length === 0) {
+            new Notice("Please add at least one wiki category in the settings first!");
             return;
         }
 
-        // Remove duplicates
-        const uniqueLinks = [...new Set(matches.map(m => m[1].trim()))];
-
+        const editor = view.editor;
+        const lineCount = editor.lineCount();
         let createdCount = 0;
-        let movedCount = 0;
-        const activeFileName = activeFile.basename;
+        let updatedLinesCount = 0;
 
-        new Notice(`🔍 Scanning ${uniqueLinks.length} links...`);
+        new Notice("Scanning scene attributes...");
 
-        for (const linkName of uniqueLinks) {
-            // Skip self
-            if (linkName === activeFileName) continue;
 
-            // Check if the file exists
-            const existingFile = this.app.metadataCache.getFirstLinkpathDest(linkName, "");
+        const separatorRegex = /[,，、/|\\;；]+/;
 
-            if (!existingFile) {
-                // --- Case A: Does not exist -> Create new file ---
-                const newFilePath = `${targetFolder}/${linkName}.md`;
-                // Default content: Title + Tags
-                const defaultContent = `# ${linkName}\n\n> [!info] Lore Data\n> - Type:: \n> - Tags:: #Wiki\n\n`;
 
-                await this.app.vault.create(newFilePath, defaultContent);
-                createdCount++;
-            } else {
-                // --- Case B: Exists -> Check if relocation is needed ---
-                // Logic: If the file is in the root directory ("/" or ""), move it to the wiki folder
-                if (existingFile.parent.path === "/" || existingFile.parent.path === "") {
-                    const newPath = `${targetFolder}/${existingFile.name}`;
-                    await this.app.fileManager.renameFile(existingFile, newPath);
-                    movedCount++;
+        for (let i = 0; i < lineCount; i++) {
+            const line = editor.getLine(i);
+
+
+            if (line.trim().startsWith("> - ") && line.includes("::")) {
+
+
+                const match = line.match(/^(>\s*-\s*)(.*?)::(.*)$/);
+                if (!match) continue;
+
+                const prefix = match[1];
+                const key = match[2].trim();
+                const rawValue = match[3];
+
+                if (!rawValue.trim()) continue;
+
+
+                const category = categories.find(c => c.name.split(/[,，、]/).map(s => s.trim()).includes(key));
+                if (!category) continue;
+
+
+                const items = rawValue.split(separatorRegex);
+                const processedItems: string[] = [];
+                let lineChanged = false;
+
+                for (let item of items) {
+                    let cleanItem = item.trim();
+                    if (!cleanItem) continue;
+
+
+                    cleanItem = cleanItem.replace(/[\[\]]/g, '');
+
+
+                    const wikiLink = `[[${cleanItem}]]`;
+                    processedItems.push(wikiLink);
+
+
+                    if (!rawValue.includes(wikiLink)) {
+                        lineChanged = true;
+                    }
+
+                    // ==========================================
+                    // 📂 create md file
+                    // ==========================================
+                    const existingFile = this.app.metadataCache.getFirstLinkpathDest(cleanItem, "");
+
+                    if (!existingFile) {
+
+                        const folderPath = category.folderPath.trim();
+                        if (!folderPath) {
+                            new Notice(`Category [${key}] has no storage path. Skipped creating ${cleanItem}.`);
+                            continue;
+                        }
+
+
+                        await ensureFolderExists(this.app, folderPath);
+                        const newFilePath = `${folderPath}/${cleanItem}.md`;
+
+
+                        const primaryName = category.name.split(/[,，、]/)[0].trim();
+                        const tplPath = `${this.settings.bookFolderPath}/${TEMPLATES_DIR}/${primaryName}.md`;
+                        const tplFile = this.app.vault.getAbstractFileByPath(tplPath);
+
+
+                        let fileContent = `# ${cleanItem}\n\n> [!info] ${key} Info\n> - Tags:: #${key}\n> - Note:: \n\n`;
+
+
+                        if (tplFile instanceof TFile) {
+                            fileContent = await this.app.vault.read(tplFile);
+
+                            fileContent = fileContent.replace(/\{\{WikiName\}\}/g, cleanItem);
+                        }
+
+
+                        try {
+                            await this.app.vault.create(newFilePath, fileContent);
+                            createdCount++;
+                        } catch (e) {
+                            console.error(`Failed to create ${cleanItem}:`, e);
+                        }
+                    }
+                }
+
+
+                if (lineChanged && processedItems.length > 0) {
+
+
+                    const newLine = `${prefix}${key}:: ${processedItems.join(", ")}`;
+                    editor.setLine(i, newLine);
+                    updatedLinesCount++;
                 }
             }
         }
 
-        if (createdCount > 0 || movedCount > 0) {
-            new Notice(`AutoWiki generation complete!\nCreated: ${createdCount}\nMoved: ${movedCount}\nTarget: ${targetFolder}`, 5000);
+        if (createdCount > 0 || updatedLinesCount > 0) {
+            new Notice(`Autowiki complete!\nFormatted ${updatedLinesCount} lines.\nCreated ${createdCount} new notes!`, 6000);
         } else {
-            new Notice("All links have been archived.");
+            new Notice(`Autowiki scanned successfully, all wiki links are already up to date.`);
         }
     }
 }
