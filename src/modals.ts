@@ -208,7 +208,7 @@ export class CompileModal extends Modal {
                 .addOption('remove-hash', 'Remove # symbol only (e.g., #draft becomes draft)')
                 .addOption('remove-all', 'Completely remove the tag and text')
                 .setValue(this.options.hashtagAction)
-                .onChange(value => this.options.hashtagAction = value as unknown)
+                .onChange(value => this.options.hashtagAction = value as "none" | "remove-all" | "remove-hash")
             );
 
         // ==========================================

@@ -33,7 +33,7 @@ export class StructureView extends ItemView {
     private sortables: Sortable[] = [];
     private docYaml: string = "";
     private isRefreshing: boolean = false;
-    private lastStructureHash: string = "";
+
 
     // 🔥 Performance Optimization: Prevent Refresh from swallowing the user's latest typing
     private pendingRefresh: boolean = false;
@@ -81,7 +81,7 @@ export class StructureView extends ItemView {
     getDisplayText() { return "Novelsmith panel"; }
     getIcon() { return "kanban-square"; }
 
-    onOpen() {
+    async onOpen() {
         void this.refresh();
         this.registerEvent(this.app.workspace.on('active-leaf-change', (leaf) => {
             if (leaf && leaf.view instanceof MarkdownView) {
@@ -129,23 +129,25 @@ export class StructureView extends ItemView {
 
         // 🔥 Include try...finally
         try {
-            const container = this.contentEl.querySelector(".ns-structure-container");
+            const container = this.contentEl.querySelector(".ns-structure-container") as HTMLElement;
             if (!container) return;
 
             const view = this.getValidMarkdownView();
 
             if (view && this.activeTab === 'outline') {
                 const editor = view.editor;
-                const lineCount = editor.lineCount();
-                let hashBuilder = "";
 
-                for (let i = 0; i < lineCount; i++) {
-                    const line = editor.getLine(i);
-                    if (line.startsWith("#") || line.startsWith("<small>")) {
-                        hashBuilder += line + "|";
-                    }
-                }
+                // 🚀 秘技 1：一次過抽晒全文，快過逐行 getLine 幾十倍
+                const text = editor.getValue();
 
+                // 🚀 秘技 2：用 Regex 精準捕捉「章節」、「場景」同「屬性 Callout」
+                // 條件解說：開頭係 `# 📄` 或者 `######` 或者 `> [!NSmith` 或者 `> -` 嘅行
+                const matches = text.match(/^(?:# 📄|######|> \[!NSmith|> -).*$/gm);
+
+                // 將所有捉到嘅結構文字連埋一齊做指紋
+                const hashBuilder = matches ? matches.join("|") : "";
+
+                // 🛡️ 智能攔截：如果指紋無變，代表只係改咗正文，即刻截停 DOM 重繪！
                 if (hashBuilder === this.lastOutlineHash) return;
                 this.lastOutlineHash = hashBuilder;
             }
@@ -430,6 +432,7 @@ export class StructureView extends ItemView {
 
         const tree = this.parseDocument(text);
 
+
         this.sortables.forEach((s: unknown) => s.destroy());
         this.sortables = [];
 
@@ -569,6 +572,7 @@ export class StructureView extends ItemView {
                 group: 'scenes', animation: 150, ghostClass: 'ns-sortable-ghost', dragClass: 'ns-sortable-drag',
                 delay: 100, delayOnTouchOnly: true,
 
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 onEnd: (evt: unknown) => {
 
                     if (evt.newIndex !== evt.oldIndex || evt.from !== evt.to) this.saveChanges(container, view);

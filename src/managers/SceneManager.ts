@@ -207,7 +207,7 @@ export class SceneManager {
 
 
 
-        let dbContent = `---\nTry: Dataview_Target\nUpdated: ${window.moment().format("YYYY-MM-DD HH:mm:ss")}\n---\n\n# 📊 Scenes Database (Auto-generated)\n> [!warning] Please don't modify this mardown file manually \n\n`;
+        let dbContent = `---\nTry: Dataview_Target\nUpdated: ${window.moment().format("YYYY-MM-DD HH:mm:ss")}\n---\n\n# 📊 Scenes Database (Auto-generated)\n> [!warning] Please don't modify this markdown file manually \n\n`;
         const view = this.app.workspace.getActiveViewOfType(MarkdownView);
 
         for (const file of files) {

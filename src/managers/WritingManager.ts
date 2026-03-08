@@ -20,8 +20,8 @@ export class WritingManager {
     private triggerEditorUpdate() {
         this.app.workspace.iterateAllLeaves((leaf) => {
             if (leaf.view instanceof MarkdownView) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const cm = (leaf.view.editor as any).cm;
+
+                const cm = leaf.view.editor.cm;
 
                 if (cm) cm.dispatch({ effects: [] });
             }

@@ -19,6 +19,6 @@ export default defineConfig([
     },
     {
         // 忽略檢查編譯後嘅檔案
-        ignores: ["main.js", "node_modules/**", "dist/**", "*.mjs", "*.js"]
+        ignores: ["main.js", "node_modules/**", "test/**", "dist/**", "*.mjs", "*.js"]
     }
 ]);
