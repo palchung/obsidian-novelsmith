@@ -108,4 +108,39 @@ describe('utils.ts - 核心字串與解析邏輯', () => {
         });
     });
 
+    // =========================================================
+    // 🚨 P0 危機極限測試：防誤刪正文引言
+    // =========================================================
+    test('parseContent - P0 邊界測試：從草稿讀取時，絕對不能誤刪正文中的正常引言 (blockquote)', () => {
+        // 1. 準備一份充滿陷阱嘅草稿內容
+        const draftContent = `###### 第一場戲 <span class="ns-id" data-scene-id="uuid-123"></span>
+> [!NSmith]
+> - POV:: Alice
+> - Status:: Draft
+
+這是一段正常的正文。
+
+> 這是一段非常重要的人物內心獨白，絕對不能被系統食走！
+> 如果這兩行消失了，就是發生了 P0 級別的資料遺失災難！
+
+這是結尾。`;
+
+        // 2. 執行 parseContent (isOriginal = false 代表系統依家洗緊草稿嘅雜質)
+        // 假設 parseContent 回傳嘅物件裡面有 .content 裝住正文
+        const result = parseContent(draftContent, false);
+
+        // 提取正文字串 (兼容唔同嘅回傳格式，如果 result 本身係 string 就直接用)
+        const finalContent = (result as any).cards[0].body;
+
+        // 3. 檢查系統有冇乖乖地洗走頂部嘅 Callout 屬性
+        expect(finalContent).not.toContain('> [!NSmith]');
+        expect(finalContent).not.toContain('> - POV:: Alice');
+
+        // ==========================================
+        // 🕵️‍♂️ P0 斷言：正常引言必須存活！
+        // ==========================================
+        expect(finalContent).toContain('> 這是一段非常重要的人物內心獨白，絕對不能被系統食走！');
+        expect(finalContent).toContain('> 如果這兩行消失了，就是發生了 P0 級別的資料遺失災難！');
+    });
+
 });

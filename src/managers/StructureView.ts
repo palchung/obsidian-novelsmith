@@ -33,7 +33,7 @@ export class StructureView extends ItemView {
     private sortables: Sortable[] = [];
     private docYaml: string = "";
     private isRefreshing: boolean = false;
-
+    private lastStructureHash: string = "";
 
     // 🔥 Performance Optimization: Prevent Refresh from swallowing the user's latest typing
     private pendingRefresh: boolean = false;
