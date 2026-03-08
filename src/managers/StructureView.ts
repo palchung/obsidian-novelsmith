@@ -1,7 +1,7 @@
 import { ItemView, WorkspaceLeaf, MarkdownView, Notice, Menu, setIcon, MarkdownRenderer, TFolder, TFile } from 'obsidian';
 import Sortable from 'sortablejs';
 import NovelSmithPlugin from '../../main';
-import { SimpleConfirmModal, DashboardBuilderModal } from '../modals';
+import { SimpleConfirmModal, DashboardBuilderModal, CorkboardModal } from '../modals';
 import { createIconButton, isScriveningsDraft, replaceEntireDocument, extractSceneId, cleanSceneTitle, DRAFT_FILENAME, extractSceneColor, getColorById, SCENE_COLORS } from '../utils';
 
 
@@ -330,6 +330,23 @@ export class StructureView extends ItemView {
         };
 
         // =========================================================
+        // 🌟 軟木板大綱按鈕 (放喺串聯同匯出中間)
+        // =========================================================
+        const btnCorkboard = createIconButton(topBtnRow, "layout-dashboard", "Corkboard", {
+            // 加少少背景色等佢同普通掣有啲分別，你唔鍾意可以成個大括號刪走
+            backgroundColor: "var(--interactive-normal)"
+        });
+
+        btnCorkboard.onclick = () => {
+            if (view && this.plugin.checkInBookFolder(view.file)) {
+                // 🌟 喺 this 後面加多個 view，將當前嘅 Markdown 檔案傳遞入去！
+                new CorkboardModal(this.plugin.app, this, view).open();
+            } else {
+                new Notice("請先打開一份小說草稿！");
+            }
+        };
+
+        // =========================================================
         // 🔥 Discard & Compile button
         // =========================================================
         if (isDraftMode) {
@@ -486,6 +503,7 @@ export class StructureView extends ItemView {
                 });
 
                 menu.addSeparator();
+
 
                 menu.addItem((item) => {
                     item.setTitle("Auto wiki")

@@ -1,5 +1,7 @@
-import { App, FuzzySuggestModal, Modal, Setting, TFile, Notice } from 'obsidian';
-import { SCENE_COLORS, createIconButton } from './utils'; // Ensure path is correct
+import { App, FuzzySuggestModal, Modal, Setting, TFile, Notice, MarkdownView } from 'obsidian';
+import { SCENE_COLORS, createIconButton, replaceEntireDocument, cleanSceneTitle, extractSceneId } from './utils';
+import { StructureView } from './managers/StructureView';
+import Sortable from 'sortablejs';
 
 // ============================================================
 // 1. Generic Input Modal (Retained: for atomic saving)
@@ -702,5 +704,324 @@ export class DashboardBuilderModal extends Modal {
 
     onClose() {
         this.contentEl.empty();
+    }
+}
+
+// ============================================================
+// 📌 軟木板模式 (Corkboard View Modal)
+// ============================================================
+
+export class CorkboardModal extends Modal {
+    view: StructureView;
+    editorView: MarkdownView;
+    sortables: Sortable[] = [];
+
+    constructor(app: App, view: StructureView, editorView: MarkdownView) {
+        super(app);
+        this.view = view;
+        this.editorView = editorView;
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.empty();
+
+        this.modalEl.setCssStyles({
+            width: "90vw",
+            height: "90vh",
+            maxWidth: "none",
+            maxHeight: "none"
+        });
+
+        contentEl.setCssStyles({ display: "flex", flexDirection: "column", height: "100%" });
+        this.modalEl.addClass("ns-corkboard-modal");
+
+        const header = contentEl.createDiv({ cls: "ns-corkboard-header" });
+        header.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "2px solid var(--background-modifier-border)", paddingBottom: "10px", marginBottom: "20px" });
+
+        header.createEl("h2", { text: "📌 軟木板大綱 (Corkboard)", attr: { style: "margin: 0; color: var(--text-accent);" } });
+        header.createSpan({ text: "💡 提示：長按卡片即可隨意拖曳調位 (即將推出)", attr: { style: "opacity: 0.6; font-size: 0.9em;" } });
+
+        const gridContainer = contentEl.createDiv({ cls: "ns-corkboard-grid" });
+        gridContainer.setCssStyles({
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
+            gap: "20px", padding: "10px", alignItems: "start", alignContent: "start",
+            flexGrow: "1", overflowY: "auto"
+        });
+
+        // 🌟 呼叫全新嘅真實卡片渲染器！
+        this.renderCards(gridContainer);
+    }
+
+    // ==========================================
+    // 🃏 核心魔法：看板模式 (Kanban / Swimlanes)
+    // ==========================================
+    renderCards(container: HTMLElement) {
+        // 清理舊引擎
+        this.sortables.forEach(s => s.destroy());
+        this.sortables = [];
+        container.empty();
+
+        const activeView = this.editorView;
+        if (!activeView) return;
+
+        const text = activeView.editor.getValue();
+        const tree = this.view.parseDocument(text);
+        const isScrivenings = text.includes('++ FILE_ID:');
+
+        // 🌟 改變容器排版：變成橫向滑動嘅看板大畫布
+        container.setCssStyles({
+            display: "flex",
+            flexDirection: "row", // 打橫排
+            gap: "20px",
+            padding: "10px",
+            alignItems: "stretch",
+            overflowX: "auto", // iPad 橫向滑動神器
+            overflowY: "hidden",
+            height: "100%"
+        });
+
+        let sceneCount = 0;
+        const renderNameCount = new Map<string, number>();
+
+        // 🌟 遍歷每個章節 (Chapter)，建立獨立直欄 (Column)
+        tree.forEach((chapter, chapterIndex) => {
+            let chapterTitle = chapter.name.replace(/# 📄 |<span.*?<\/span>/g, "").trim();
+
+            // 🌟 修正 1：隱藏 Scrivenings 模式下頂部嗰個無用嘅 root 區塊
+            if (isScrivenings && chapterIndex === 0 && chapterTitle.toLowerCase() === "root" && chapter.scenes.length === 0) {
+                return; // 直接跳過，唔好畫個空直欄出嚟！
+            }
+
+            // 🌟 修正 2：如果係普通草稿，將 root 改個好聽啲嘅名
+            if (!chapterTitle || chapterTitle.toLowerCase() === "root") {
+                chapterTitle = isScrivenings ? "未分類區塊" : "當前草稿";
+            }
+
+            // 建立直欄
+            const col = container.createDiv({ cls: "ns-corkboard-column" });
+            col.setCssStyles({
+                display: "flex", flexDirection: "column",
+                minWidth: "320px", maxWidth: "320px",
+                backgroundColor: "var(--background-secondary-alt)",
+                borderRadius: "10px", padding: "12px",
+                maxHeight: "100%", border: "1px solid var(--background-modifier-border)"
+            });
+
+            col.createEl("h3", {
+                text: `📁 ${chapterTitle}`,
+                attr: { style: "margin: 0 0 15px 0; font-size: 1.1em; color: var(--text-normal); text-align: center; border-bottom: 2px solid var(--background-modifier-border); padding-bottom: 10px;" }
+            });
+
+
+
+
+
+
+
+
+
+
+            // 建立卡片放置區 (List Container)
+            const listContainer = col.createDiv({ cls: "ns-corkboard-list" });
+            listContainer.setCssStyles({
+                display: "flex", flexDirection: "column", gap: "15px",
+                overflowY: "auto", flexGrow: "1", minHeight: "100px", paddingRight: "5px"
+            });
+            listContainer.dataset.chapterIndex = chapterIndex.toString(); // 記低屬於邊個章節
+
+            // 遍歷章節內嘅場景，生成卡片
+            chapter.scenes.forEach(scene => {
+                sceneCount++;
+                let safeKey = scene.id;
+                if (!safeKey) {
+                    const count = renderNameCount.get(scene.name) || 0;
+                    safeKey = `NO_ID_${scene.name}_${count}`;
+                    renderNameCount.set(scene.name, count + 1);
+                }
+
+                const card = listContainer.createDiv({ cls: "ns-corkboard-card" });
+                card.setCssStyles({
+                    backgroundColor: "var(--background-primary)",
+                    border: "1px solid var(--background-modifier-border)",
+                    borderRadius: "8px", padding: "15px",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                    display: "flex", flexDirection: "column", gap: "10px",
+                    cursor: "grab", position: "relative"
+                });
+                card.dataset.safeKey = safeKey;
+
+                // 卡片標題
+                card.createEl("h4", { text: `🎬 ${scene.name.replace(/<span.*?<\/span>/g, "")}`, attr: { style: "margin: 0; color: var(--text-accent); font-size: 1.05em;" } });
+
+                // 動態屬性提取
+                let noteText = "📝 (未填寫大綱筆記)";
+                const dynamicTags: { key: string, value: string }[] = [];
+                const lines = scene.content.split('\n');
+                for (let line of lines) {
+                    const clean = line.trim();
+                    if (clean.startsWith('> - ')) {
+                        const match = clean.match(/> -\s*(.*?)::\s*(.*)/);
+                        if (match) {
+                            const key = match[1].trim();
+                            const value = match[2].trim();
+                            if (key.toLowerCase() === 'note' || key === '備註') noteText = value;
+                            else dynamicTags.push({ key, value });
+                        }
+                    }
+                }
+
+                // 內文
+                const noteEl = card.createDiv({ text: noteText });
+                noteEl.setCssStyles({
+                    flexGrow: "1", fontSize: "0.9em", opacity: noteText.includes("(未填寫") ? "0.4" : "0.8",
+                    whiteSpace: "pre-wrap", maxHeight: "150px", overflow: "hidden", textOverflow: "ellipsis"
+                });
+
+                // 標籤
+                const footer = card.createDiv();
+                footer.setCssStyles({ display: "flex", gap: "6px", flexWrap: "wrap", fontSize: "0.8em", marginTop: "auto", paddingTop: "10px", borderTop: "1px solid var(--background-modifier-border)" });
+                dynamicTags.forEach(tag => {
+                    let icon = "🏷️";
+                    if (tag.key.toLowerCase().includes("pov") || tag.key.includes("視角")) icon = "👁️";
+                    if (tag.key.toLowerCase().includes("status") || tag.key.includes("狀態")) icon = "📌";
+                    footer.createSpan({ text: `${icon} ${tag.key}: ${tag.value.replace(/[[\]]/g, '')}`, attr: { style: "background: var(--background-secondary); padding: 2px 6px; border-radius: 4px; opacity: 0.8;" } });
+                });
+            });
+
+            // 🌟 為每個章節嘅直欄獨立啟動 SortableJS，並設定 Group 允許跨欄拖曳！
+            this.sortables.push(new Sortable(listContainer, {
+                group: 'kanban-board',  // 🔥 關鍵魔法：相同 group 就可以互相拉來拉去！
+                animation: 150,
+                delay: 100, delayOnTouchOnly: true,
+                ghostClass: 'ns-sortable-ghost',
+                onEnd: () => {
+                    // 任何拖曳放手後，觸發全域儲存
+                    this.saveCorkboardOrder(container);
+                }
+            }));
+        });
+
+        if (sceneCount === 0) {
+            container.createDiv({ text: "找不到任何場景卡片。", attr: { style: "opacity: 0.6; padding: 20px;" } });
+        }
+    }
+
+    // ==========================================
+    // 💾 儲存跨章節拖曳後的新順序 (雙引擎終極版)
+    // ==========================================
+    saveCorkboardOrder(container: HTMLElement) {
+        const editor = this.editorView.editor;
+        const liveText = editor.getValue();
+        const isScrivenings = liveText.includes('++ FILE_ID:');
+
+        new Notice("🔄 更新草稿結構中...");
+
+        if (!isScrivenings) {
+            // =========================================================
+            // 🌟 引擎 A：單獨章節模式 (100% 精準嘅 AST 解析器)
+            // =========================================================
+            const liveTree = this.view.parseDocument(liveText);
+            const liveSceneMap = new Map<string, string>();
+            const liveNameCount = new Map<string, number>();
+
+            // 1. 建立精準嘅場景緩存
+            liveTree.forEach(ch => {
+                ch.scenes.forEach(sc => {
+                    let safeKey = sc.id;
+                    if (!safeKey) {
+                        const count = liveNameCount.get(sc.name) || 0;
+                        safeKey = `NO_ID_${sc.name}_${count}`;
+                        liveNameCount.set(sc.name, count + 1);
+                    }
+                    liveSceneMap.set(safeKey, sc.content);
+                });
+            });
+
+            const chunks: string[] = [];
+            // 2. 放入頂部前言 (例如 YAML 等)
+            if (liveTree[0] && liveTree[0].preamble) {
+                chunks.push(liveTree[0].preamble.trimEnd());
+            }
+
+            // 3. 根據軟木板的新順序，完美重組
+            const cards = container.querySelectorAll(".ns-corkboard-card");
+            cards.forEach(card => {
+                const safeKey = (card as HTMLElement).dataset.safeKey;
+                if (safeKey && liveSceneMap.has(safeKey)) {
+                    chunks.push("\n\n" + liveSceneMap.get(safeKey)!.trimEnd());
+                }
+            });
+
+            // 4. 無痕寫入
+            const finalText = chunks.join("").trim() + "\n";
+            replaceEntireDocument(editor, finalText);
+            this.view.lastOutlineHash = ""; // 觸發側邊欄刷新
+            return; // 搞掂！提早結束！
+        }
+
+        // =========================================================
+        // 🌟 引擎 B：串聯草稿模式 (保留 FILE ID 嘅正則切割器)
+        // =========================================================
+        const chapterParts = liveText.split(/(?=^[ \t]*# 📄 )/m);
+        const preambles: string[] = [];
+        const liveSceneMap = new Map<string, string>();
+        const liveNameCount = new Map<string, number>();
+
+        chapterParts.forEach(part => {
+            const sceneParts = part.split(/(?=^[ \t]*######\s)/m);
+            preambles.push(sceneParts[0]);
+
+            for (let i = 1; i < sceneParts.length; i++) {
+                const scText = sceneParts[i];
+                const titleMatch = scText.match(/^[ \t]*######\s+(.*)$/m);
+                if (titleMatch) {
+                    const fullHeader = `###### ${titleMatch[1]}`;
+                    let safeKey = extractSceneId(fullHeader);
+
+                    if (!safeKey) {
+                        const cleanName = cleanSceneTitle(fullHeader);
+                        const count = liveNameCount.get(cleanName) || 0;
+                        safeKey = `NO_ID_${cleanName}_${count}`;
+                        liveNameCount.set(cleanName, count + 1);
+                    }
+                    liveSceneMap.set(safeKey, scText);
+                }
+            }
+        });
+
+        const chunks: string[] = [];
+        if (preambles[0]) chunks.push(preambles[0].trimEnd());
+
+        const columns = container.querySelectorAll(".ns-corkboard-list");
+        columns.forEach((listEl) => {
+            const originalIndex = parseInt((listEl as HTMLElement).dataset.chapterIndex || "0");
+
+            if (originalIndex > 0 && originalIndex < preambles.length) {
+                chunks.push("\n\n" + preambles[originalIndex].trimEnd());
+            }
+
+            const cards = listEl.querySelectorAll(".ns-corkboard-card");
+            cards.forEach(card => {
+                const safeKey = (card as HTMLElement).dataset.safeKey;
+                if (safeKey && liveSceneMap.has(safeKey)) {
+                    chunks.push("\n\n" + liveSceneMap.get(safeKey)!.trimEnd());
+                }
+            });
+        });
+
+        const finalText = chunks.join("") + "\n";
+        replaceEntireDocument(editor, finalText);
+        this.view.lastOutlineHash = "";
+    }
+
+    onClose() {
+        const { contentEl } = this;
+        this.sortables.forEach(s => s.destroy()); // 🌟 銷毀所有直欄引擎
+        this.sortables = [];
+        contentEl.empty();
+        this.view.lastOutlineHash = "";
+        void this.view.parseAndRender();
     }
 }

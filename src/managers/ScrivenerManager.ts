@@ -122,7 +122,7 @@ export class ScrivenerManager {
 
             for (const card of parsedData.cards) {
                 contentChunks.push(`${card.rawHeader}\n`);
-                if (card.meta.length > 0) contentChunks.push(`${card.meta.join("\n")}\n`);
+                //if (card.meta.length > 0) contentChunks.push(`${card.meta.join("\n")}\n`);
                 contentChunks.push(`\n${card.body}\n\n`);
             }
         }
