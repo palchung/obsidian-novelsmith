@@ -1,4 +1,4 @@
-# ⚔️ NovelSmith (under development)
+# ⚔️ NovelSmith (Beta)
 
 **Forge your novel, one scene at a time.** NovelSmith is a comprehensive, Scrivener-inspired writing environment built directly into Obsidian. It transforms your vault into a powerhouse for long-form fiction writing, offering seamless chapter merging, atomic version control, dynamic outlining, intelligent worldbuilding, and no-code data analytics—all without breaking standard Markdown.
 
