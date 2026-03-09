@@ -146,7 +146,7 @@ export class ScrivenerManager {
                     let targetLine = 0;
                     if (targetSceneRaw) {
                         for (let i = 0; i < editor.lineCount(); i++) {
-                            if (editor.getLine(i).trim() === targetSceneRaw) { targetLine = i; break; }
+                            if (editor.getLine(i).includes(targetSceneRaw)) { targetLine = i; break; }
                         }
                     } else if (targetFileName) {
                         for (let i = 0; i < editor.lineCount(); i++) {
@@ -160,6 +160,37 @@ export class ScrivenerManager {
                 }
             }, 300);
         }
+    }
+
+    // =========================================================
+    // 🔥 New Feature: Silent Rebuild (For Corkboard Restoration)
+    // =========================================================
+    async rebuildScriveningsSilent(folder: TFolder, targetSceneId: string | null = null) {
+        const rawFiles = folder.children.filter((f) =>
+            f instanceof TFile && f.extension === 'md' && f.name !== DRAFT_FILENAME &&
+            !f.name.includes("Script") && !f.name.includes("_History") && !f.name.startsWith("_")
+        ) as TFile[];
+
+        rawFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+        const validFiles: TFile[] = [];
+        for (const f of rawFiles) {
+            const content = await this.app.vault.cachedRead(f);
+            if (content.includes("######") || content.trim() === "") {
+                validFiles.push(f);
+            }
+        }
+
+        if (validFiles.length === 0) return;
+
+        // 轉換 ID 為可搜尋字串
+        let targetSceneRaw = "";
+        if (targetSceneId) {
+            targetSceneRaw = `data-scene-id="${targetSceneId}"`;
+        }
+
+        // 直接無痕執行 compile，唔彈任何 Modal
+        await this.compileDraft(folder, validFiles, "", targetSceneRaw);
     }
 
     async syncBack(draftFile: TFile, folder: TFolder) {

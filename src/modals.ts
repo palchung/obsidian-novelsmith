@@ -1,20 +1,24 @@
-import { App, FuzzySuggestModal, Modal, Setting, TFile, Notice, MarkdownView } from 'obsidian';
-import { SCENE_COLORS, createIconButton, replaceEntireDocument, cleanSceneTitle, extractSceneId } from './utils';
+import { App, TFolder, Menu, setIcon, FuzzySuggestModal, Modal, Setting, TFile, Notice, MarkdownView, MarkdownRenderer } from 'obsidian';
+import { extractSynopsisAndTags, TEMPLATES_DIR, getColorById, generateSceneId, SCENE_COLORS, createIconButton, replaceEntireDocument, cleanSceneTitle, extractSceneId, getManuscriptFiles, parseUniversalScenes, parseContent } from './utils';
 import { StructureView } from './managers/StructureView';
 import Sortable from 'sortablejs';
+import NovelSmithPlugin from '../main';
 
 // ============================================================
-// 1. Generic Input Modal (Retained: for atomic saving)
+// 1. Generic Input Modal (Upgraded with Default Value)
 // ============================================================
 export class InputModal extends Modal {
     result: string;
     onSubmit: (result: string) => void;
     title: string;
+    defaultValue: string;
 
-    constructor(app: App, title: string, onSubmit: (result: string) => void) {
+    constructor(app: App, title: string, onSubmit: (result: string) => void, defaultValue: string = "") {
         super(app);
         this.title = title;
         this.onSubmit = onSubmit;
+        this.defaultValue = defaultValue;
+        this.result = defaultValue;
     }
 
     onOpen() {
@@ -23,22 +27,22 @@ export class InputModal extends Modal {
 
         new Setting(contentEl)
             .setName('Name')
-            .addText((text) =>
+            .addText((text) => {
+                text.setValue(this.defaultValue); // 🌟 載入預設文字
                 text.onChange((value) => {
                     this.result = value;
-                })
-                    .inputEl.addEventListener('keydown', (e: KeyboardEvent) => {
-                        if (e.key === 'Enter') {
-                            this.onSubmit(this.result);
-                            this.close();
-                        }
-                    })
-            );
+                });
+                text.inputEl.addEventListener('keydown', (e: KeyboardEvent) => {
+                    if (e.key === 'Enter') {
+                        this.onSubmit(this.result);
+                        this.close();
+                    }
+                });
+            });
 
         new Setting(contentEl)
             .addButton((btn) =>
-                btn
-                    .setButtonText('Confirm')
+                btn.setButtonText("Submit")
                     .setCta()
                     .onClick(() => {
                         this.onSubmit(this.result);
@@ -47,8 +51,7 @@ export class InputModal extends Modal {
     }
 
     onClose() {
-        const { contentEl } = this;
-        contentEl.empty();
+        this.contentEl.empty();
     }
 }
 
@@ -706,322 +709,973 @@ export class DashboardBuilderModal extends Modal {
         this.contentEl.empty();
     }
 }
-
 // ============================================================
-// 📌 軟木板模式 (Corkboard View Modal)
+// 🚨 Draft Action Modal (Intercept before entering Corkboard)
 // ============================================================
+export class CorkboardDraftActionModal extends Modal {
+    onSyncAndOpen: () => void;
+    onDiscardAndOpen: () => void;
 
-export class CorkboardModal extends Modal {
-    view: StructureView;
-    editorView: MarkdownView;
-    sortables: Sortable[] = [];
-
-    constructor(app: App, view: StructureView, editorView: MarkdownView) {
+    constructor(app: App, onSyncAndOpen: () => void, onDiscardAndOpen: () => void) {
         super(app);
-        this.view = view;
-        this.editorView = editorView;
+        this.onSyncAndOpen = onSyncAndOpen;
+        this.onDiscardAndOpen = onDiscardAndOpen;
     }
 
     onOpen() {
         const { contentEl } = this;
-        contentEl.empty();
 
-        this.modalEl.setCssStyles({
-            width: "90vw",
-            height: "90vh",
-            maxWidth: "none",
-            maxHeight: "none"
+        contentEl.createEl('h2', { text: "⚠️ Scrivenings Mode Active" });
+        contentEl.createEl('p', {
+            text: "To protect your manuscript structure, please handle the current draft before opening the global corkboard:",
+            cls: "setting-item-description"
         });
 
+        const btnGroup = contentEl.createDiv({ cls: 'ns-modal-button-group' });
+        btnGroup.setCssStyles({
+            display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px'
+        });
+
+        // Option A: Sync & Open
+        const btnSync = btnGroup.createEl('button', {
+            text: "💾 Sync & Open Corkboard",
+            cls: "mod-cta"
+        });
+        btnSync.onclick = () => {
+            this.close();
+            this.onSyncAndOpen();
+        };
+
+        // Option B: Discard & Open
+        const btnDiscard = btnGroup.createEl('button', {
+            text: "🗑️ Discard Draft & Open Corkboard"
+        });
+        btnDiscard.setCssStyles({
+            backgroundColor: "var(--background-modifier-error)", color: "white"
+        });
+        btnDiscard.onclick = () => {
+            this.close();
+            this.onDiscardAndOpen();
+        };
+
+        // Option C: Cancel
+        const btnCancel = btnGroup.createEl('button', { text: "❌ Cancel" });
+        btnCancel.onclick = () => { this.close(); };
+    }
+
+    onClose() {
+        this.contentEl.empty();
+    }
+}
+
+// ============================================================
+// 📌 Global Corkboard View Modal (Ultimate Edition with CRUD & Colors)
+// ============================================================
+export class CorkboardModal extends Modal {
+    plugin: NovelSmithPlugin;
+    anchorSceneId: string | null;
+    workingFolderPath: string; // 🌟 記住當前嘅資料夾 (例如 MySeries/Book1)
+    isFromScrivenings: boolean;
+    sortables: Sortable[] = [];
+    wikiPanel: HTMLElement;
+
+    // 🌟 終極沙盒記憶體
+    liveSceneMap: Map<string, string> = new Map(); // 記住硬碟最原始嘅字
+    pendingEdits: Map<string, string> = new Map(); // 記住你啱啱喺面板改嘅字
+
+    constructor(plugin: NovelSmithPlugin, anchorSceneId: string | null = null, workingFolderPath: string, isFromScrivenings: boolean = false) {
+        super(plugin.app);
+        this.plugin = plugin;
+        this.anchorSceneId = anchorSceneId;
+        this.workingFolderPath = workingFolderPath;
+        this.isFromScrivenings = isFromScrivenings; // 🌟 儲存標記
+    }
+
+    async onOpen() {
+        const { contentEl } = this;
+        contentEl.empty();
+
+        this.modalEl.setCssStyles({ width: "95vw", height: "95vh", maxWidth: "none", maxHeight: "none" });
         contentEl.setCssStyles({ display: "flex", flexDirection: "column", height: "100%" });
         this.modalEl.addClass("ns-corkboard-modal");
 
         const header = contentEl.createDiv({ cls: "ns-corkboard-header" });
         header.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "2px solid var(--background-modifier-border)", paddingBottom: "10px", marginBottom: "20px" });
 
-        header.createEl("h2", { text: "📌 軟木板大綱 (Corkboard)", attr: { style: "margin: 0; color: var(--text-accent);" } });
-        header.createSpan({ text: "💡 提示：長按卡片即可隨意拖曳調位 (即將推出)", attr: { style: "opacity: 0.6; font-size: 0.9em;" } });
+        // 顯示當前嘅資料夾名，等用家清楚知道自己改緊邊本書
+        const folderName = this.workingFolderPath.split('/').pop() || "Global";
+        header.createEl("h2", { text: `📌 Corkboard (${folderName})`, attr: { style: "margin: 0; color: var(--text-accent);" } });
+
+        const controls = header.createDiv();
+        controls.setCssStyles({ display: "flex", gap: "10px" });
+
+        const btnCancel = controls.createEl("button", { text: "Cancel" });
+        btnCancel.onclick = () => this.cancelCorkboard(); // 🌟 攔截 Cancel 動作！
+
+        const btnSave = controls.createEl("button", { text: "Save & Close", cls: "mod-cta ns-save-btn" });
+        btnSave.onclick = async () => {
+            btnSave.disabled = true;
+            btnSave.innerText = "⏳ Saving...";
+            await this.saveGlobalCorkboard(gridContainer, btnSave);
+        };
 
         const gridContainer = contentEl.createDiv({ cls: "ns-corkboard-grid" });
         gridContainer.setCssStyles({
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
-            gap: "20px", padding: "10px", alignItems: "start", alignContent: "start",
-            flexGrow: "1", overflowY: "auto"
+            display: "flex", flexDirection: "row", gap: "20px", padding: "10px",
+            alignItems: "stretch", overflowX: "auto", overflowY: "hidden", height: "100%"
         });
 
-        // 🌟 呼叫全新嘅真實卡片渲染器！
-        this.renderCards(gridContainer);
+        gridContainer.createEl("h3", { text: "Loading manuscript data...", attr: { style: "opacity: 0.6; margin: auto;" } });
+
+        await this.renderGlobalCards(gridContainer);
+        // 🌟 構建「側滑資料面板 (Slide-over Drawer)」
+        this.wikiPanel = contentEl.createDiv({ cls: "ns-corkboard-wiki-panel" });
+        this.wikiPanel.setCssStyles({
+            position: "absolute", top: "0", right: "0",
+            width: "450px", maxWidth: "90%", height: "100%", // iPad 友善寬度
+            backgroundColor: "var(--background-primary)",
+            borderLeft: "1px solid var(--background-modifier-border)",
+            boxShadow: "-5px 0 20px rgba(0,0,0,0.15)",
+            transform: "translateX(100%)", // 預設隱藏喺螢幕右邊出面
+            transition: "transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)", // 順滑動畫
+            zIndex: "100", display: "flex", flexDirection: "column"
+        });
     }
 
     // ==========================================
-    // 🃏 核心魔法：看板模式 (Kanban / Swimlanes)
+    // 🎨 UI Builders (Fix Colors & Icons)
     // ==========================================
-    renderCards(container: HTMLElement) {
-        // 清理舊引擎
-        this.sortables.forEach(s => s.destroy());
-        this.sortables = [];
+    // 🌟 外殼構建器
+    buildCardDOM(listContainer: HTMLElement, scene: any) {
+        const card = listContainer.createDiv({ cls: "ns-corkboard-card" });
+        card.setCssStyles({
+            backgroundColor: "var(--background-primary)", border: "1px solid var(--background-modifier-border)",
+            borderRadius: "8px", padding: "15px", boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+            display: "flex", flexDirection: "column", gap: "10px", cursor: "grab", position: "relative"
+        });
+
+        card.dataset.sceneId = scene.id || "";
+        card.dataset.sceneTitle = scene.title || "";
+        card.dataset.colorId = scene.colorId || "default";
+        if (scene.isNew) card.dataset.isNew = "true";
+
+        this.populateCardInnerDOM(card, scene); // 🚀 呼叫內部渲染器
+    }
+
+    // 🌟 內部渲染器 (方便隨時清空重畫！)
+    populateCardInnerDOM(card: HTMLElement, scene: any) {
+        const colorObj = getColorById(card.dataset.colorId);
+        const hexColor = colorObj?.color || "var(--background-modifier-border)";
+        card.setCssStyles({ borderLeft: `6px solid ${hexColor}` });
+
+        const titleRow = card.createDiv();
+        titleRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "flex-start" });
+
+        const titleLeft = titleRow.createDiv();
+        titleLeft.setCssStyles({ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", flex: "1" });
+
+        const iconEl = titleLeft.createSpan();
+        setIcon(iconEl, "clapperboard");
+        iconEl.setCssStyles({ opacity: "0.6", display: "flex", alignItems: "center" });
+
+        // 🌟 即時顯示最新標題
+        titleLeft.createEl("h4", { text: card.dataset.sceneTitle, attr: { style: "margin: 0; color: var(--text-accent); font-size: 1.05em; line-height: 1.2;" } });
+
+        const jumpBtn = titleLeft.createDiv();
+        setIcon(jumpBtn, "external-link");
+        jumpBtn.setCssStyles({ cursor: "pointer", opacity: "0.4", display: "flex", alignItems: "center", justifyContent: "center", padding: "2px" });
+        const jumpSvg = jumpBtn.querySelector("svg");
+        if (jumpSvg) { jumpSvg.style.width = "14px"; jumpSvg.style.height = "14px"; }
+        jumpBtn.addEventListener("mouseover", () => jumpBtn.setCssStyles({ opacity: "1", color: "var(--interactive-accent)" }));
+        jumpBtn.addEventListener("mouseout", () => jumpBtn.setCssStyles({ opacity: "0.4", color: "initial" }));
+        jumpBtn.onclick = (e) => {
+            e.stopPropagation();
+            new SimpleConfirmModal(this.app, "Save corkboard and jump to this scene?", async () => {
+                this.anchorSceneId = card.dataset.sceneId || card.dataset.sceneTitle || null;
+                const saveBtn = this.contentEl.querySelector(".ns-save-btn") as HTMLButtonElement;
+                if (saveBtn) { saveBtn.disabled = true; saveBtn.innerText = "⏳ Saving & Jumping..."; }
+                const gridContainer = this.contentEl.querySelector(".ns-corkboard-grid") as HTMLElement;
+                await this.saveGlobalCorkboard(gridContainer, saveBtn);
+            }).open();
+        };
+
+        const titleRight = titleRow.createDiv();
+        titleRight.setCssStyles({ display: "flex", alignItems: "center", gap: "6px" });
+
+        if (card.dataset.isNew === "true") {
+            const deleteBtn = titleRight.createDiv();
+            setIcon(deleteBtn, "trash-2");
+            deleteBtn.setCssStyles({ cursor: "pointer", opacity: "0.4", display: "flex", alignItems: "center", justifyContent: "center", padding: "2px" });
+            const delSvg = deleteBtn.querySelector("svg");
+            if (delSvg) { delSvg.style.width = "16px"; delSvg.style.height = "16px"; }
+
+            deleteBtn.addEventListener("mouseover", () => deleteBtn.setCssStyles({ opacity: "1", color: "var(--text-error)" }));
+            deleteBtn.addEventListener("mouseout", () => deleteBtn.setCssStyles({ opacity: "0.4", color: "initial" }));
+            deleteBtn.onclick = (e) => { e.stopPropagation(); card.remove(); };
+        }
+
+        const editBtn = titleRight.createDiv();
+        setIcon(editBtn, "pencil");
+        editBtn.setCssStyles({ cursor: "pointer", opacity: "0.4", display: "flex", alignItems: "center", justifyContent: "center", padding: "2px" });
+        const editSvg = editBtn.querySelector("svg");
+        if (editSvg) { editSvg.style.width = "14px"; editSvg.style.height = "14px"; }
+        editBtn.addEventListener("mouseover", () => editBtn.setCssStyles({ opacity: "1", color: "var(--interactive-accent)" }));
+        editBtn.addEventListener("mouseout", () => editBtn.setCssStyles({ opacity: "0.4", color: "initial" }));
+        editBtn.onclick = (e) => {
+            e.stopPropagation();
+            this.openScenePanel(card, scene);
+        };
+
+        const colorBtn = titleRight.createDiv();
+        setIcon(colorBtn, "palette");
+        colorBtn.setCssStyles({ cursor: "pointer", opacity: "0.3", display: "flex", alignItems: "center", justifyContent: "center", padding: "2px" });
+        colorBtn.addEventListener("mouseover", () => colorBtn.setCssStyles({ opacity: "1" }));
+        colorBtn.addEventListener("mouseout", () => colorBtn.setCssStyles({ opacity: "0.3" }));
+        colorBtn.onclick = (e) => {
+            e.stopPropagation();
+            const menu = new Menu();
+            SCENE_COLORS.forEach(c => {
+                menu.addItem((item) => {
+                    item.setTitle(c.name).setIcon("palette").onClick(() => {
+                        card.dataset.colorId = c.id;
+                        card.dataset.colorModified = "true";
+                        card.setCssStyles({ borderLeft: `6px solid ${c.color || 'var(--background-modifier-border)'}` });
+                    });
+                });
+            });
+            menu.showAtMouseEvent(e);
+        };
+
+
+
+
+
+
+        // 🌟 Refactored: 使用 utils.ts 的共用雷達，一行抽齊大綱同標籤！
+        const { foundSynopsis, dynamicTags } = extractSynopsisAndTags(scene.meta || []);
+
+        const noteText = foundSynopsis || (card.dataset.isNew === "true" ? "(New scene, edit later)" : "(No synopsis)");
+        const noteEl = card.createDiv({ text: noteText });
+        noteEl.setCssStyles({ flexGrow: "1", fontSize: "0.9em", opacity: foundSynopsis ? "0.8" : "0.4", whiteSpace: "pre-wrap", maxHeight: "150px", overflow: "hidden", textOverflow: "ellipsis" });
+
+        const footer = card.createDiv();
+        footer.setCssStyles({ display: "flex", gap: "6px", flexWrap: "wrap", fontSize: "0.8em", marginTop: "auto", paddingTop: "10px", borderTop: "1px solid var(--background-modifier-border)" });
+
+        // 即時反映 ✅ 完成狀態！
+        if (dynamicTags.some(t => t.key.toLowerCase().includes('status') && (t.value.toLowerCase().includes('done') || t.value.includes('完成') || t.value.includes('完稿')))) {
+            const doneBadge = footer.createSpan({ text: "✅" });
+            doneBadge.setCssStyles({ marginRight: "auto" });
+        }
+
+        dynamicTags.forEach(tag => {
+            const tagSpan = footer.createSpan();
+            tagSpan.setCssStyles({ display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap", background: "var(--background-secondary)", padding: "4px 8px", borderRadius: "6px", opacity: "0.9" });
+            const iconEl = tagSpan.createSpan();
+            setIcon(iconEl, "tag");
+            iconEl.setCssStyles({ opacity: "0.5", display: "flex", alignItems: "center" });
+            const svg = iconEl.querySelector("svg");
+            if (svg) { svg.style.width = "12px"; svg.style.height = "12px"; }
+
+            tagSpan.createSpan({ text: `${tag.key}: `, attr: { style: "color: var(--text-muted);" } });
+
+            const wikiCategory = this.plugin.settings.wikiCategories?.find(c => c.name.split(/[,，、]/).map(s => s.trim()).includes(tag.key));
+            if (wikiCategory && tag.value) {
+                const rawItems = tag.value.replace(/[\[\]]/g, '').split(/[,，、/|\\;；]+/).map(i => i.trim()).filter(i => i);
+                rawItems.forEach((item, index) => {
+                    const chip = tagSpan.createSpan({ text: item });
+                    chip.setCssStyles({ color: "var(--interactive-accent)", cursor: "pointer", fontWeight: "bold", transition: "filter 0.2s" });
+                    chip.addEventListener("mouseover", () => chip.setCssProps({ filter: "brightness(1.3)" }));
+                    chip.addEventListener("mouseout", () => chip.setCssProps({ filter: "brightness(1)" }));
+                    chip.onclick = (e) => { e.stopPropagation(); this.openWikiPanel(item, wikiCategory.folderPath); };
+                    if (index < rawItems.length - 1) tagSpan.createSpan({ text: ", ", attr: { style: "opacity: 0.5;" } });
+                });
+            } else {
+                tagSpan.createSpan({ text: tag.value.replace(/[[\]]/g, '') });
+            }
+        });
+    }
+
+    buildColumnDOM(container: HTMLElement, colTitle: string, filePath: string | null, scenes: any[], insertBeforeEl?: HTMLElement) {
+        const col = container.createDiv({ cls: "ns-corkboard-column" });
+        col.setCssStyles({
+            display: "flex", flexDirection: "column", minWidth: "320px", maxWidth: "320px",
+            backgroundColor: "var(--background-secondary-alt)", borderRadius: "10px", padding: "12px",
+            maxHeight: "100%", border: "1px solid var(--background-modifier-border)"
+        });
+
+        // 🌟 升級版：章節標題區變成 Flex 容器，容納左右兩邊元素
+        const headerEl = col.createEl("h3");
+        headerEl.setCssStyles({
+            margin: "0 0 15px 0", fontSize: "1.1em", color: "var(--text-normal)",
+            display: "flex", alignItems: "center", justifyContent: "space-between", // 改為 space-between
+            borderBottom: "2px solid var(--background-modifier-border)", paddingBottom: "10px"
+        });
+
+        const listContainer = col.createDiv({ cls: "ns-corkboard-list" });
+        listContainer.setCssStyles({ display: "flex", flexDirection: "column", gap: "15px", overflowY: "auto", flexGrow: "1", paddingRight: "5px" });
+        if (filePath) listContainer.dataset.filePath = filePath;
+
+        // 🌟 記低前綴同埋乾淨標題，方便等陣儲存嗰陣用
+        const match = colTitle.match(/^(\d+[\s_\-]+)(.*)$/);
+        listContainer.dataset.prefix = match ? match[1] : "";
+        listContainer.dataset.cleanTitle = match ? match[2] : colTitle;
+
+
+
+        // 👈 左邊：Icon ＋ 標題
+        const titleLeft = headerEl.createDiv();
+        titleLeft.setCssStyles({ display: "flex", alignItems: "center", gap: "8px", cursor: "grab", flexGrow: "1" });
+        titleLeft.addClass("ns-column-drag-handle");
+
+        const folderIcon = titleLeft.createSpan();
+        setIcon(folderIcon, "folder-open");
+        folderIcon.setCssStyles({ display: "flex", alignItems: "center", opacity: "0.7" });
+
+        const titleTextContainer = titleLeft.createSpan();
+        if (listContainer.dataset.prefix) {
+            titleTextContainer.createSpan({ text: listContainer.dataset.prefix, attr: { style: "opacity: 0.3; font-weight: normal;" } });
+        }
+        titleTextContainer.createSpan({ text: listContainer.dataset.cleanTitle });
+
+        // 👉 🌟 右邊：按鈕群組容器
+        const rightControls = headerEl.createDiv();
+        rightControls.setCssStyles({ display: "flex", gap: "4px", alignItems: "center" });
+
+
+        // 🌟 新增：就地改名按鈕 (鉛筆)
+        const btnEditCol = rightControls.createDiv();
+        setIcon(btnEditCol, "pencil");
+        btnEditCol.setCssStyles({ cursor: "pointer", opacity: "0.4", display: "flex", alignItems: "center", justifyContent: "center", padding: "4px", borderRadius: "4px" });
+        btnEditCol.addEventListener("mouseover", () => btnEditCol.setCssStyles({ opacity: "1", color: "var(--interactive-accent)" }));
+        btnEditCol.addEventListener("mouseout", () => btnEditCol.setCssStyles({ opacity: "0.4", color: "initial" }));
+
+        btnEditCol.onclick = (e) => {
+            e.stopPropagation();
+            new InputModal(this.app, "Rename Chapter", (newName) => {
+                if (!newName.trim()) return;
+                const safeName = newName.trim();
+
+                // 1. 更新 Dataset (俾等陣 Save 用)
+                listContainer.dataset.cleanTitle = safeName;
+
+                // 2. 即時更新畫面
+                titleTextContainer.empty();
+                if (listContainer.dataset.prefix) {
+                    titleTextContainer.createSpan({ text: listContainer.dataset.prefix, attr: { style: "opacity: 0.3; font-weight: normal;" } });
+                }
+                titleTextContainer.createSpan({ text: safeName });
+            }, listContainer.dataset.cleanTitle).open(); // 🌟 傳入舊名做預設值！
+        };
+
+
+        // 🌟 1. 先放：智能刪除空章節按鈕 (垃圾桶喺左)
+        const btnDeleteCol = rightControls.createDiv();
+        setIcon(btnDeleteCol, "trash-2");
+        btnDeleteCol.setCssStyles({ cursor: "pointer", opacity: "0.4", display: "flex", alignItems: "center", justifyContent: "center", padding: "4px", borderRadius: "4px" });
+        btnDeleteCol.addEventListener("mouseover", () => btnDeleteCol.setCssStyles({ opacity: "1", color: "var(--text-error)", backgroundColor: "var(--background-modifier-error-hover)" }));
+        btnDeleteCol.addEventListener("mouseout", () => btnDeleteCol.setCssStyles({ opacity: "0.4", color: "initial", backgroundColor: "transparent" }));
+
+        btnDeleteCol.onclick = async (e) => {
+            e.stopPropagation();
+            const cardsCount = listContainer.querySelectorAll(".ns-corkboard-card").length;
+
+            // 🛡️ 防禦機制：有卡片絕對唔畀刪除！
+            if (cardsCount > 0) {
+                new Notice("Cannot delete: This chapter still contains scenes. Please move them first.", 4000);
+                return;
+            }
+
+            new SimpleConfirmModal(this.app, "Delete this empty chapter?", () => {
+                // 🌟 魔法沙盒：只喺畫面上移除，唔觸碰實體檔案！
+                col.remove();
+                new Notice("Chapter removed from board (Will be trashed on Save).");
+            }).open();
+        };
+
+        // 🌟 2. 後放：就地插入新章節按鈕 (➕號喺右)
+        const btnAddColHere = rightControls.createDiv();
+        setIcon(btnAddColHere, "plus");
+        btnAddColHere.setCssStyles({ cursor: "pointer", opacity: "0.4", display: "flex", alignItems: "center", justifyContent: "center", padding: "4px", borderRadius: "4px" });
+        btnAddColHere.addEventListener("mouseover", () => btnAddColHere.setCssStyles({ opacity: "1", backgroundColor: "var(--background-modifier-hover)" }));
+        btnAddColHere.addEventListener("mouseout", () => btnAddColHere.setCssStyles({ opacity: "0.4", backgroundColor: "transparent" }));
+
+        btnAddColHere.onclick = (e) => {
+            e.stopPropagation();
+            new InputModal(this.app, "Insert New Chapter Here", (result) => {
+                if (!result.trim()) return;
+                this.buildColumnDOM(container, result, null, [], col.nextElementSibling as HTMLElement);
+            }).open();
+        };
+
+
+
+
+
+
+
+        scenes.forEach(scene => this.buildCardDOM(listContainer, scene));
+
+        const btnAddScene = col.createEl("button", { text: "+ Add Scene Card" });
+        btnAddScene.setCssStyles({ marginTop: "15px", backgroundColor: "transparent", border: "1px dashed var(--background-modifier-border)", color: "var(--text-muted)", cursor: "pointer", padding: "8px", borderRadius: "6px" });
+
+        btnAddScene.onclick = () => {
+            new SceneCreateModal(this.app, "Create New Scene", "", (result, colorId) => {
+                const newScene = { id: generateSceneId(), title: result, colorId: colorId, meta: [], isNew: true };
+                this.buildCardDOM(listContainer, newScene);
+                listContainer.scrollTop = listContainer.scrollHeight;
+            }).open();
+        };
+
+        if (insertBeforeEl) container.insertBefore(col, insertBeforeEl);
+        else container.appendChild(col);
+
+        this.sortables.push(new Sortable(listContainer, {
+            group: 'global-kanban-board',
+            animation: 150, handle: '.ns-corkboard-card', delay: 100, delayOnTouchOnly: true, ghostClass: 'ns-sortable-ghost'
+        }));
+    }
+
+    async renderGlobalCards(container: HTMLElement) {
+        // 🌟 傳入 workingFolderPath，只讀取當前部曲嘅檔案！
+        const files = getManuscriptFiles(this.app, this.workingFolderPath, this.plugin.settings.exportFolderPath);
         container.empty();
 
-        const activeView = this.editorView;
-        if (!activeView) return;
-
-        const text = activeView.editor.getValue();
-        const tree = this.view.parseDocument(text);
-        const isScrivenings = text.includes('++ FILE_ID:');
-
-        // 🌟 改變容器排版：變成橫向滑動嘅看板大畫布
-        container.setCssStyles({
-            display: "flex",
-            flexDirection: "row", // 打橫排
-            gap: "20px",
-            padding: "10px",
-            alignItems: "stretch",
-            overflowX: "auto", // iPad 橫向滑動神器
-            overflowY: "hidden",
-            height: "100%"
-        });
-
-        let sceneCount = 0;
-        const renderNameCount = new Map<string, number>();
-
-        // 🌟 遍歷每個章節 (Chapter)，建立獨立直欄 (Column)
-        tree.forEach((chapter, chapterIndex) => {
-            let chapterTitle = chapter.name.replace(/# 📄 |<span.*?<\/span>/g, "").trim();
-
-            // 🌟 修正 1：隱藏 Scrivenings 模式下頂部嗰個無用嘅 root 區塊
-            if (isScrivenings && chapterIndex === 0 && chapterTitle.toLowerCase() === "root" && chapter.scenes.length === 0) {
-                return; // 直接跳過，唔好畫個空直欄出嚟！
+        // 🌟 修正點 1：打開軟木板時，即刻將所有卡片嘅真實文字載入記憶體！
+        for (const file of files) {
+            const content = await this.app.vault.read(file);
+            const parsedData = parseContent(content, true, this.app, file);
+            for (const card of parsedData.cards) {
+                let sceneFullText = card.rawHeader + "\n";
+                if (card.meta && card.meta.length > 0) sceneFullText += card.meta.join("\n") + "\n";
+                sceneFullText += "\n" + card.body;
+                const safeKey = card.id || card.key;
+                this.liveSceneMap.set(safeKey, sceneFullText.trimEnd()); // 存入記憶體
             }
-
-            // 🌟 修正 2：如果係普通草稿，將 root 改個好聽啲嘅名
-            if (!chapterTitle || chapterTitle.toLowerCase() === "root") {
-                chapterTitle = isScrivenings ? "未分類區塊" : "當前草稿";
-            }
-
-            // 建立直欄
-            const col = container.createDiv({ cls: "ns-corkboard-column" });
-            col.setCssStyles({
-                display: "flex", flexDirection: "column",
-                minWidth: "320px", maxWidth: "320px",
-                backgroundColor: "var(--background-secondary-alt)",
-                borderRadius: "10px", padding: "12px",
-                maxHeight: "100%", border: "1px solid var(--background-modifier-border)"
-            });
-
-            col.createEl("h3", {
-                text: `📁 ${chapterTitle}`,
-                attr: { style: "margin: 0 0 15px 0; font-size: 1.1em; color: var(--text-normal); text-align: center; border-bottom: 2px solid var(--background-modifier-border); padding-bottom: 10px;" }
-            });
+        }
 
 
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const content = await this.app.vault.read(file);
+            const scenes = parseUniversalScenes(content);
+            this.buildColumnDOM(container, file.basename, file.path, scenes);
+        }
 
-
-
-
-
-
-
-
-            // 建立卡片放置區 (List Container)
-            const listContainer = col.createDiv({ cls: "ns-corkboard-list" });
-            listContainer.setCssStyles({
-                display: "flex", flexDirection: "column", gap: "15px",
-                overflowY: "auto", flexGrow: "1", minHeight: "100px", paddingRight: "5px"
-            });
-            listContainer.dataset.chapterIndex = chapterIndex.toString(); // 記低屬於邊個章節
-
-            // 遍歷章節內嘅場景，生成卡片
-            chapter.scenes.forEach(scene => {
-                sceneCount++;
-                let safeKey = scene.id;
-                if (!safeKey) {
-                    const count = renderNameCount.get(scene.name) || 0;
-                    safeKey = `NO_ID_${scene.name}_${count}`;
-                    renderNameCount.set(scene.name, count + 1);
-                }
-
-                const card = listContainer.createDiv({ cls: "ns-corkboard-card" });
-                card.setCssStyles({
-                    backgroundColor: "var(--background-primary)",
-                    border: "1px solid var(--background-modifier-border)",
-                    borderRadius: "8px", padding: "15px",
-                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                    display: "flex", flexDirection: "column", gap: "10px",
-                    cursor: "grab", position: "relative"
-                });
-                card.dataset.safeKey = safeKey;
-
-                // 卡片標題
-                card.createEl("h4", { text: `🎬 ${scene.name.replace(/<span.*?<\/span>/g, "")}`, attr: { style: "margin: 0; color: var(--text-accent); font-size: 1.05em;" } });
-
-                // 動態屬性提取
-                let noteText = "📝 (未填寫大綱筆記)";
-                const dynamicTags: { key: string, value: string }[] = [];
-                const lines = scene.content.split('\n');
-                for (let line of lines) {
-                    const clean = line.trim();
-                    if (clean.startsWith('> - ')) {
-                        const match = clean.match(/> -\s*(.*?)::\s*(.*)/);
-                        if (match) {
-                            const key = match[1].trim();
-                            const value = match[2].trim();
-                            if (key.toLowerCase() === 'note' || key === '備註') noteText = value;
-                            else dynamicTags.push({ key, value });
-                        }
-                    }
-                }
-
-                // 內文
-                const noteEl = card.createDiv({ text: noteText });
-                noteEl.setCssStyles({
-                    flexGrow: "1", fontSize: "0.9em", opacity: noteText.includes("(未填寫") ? "0.4" : "0.8",
-                    whiteSpace: "pre-wrap", maxHeight: "150px", overflow: "hidden", textOverflow: "ellipsis"
-                });
-
-                // 標籤
-                const footer = card.createDiv();
-                footer.setCssStyles({ display: "flex", gap: "6px", flexWrap: "wrap", fontSize: "0.8em", marginTop: "auto", paddingTop: "10px", borderTop: "1px solid var(--background-modifier-border)" });
-                dynamicTags.forEach(tag => {
-                    let icon = "🏷️";
-                    if (tag.key.toLowerCase().includes("pov") || tag.key.includes("視角")) icon = "👁️";
-                    if (tag.key.toLowerCase().includes("status") || tag.key.includes("狀態")) icon = "📌";
-                    footer.createSpan({ text: `${icon} ${tag.key}: ${tag.value.replace(/[[\]]/g, '')}`, attr: { style: "background: var(--background-secondary); padding: 2px 6px; border-radius: 4px; opacity: 0.8;" } });
-                });
-            });
-
-            // 🌟 為每個章節嘅直欄獨立啟動 SortableJS，並設定 Group 允許跨欄拖曳！
-            this.sortables.push(new Sortable(listContainer, {
-                group: 'kanban-board',  // 🔥 關鍵魔法：相同 group 就可以互相拉來拉去！
-                animation: 150,
-                delay: 100, delayOnTouchOnly: true,
-                ghostClass: 'ns-sortable-ghost',
-                onEnd: () => {
-                    // 任何拖曳放手後，觸發全域儲存
-                    this.saveCorkboardOrder(container);
-                }
-            }));
+        const addColBtn = container.createDiv({ cls: "ns-corkboard-column" });
+        addColBtn.setCssStyles({
+            display: "flex", alignItems: "center", justifyContent: "center",
+            minWidth: "320px", maxWidth: "320px", backgroundColor: "transparent",
+            border: "2px dashed var(--background-modifier-border)", borderRadius: "10px",
+            cursor: "pointer", color: "var(--text-muted)", fontSize: "1.2em", transition: "all 0.2s"
         });
+        addColBtn.createSpan({ text: "＋ Add New Chapter" });
+        addColBtn.addEventListener("mouseover", () => addColBtn.setCssStyles({ backgroundColor: "var(--background-secondary)" }));
+        addColBtn.addEventListener("mouseout", () => addColBtn.setCssStyles({ backgroundColor: "transparent" }));
+        addColBtn.onclick = () => {
+            new InputModal(this.app, "New Chapter Name", (result) => {
+                if (!result.trim()) return;
+                this.buildColumnDOM(container, result, null, [], addColBtn);
+            }).open();
+        };
 
-        if (sceneCount === 0) {
-            container.createDiv({ text: "找不到任何場景卡片。", attr: { style: "opacity: 0.6; padding: 20px;" } });
+        this.sortables.push(new Sortable(container, {
+            animation: 150, handle: '.ns-column-drag-handle', delay: 100, delayOnTouchOnly: true, ghostClass: 'ns-sortable-ghost'
+        }));
+    }
+
+    // ==========================================
+    // 📖 側滑面板：Wiki 雙模式
+    // ==========================================
+    async openWikiPanel(noteName: string, folderPath: string) {
+        this.wikiPanel.empty();
+        this.wikiPanel.setCssStyles({ width: "450px", transform: "translateX(0)" }); // 預設：窄面板 (閱讀)
+
+        const headerRow = this.wikiPanel.createDiv();
+        headerRow.setCssStyles({ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 20px", borderBottom: "1px solid var(--background-modifier-border)" });
+
+        headerRow.createEl("h3", { text: noteName, attr: { style: "margin: 0; color: var(--interactive-accent);" } });
+
+        const controls = headerRow.createDiv({ attr: { style: "display: flex; gap: 10px; align-items: center;" } });
+
+        // Wiki 鉛筆按鈕
+        const btnEdit = createIconButton(controls, "pencil", "");
+        btnEdit.onclick = async () => {
+            const file = this.app.metadataCache.getFirstLinkpathDest(noteName, folderPath || "");
+            // 🌟 修正點 2：移除 import('obsidian') 毒藥，直接用 TFile！
+            if (file && file instanceof TFile) {
+                const content = await this.app.vault.read(file);
+                this.renderEditMode(noteName, content, async (newText) => {
+                    await this.app.vault.modify(file, newText);
+                    new Notice("Wiki updated!");
+                    this.openWikiPanel(noteName, folderPath);
+                });
+            }
+        };
+
+        const btnClose = createIconButton(controls, "arrow-right", "");
+        btnClose.onclick = () => this.wikiPanel.setCssStyles({ transform: "translateX(100%)" });
+
+        const contentWrapper = this.wikiPanel.createDiv({ cls: "markdown-rendered" });
+        contentWrapper.setCssStyles({ padding: "20px", overflowY: "auto", flexGrow: "1", fontSize: "0.95em" });
+
+        const file = this.app.metadataCache.getFirstLinkpathDest(noteName, folderPath || "");
+        if (file && file instanceof TFile) {
+            const content = await this.app.vault.read(file);
+            await MarkdownRenderer.render(this.app, content, contentWrapper, file.path, this);
+        } else {
+            contentWrapper.createDiv({ text: `Cannot find note: ${noteName}` });
         }
     }
 
     // ==========================================
-    // 💾 儲存跨章節拖曳後的新順序 (雙引擎終極版)
+    // 🎬 側滑面板：劇情卡片雙模式 (先閱讀，後編輯)
     // ==========================================
-    saveCorkboardOrder(container: HTMLElement) {
-        const editor = this.editorView.editor;
-        const liveText = editor.getValue();
-        const isScrivenings = liveText.includes('++ FILE_ID:');
+    async openScenePanel(cardEl: HTMLElement, scene: any) {
+        this.wikiPanel.empty();
+        this.wikiPanel.setCssStyles({ width: "450px", transform: "translateX(0)" }); // 預設：窄面板 (閱讀)
 
-        new Notice("🔄 更新草稿結構中...");
+        const safeKey = cardEl.dataset.sceneId || cardEl.dataset.sceneTitle || "";
+        let currentText = this.pendingEdits.get(safeKey) || this.liveSceneMap.get(safeKey) || "";
 
-        if (!isScrivenings) {
-            // =========================================================
-            // 🌟 引擎 A：單獨章節模式 (100% 精準嘅 AST 解析器)
-            // =========================================================
-            const liveTree = this.view.parseDocument(liveText);
-            const liveSceneMap = new Map<string, string>();
-            const liveNameCount = new Map<string, number>();
-
-            // 1. 建立精準嘅場景緩存
-            liveTree.forEach(ch => {
-                ch.scenes.forEach(sc => {
-                    let safeKey = sc.id;
-                    if (!safeKey) {
-                        const count = liveNameCount.get(sc.name) || 0;
-                        safeKey = `NO_ID_${sc.name}_${count}`;
-                        liveNameCount.set(sc.name, count + 1);
-                    }
-                    liveSceneMap.set(safeKey, sc.content);
-                });
-            });
-
-            const chunks: string[] = [];
-            // 2. 放入頂部前言 (例如 YAML 等)
-            if (liveTree[0] && liveTree[0].preamble) {
-                chunks.push(liveTree[0].preamble.trimEnd());
-            }
-
-            // 3. 根據軟木板的新順序，完美重組
-            const cards = container.querySelectorAll(".ns-corkboard-card");
-            cards.forEach(card => {
-                const safeKey = (card as HTMLElement).dataset.safeKey;
-                if (safeKey && liveSceneMap.has(safeKey)) {
-                    chunks.push("\n\n" + liveSceneMap.get(safeKey)!.trimEnd());
-                }
-            });
-
-            // 4. 無痕寫入
-            const finalText = chunks.join("").trim() + "\n";
-            replaceEntireDocument(editor, finalText);
-            this.view.lastOutlineHash = ""; // 觸發側邊欄刷新
-            return; // 搞掂！提早結束！
+        // 全新卡片俾 Default Template
+        if (!currentText && cardEl.dataset.isNew === "true") {
+            const newColor = cardEl.dataset.colorId || "default";
+            const calloutType = newColor === "default" ? "NSmith" : `NSmith-${newColor}`;
+            currentText = `###### ${scene.title} <span class="ns-id" data-scene-id="${cardEl.dataset.sceneId}" data-color="${newColor}" data-warning="⛔️ ID (Do not edit)"></span>\n> [!${calloutType}] Scene Info\n> - Status:: #Writing\n> - Note:: \n\n(Write your scene here...)\n`;
         }
 
-        // =========================================================
-        // 🌟 引擎 B：串聯草稿模式 (保留 FILE ID 嘅正則切割器)
-        // =========================================================
-        const chapterParts = liveText.split(/(?=^[ \t]*# 📄 )/m);
-        const preambles: string[] = [];
-        const liveSceneMap = new Map<string, string>();
-        const liveNameCount = new Map<string, number>();
+        // ==========================================
+        // 🪄 魔法 1：分離 Callout 屬性區 (Meta) 與 內文區 (Body)
+        // ==========================================
+        let metaLines: string[] = [];
+        let bodyLines: string[] = [];
+        let isBody = false;
 
-        chapterParts.forEach(part => {
-            const sceneParts = part.split(/(?=^[ \t]*######\s)/m);
-            preambles.push(sceneParts[0]);
+        const lines = currentText.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const trimLine = line.trim();
+            if (!isBody) {
+                // 如果係標題，或者係 Callout (以 > 開頭)
+                if (trimLine.startsWith('######') || trimLine.startsWith('>')) {
+                    metaLines.push(line);
+                } else if (trimLine === "") {
+                    // 遇到第一個空行，開始當作內文
+                    bodyLines.push(line);
+                    isBody = true;
+                } else {
+                    bodyLines.push(line);
+                    isBody = true;
+                }
+            } else {
+                bodyLines.push(line);
+            }
+        }
 
-            for (let i = 1; i < sceneParts.length; i++) {
-                const scText = sceneParts[i];
-                const titleMatch = scText.match(/^[ \t]*######\s+(.*)$/m);
-                if (titleMatch) {
-                    const fullHeader = `###### ${titleMatch[1]}`;
-                    let safeKey = extractSceneId(fullHeader);
+        // 呢兩舊就係分離出嚟嘅字！
+        const displayMetaText = metaLines.join('\n');
+        const hiddenBodyText = bodyLines.join('\n');
 
-                    if (!safeKey) {
-                        const cleanName = cleanSceneTitle(fullHeader);
-                        const count = liveNameCount.get(cleanName) || 0;
-                        safeKey = `NO_ID_${cleanName}_${count}`;
-                        liveNameCount.set(cleanName, count + 1);
+
+        const headerRow = this.wikiPanel.createDiv();
+        headerRow.setCssStyles({ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 20px", borderBottom: "1px solid var(--background-modifier-border)" });
+
+        headerRow.createEl("h3", { text: scene.title, attr: { style: "margin: 0; color: var(--interactive-accent);" } });
+
+        const controls = headerRow.createDiv({ attr: { style: "display: flex; gap: 10px; align-items: center;" } });
+
+        // 🌟 劇情卡鉛筆按鈕
+        const btnEdit = createIconButton(controls, "pencil", "");
+        btnEdit.onclick = () => {
+            const spanRegex = /(<span class="ns-id"[^>]*><\/span>)/;
+            // 🌟 只對 displayMetaText 進行剝殼操作
+            const match = displayMetaText.match(spanRegex);
+            let hiddenSpan = "";
+            let editMarkdown = displayMetaText;
+
+            if (match) {
+                hiddenSpan = match[1];
+                editMarkdown = editMarkdown.replace(hiddenSpan, "");
+                editMarkdown = editMarkdown.replace(/(######.*?)\s+\n/, "$1\n");
+                editMarkdown = editMarkdown.replace(/######\s*🎬\s*/, "###### ");
+            }
+
+            // 🌟 編輯模式：只傳入 Callout 屬性區！
+            this.renderEditMode(`Edit: ${scene.title}`, editMarkdown, (newMetaText) => {
+                let finalMetaMarkdown = newMetaText;
+
+                // 還原標題同 ID
+                if (hiddenSpan) {
+                    const editLines = newMetaText.split('\n');
+                    let injected = false;
+                    for (let i = 0; i < editLines.length; i++) {
+                        const headerMatch = editLines[i].match(/^(#{1,6})\s*(.*)/);
+                        if (headerMatch) {
+                            let cleanNewTitle = headerMatch[2].replace(/^🎬\s*/, '').trim();
+                            if (!cleanNewTitle) cleanNewTitle = "Untitled Scene";
+                            editLines[i] = `###### ${cleanNewTitle} ${hiddenSpan}`;
+                            injected = true;
+                            break;
+                        }
                     }
-                    liveSceneMap.set(safeKey, scText);
+                    if (!injected) {
+                        let safeTitle = scene.title.replace(/^🎬\s*/, '').trim();
+                        finalMetaMarkdown = `###### ${safeTitle} ${hiddenSpan}\n` + newMetaText;
+                    } else {
+                        finalMetaMarkdown = editLines.join('\n');
+                    }
                 }
-            }
-        });
 
-        const chunks: string[] = [];
-        if (preambles[0]) chunks.push(preambles[0].trimEnd());
+                // ==========================================
+                // 🪄 魔法 2：將改好嘅 屬性區 同 隱藏嘅文稿 重新黐返埋一齊！
+                // ==========================================
+                let safeBody = hiddenBodyText.replace(/^\s+/, ""); // 清除開頭多餘空行
+                let finalFullText = finalMetaMarkdown.trimEnd();
 
-        const columns = container.querySelectorAll(".ns-corkboard-list");
-        columns.forEach((listEl) => {
-            const originalIndex = parseInt((listEl as HTMLElement).dataset.chapterIndex || "0");
-
-            if (originalIndex > 0 && originalIndex < preambles.length) {
-                chunks.push("\n\n" + preambles[originalIndex].trimEnd());
-            }
-
-            const cards = listEl.querySelectorAll(".ns-corkboard-card");
-            cards.forEach(card => {
-                const safeKey = (card as HTMLElement).dataset.safeKey;
-                if (safeKey && liveSceneMap.has(safeKey)) {
-                    chunks.push("\n\n" + liveSceneMap.get(safeKey)!.trimEnd());
+                if (safeBody) {
+                    finalFullText += "\n\n" + safeBody;
+                } else {
+                    finalFullText += "\n";
                 }
+
+                // 將完整文稿寫入沙盒記憶體
+                this.pendingEdits.set(safeKey, finalFullText);
+                this.liveSceneMap.set(safeKey, finalFullText);
+
+                // 即時解析新文字，並刷新卡片 UI
+                const parsedScenes = parseUniversalScenes(finalFullText);
+                let updatedScene = scene;
+                if (parsedScenes.length > 0) {
+                    updatedScene = parsedScenes[0];
+                    cardEl.dataset.sceneTitle = updatedScene.title;
+                    cardEl.empty();
+                    this.populateCardInnerDOM(cardEl, updatedScene);
+                }
+
+                new Notice("Edits saved to memory. Press Save & Close board to keep.", 3000);
+                this.openScenePanel(cardEl, updatedScene);
             });
+        };
+
+        const btnClose = createIconButton(controls, "arrow-right", "");
+        btnClose.onclick = () => this.wikiPanel.setCssStyles({ transform: "translateX(100%)" });
+
+        const contentWrapper = this.wikiPanel.createDiv({ cls: "markdown-rendered" });
+        contentWrapper.setCssStyles({ padding: "20px", overflowY: "auto", flexGrow: "1", fontSize: "0.95em" });
+
+        // 🌟 完美渲染 Callout 閱讀模式 (魔法 3：只 Render 屬性區！)
+        await MarkdownRenderer.render(this.app, displayMetaText, contentWrapper, "", this);
+    }
+
+    renderEditMode(title: string, rawMarkdown: string, onSave: (newText: string) => void) {
+        this.wikiPanel.empty();
+        // 🌟 順滑動畫：變闊為 600px！
+        this.wikiPanel.setCssStyles({ width: "600px", transform: "translateX(0)" });
+
+        const headerRow = this.wikiPanel.createDiv();
+        headerRow.setCssStyles({ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 20px", borderBottom: "1px solid var(--background-modifier-border)" });
+
+        headerRow.createEl("h3", { text: title, attr: { style: "margin: 0; color: var(--interactive-accent);" } });
+
+        const btnRow = headerRow.createDiv({ attr: { style: "display: flex; gap: 8px;" } });
+
+        const btnCancel = btnRow.createEl("button", { text: "Cancel" });
+        btnCancel.onclick = () => {
+            this.wikiPanel.setCssStyles({ transform: "translateX(100%)" });
+        };
+
+        const btnSave = btnRow.createEl("button", { text: "Save", cls: "mod-cta" });
+
+        const contentWrapper = this.wikiPanel.createDiv();
+        contentWrapper.setCssStyles({ padding: "20px", display: "flex", flexDirection: "column", flexGrow: "1" });
+
+        // iPad 友善嘅超大 Textarea
+        const textArea = contentWrapper.createEl("textarea");
+        textArea.value = rawMarkdown;
+        textArea.setCssStyles({ width: "100%", flexGrow: "1", resize: "none", padding: "15px", fontFamily: "var(--font-monospace)", fontSize: "14px", border: "1px solid var(--background-modifier-border)", borderRadius: "8px", backgroundColor: "var(--background-primary-alt)" });
+
+        // 🌟 魔法引擎：模擬 Obsidian 原生編輯器嘅 Auto-continue 功能
+        textArea.addEventListener('keydown', (e: KeyboardEvent) => {
+            // 只有禁單獨 Enter 先觸發 (Shift+Enter 容許正常換行)
+            if (e.key === 'Enter' && !e.shiftKey) {
+                const cursorPos = textArea.selectionStart;
+                const textBefore = textArea.value.substring(0, cursorPos);
+                const textAfter = textArea.value.substring(textArea.selectionEnd);
+
+                const lines = textBefore.split('\n');
+                const currentLine = lines[lines.length - 1];
+
+                // 🔍 雷達：認得 Callout List (> - )、Callout (> ) 或者普通 List (- )
+                const match = currentLine.match(/^(>\s*-\s*|>\s*|-\s*)/);
+
+                if (match) {
+                    e.preventDefault(); // 攔截預設嘅普通換行
+                    const prefix = match[1];
+
+                    // 🚪 智能逃脫 (Escape)：如果嗰行淨係得個符號 (即係用家喺空 List 撳 Enter)，就自動刪除佢跳出框框
+                    if (currentLine === prefix) {
+                        const newTextBefore = textBefore.substring(0, textBefore.length - prefix.length);
+                        textArea.value = newTextBefore + '\n' + textAfter;
+                        const newPos = newTextBefore.length + 1;
+                        textArea.selectionStart = textArea.selectionEnd = newPos;
+                    } else {
+                        // ✍️ 自動補全：換行並自動加上同一個符號
+                        const insertStr = '\n' + prefix;
+                        textArea.value = textBefore + insertStr + textAfter;
+                        const newPos = cursorPos + insertStr.length;
+                        textArea.selectionStart = textArea.selectionEnd = newPos;
+                    }
+                }
+            }
         });
 
-        const finalText = chunks.join("") + "\n";
-        replaceEntireDocument(editor, finalText);
-        this.view.lastOutlineHash = "";
+        btnSave.onclick = () => onSave(textArea.value);
+    }
+
+    // ==========================================
+    // 🛡️ 智能取消與賬本結算引擎
+    // ==========================================
+    async cancelCorkboard() {
+        const hasNewCards = Array.from(this.contentEl.querySelectorAll(".ns-corkboard-card")).some(c => (c as HTMLElement).dataset.isNew === "true");
+
+        const doCancel = async () => {
+            if (this.pendingEdits.size > 0) {
+                new Notice("Saving text edits to original files...", 2000);
+                const allFiles = getManuscriptFiles(this.app, this.workingFolderPath, this.plugin.settings.exportFolderPath);
+                for (const file of allFiles) {
+                    let content = await this.app.vault.read(file);
+                    let changed = false;
+                    for (const [id, newText] of this.pendingEdits.entries()) {
+                        const parsedData = parseContent(content, true, this.app, file);
+                        const card = parsedData.cards.find(c => c.id === id || c.key === id);
+                        if (card) {
+                            const oldBlock = card.rawHeader + "\n" + (card.meta.length > 0 ? card.meta.join("\n") + "\n" : "") + "\n" + card.body;
+                            content = content.replace(oldBlock.trimEnd(), newText.trimEnd());
+                            changed = true;
+                        }
+                    }
+                    if (changed) await this.app.vault.modify(file, content);
+                }
+                new Notice("Edits saved. Layout changes discarded.");
+            }
+            this.close();
+        };
+
+        if (hasNewCards) {
+            new SimpleConfirmModal(this.app, "⚠️ 警告：您有全新建立的劇情卡片！\n取消將放棄排版並永久遺失新卡片（現有舊卡片的文字修改則會被安全保留）。確定放棄嗎？", () => {
+                doCancel();
+            }).open();
+        } else {
+            doCancel();
+        }
+    }
+
+    // ==========================================
+    // 💾 🌟 Ultimate Settlement Engine (With Crash Protection)
+    // ==========================================
+    async saveGlobalCorkboard(container: HTMLElement, btnSaveEl?: HTMLButtonElement) {
+        try {
+            new Notice("🔄 Saving manuscript structure...", 2000);
+
+            let cachedTemplateText: string | null = null;
+            if (TEMPLATES_DIR) {
+                const tplFile = this.app.vault.getAbstractFileByPath(`${this.plugin.settings.bookFolderPath}/${TEMPLATES_DIR}/NovelSmith_Template.md`);
+                if (tplFile && tplFile instanceof TFile) {
+                    cachedTemplateText = await this.app.vault.read(tplFile);
+                }
+            }
+
+            const allFiles = getManuscriptFiles(this.app, this.workingFolderPath, this.plugin.settings.exportFolderPath);
+            const liveSceneMap = new Map<string, string>();
+            const chapterPreambles = new Map<string, string>();
+            const fileObjMap = new Map<string, TFile>();
+
+            for (const file of allFiles) {
+                fileObjMap.set(file.path, file);
+                const content = await this.app.vault.read(file);
+                const parsedData = parseContent(content, true, this.app, file);
+
+                let fullPreamble = "";
+                if (parsedData.yaml) fullPreamble += parsedData.yaml + "\n";
+                if (parsedData.preamble) fullPreamble += parsedData.preamble + "\n";
+                chapterPreambles.set(file.path, fullPreamble.trimEnd());
+
+                for (const card of parsedData.cards) {
+                    let sceneFullText = card.rawHeader + "\n";
+                    if (card.meta && card.meta.length > 0) sceneFullText += card.meta.join("\n") + "\n";
+                    sceneFullText += "\n" + card.body;
+
+                    const safeKey = card.id || card.key;
+                    liveSceneMap.set(safeKey, sceneFullText.trimEnd());
+                }
+            }
+
+            const columns = container.querySelectorAll(".ns-corkboard-list");
+
+            // ==========================================
+            // 🗑️ 🌟 智能垃圾桶結算：對比畫面與硬碟
+            // ==========================================
+            const keptFilePaths = new Set<string>();
+            columns.forEach(listEl => {
+                const path = (listEl as HTMLElement).dataset.filePath;
+                if (path) keptFilePaths.add(path);
+            });
+
+            for (const file of allFiles) {
+                // 如果硬碟有呢個檔案，但畫面上已經搵唔到佢個 path，證明用家喺板上 Delete 咗佢！
+                if (!keptFilePaths.has(file.path)) {
+                    console.log("Trashing deleted chapter:", file.path);
+                    await this.app.fileManager.trashFile(file); // 實體掉落垃圾桶
+                    fileObjMap.delete(file.path); // 喺 Map 移除，等陣唔好再處理佢
+                }
+            }
+
+
+
+
+            let chapterIndex = 1;
+
+            for (const listEl of Array.from(columns)) {
+                const el = listEl as HTMLElement;
+                const originalFilePath = el.dataset.filePath;
+                const chunks: string[] = [];
+
+                if (originalFilePath && fileObjMap.has(originalFilePath)) {
+                    const preamble = chapterPreambles.get(originalFilePath);
+                    if (preamble) chunks.push(preamble);
+                }
+
+                const cards = el.querySelectorAll(".ns-corkboard-card");
+                for (const card of Array.from(cards)) {
+                    const cardEl = card as HTMLElement;
+                    const sceneId = cardEl.dataset.sceneId;
+                    const sceneTitle = cardEl.dataset.sceneTitle;
+                    const safeKey = sceneId || sceneTitle || "";
+
+                    if (liveSceneMap.has(safeKey)) {
+                        // 🌟 優先使用面板修改過嘅字，冇修改過先用硬碟原本嘅字！
+                        let sceneMd = this.pendingEdits.get(safeKey) || liveSceneMap.get(safeKey)!;
+                        if (cardEl.dataset.colorModified === "true") {
+                            const newColor = cardEl.dataset.colorId || "default";
+                            if (sceneMd.includes('data-color="')) sceneMd = sceneMd.replace(/data-color="[^"]*"/, `data-color="${newColor}"`);
+                            else if (sceneMd.includes('data-scene-id="')) sceneMd = sceneMd.replace(/"><\/span>/, `" data-color="${newColor}"></span>`);
+                            const calloutType = newColor === "default" ? "NSmith" : `NSmith-${newColor}`;
+                            sceneMd = sceneMd.replace(/> \[!NSmith[^\]]*\]/, `> [!${calloutType}]`);
+                        }
+                        chunks.push("\n\n" + sceneMd);
+                    }
+                    else if (cardEl.dataset.isNew === "true") {
+                        const newColor = cardEl.dataset.colorId || "default";
+                        const calloutType = newColor === "default" ? "NSmith" : `NSmith-${newColor}`;
+
+                        let metaBlock = `> [!${calloutType}] Scene Info\n> - Time:: \n> - POV:: \n> - Status:: #Writing\n> - Note:: \n`;
+                        if (cachedTemplateText) {
+                            const metaBlockMatch = cachedTemplateText.match(/> \[!NSmith\][\s\S]*?(?=\n[^>]|$)/);
+                            if (metaBlockMatch) metaBlock = metaBlockMatch[0].replace(/> \[!NSmith[^\]]*\]/, `> [!${calloutType}]`);
+                        }
+
+                        // 🌟 修正點 3：移除 Markdown 入面硬編碼嘅 🎬 emoji
+                        const newCardMd = `###### ${sceneTitle} <span class="ns-id" data-scene-id="${sceneId}" data-color="${newColor}" data-warning="⛔️ ID (Do not edit)"></span>\n${metaBlock}\n\n(Write your scene here...)\n`;
+                        chunks.push("\n\n" + newCardMd);
+                    }
+                }
+
+                const newContent = chunks.join("").trim() + "\n";
+
+
+                const cleanTitle = el.dataset.cleanTitle || "Untitled_Chapter";
+                const prefix = chapterIndex < 10 ? `0${chapterIndex}_` : `${chapterIndex}_`;
+                const newName = `${prefix}${cleanTitle}.md`;
+                // 🌟 修正點 3：智能過濾路徑，防止出現 // 雙斜線崩潰
+                const parentPath = fileObjMap.has(originalFilePath!) ? fileObjMap.get(originalFilePath!)!.parent?.path : "";
+                const safeParentPath = parentPath === "/" ? "" : parentPath;
+                const safeWorkingPath = this.workingFolderPath === "/" ? "" : this.workingFolderPath;
+
+                if (originalFilePath && fileObjMap.has(originalFilePath)) {
+                    const file = fileObjMap.get(originalFilePath)!;
+                    const oldContent = await this.app.vault.read(file);
+                    if (newContent !== oldContent.trim() + "\n") {
+                        await this.app.vault.modify(file, newContent);
+                    }
+
+
+                    // 🌟 完美改名！
+                    const newPath = `${safeParentPath}/${newName}`;
+                    if (file.path !== newPath) {
+                        try { await this.app.fileManager.renameFile(file, newPath); } catch (e) { /* ignore */ }
+                    }
+                } else {
+                    const newPath = `${safeWorkingPath}/${newName}`;
+                    try { await this.app.vault.create(newPath, newContent); }
+                    catch (e) { console.error("Create new file failed", e); }
+                }
+                chapterIndex++;
+            }
+
+            new Notice("✅ Corkboard saved successfully!");
+            this.close();
+
+        } catch (error) {
+            // 🛡️ 防死機保護罩：如果出錯，解除鎖定，彈出警告！
+            console.error("Corkboard save error:", error);
+            new Notice("❌ Error saving corkboard. Please try again.", 5000);
+            if (btnSaveEl) {
+                btnSaveEl.innerText = "Save & Close";
+                btnSaveEl.disabled = false;
+            }
+        }
     }
 
     onClose() {
-        const { contentEl } = this;
-        this.sortables.forEach(s => s.destroy()); // 🌟 銷毀所有直欄引擎
+        this.sortables.forEach(s => s.destroy());
         this.sortables = [];
-        contentEl.empty();
-        this.view.lastOutlineHash = "";
-        void this.view.parseAndRender();
+        this.contentEl.empty();
+
+        if (this.anchorSceneId) {
+            if (this.isFromScrivenings) {
+                // 來自串聯草稿，無痕重建並跳轉
+                new Notice("Restoring Scrivenings mode...", 1500);
+                const folder = this.app.vault.getAbstractFileByPath(this.workingFolderPath);
+                if (folder && folder instanceof TFolder) {
+                    setTimeout(() => {
+                        void this.plugin.sceneManager.assignIDsToAllFiles(folder).then(() => {
+                            if (typeof this.plugin.scrivenerManager.rebuildScriveningsSilent === 'function') {
+                                void this.plugin.scrivenerManager.rebuildScriveningsSilent(folder, this.anchorSceneId);
+                            } else {
+                                void this.plugin.scrivenerManager.toggleScrivenings();
+                            }
+                        });
+                    }, 300);
+                }
+            } else {
+                // 🌟 來自普通大綱，全域搜尋並跳轉！
+                new Notice("Jumping to scene...", 1000);
+                setTimeout(async () => {
+                    const files = getManuscriptFiles(this.app, this.workingFolderPath, this.plugin.settings.exportFolderPath);
+                    for (const file of files) {
+                        const content = await this.app.vault.read(file);
+                        // 搵吓邊個實體檔案包含呢個 ID 或者 Title
+                        if (content.includes(`data-scene-id="${this.anchorSceneId}"`) || content.includes(`###### 🎬 ${this.anchorSceneId}`)) {
+                            const leaf = this.app.workspace.getLeaf(false);
+                            await leaf.openFile(file); // 打開該章節
+
+                            const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+                            if (view) {
+                                const editor = view.editor;
+                                for (let i = 0; i < editor.lineCount(); i++) {
+                                    const line = editor.getLine(i);
+                                    if (line.includes(`data-scene-id="${this.anchorSceneId}"`) || line.includes(`###### 🎬 ${this.anchorSceneId}`)) {
+                                        editor.setCursor({ line: i, ch: 0 });
+                                        editor.scrollIntoView({ from: { line: i, ch: 0 }, to: { line: i, ch: 0 } }, true);
+                                        break;
+                                    }
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }, 300); // 畀系統少少時間 Save 完
+            }
+        }
     }
 }

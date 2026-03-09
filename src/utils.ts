@@ -42,6 +42,52 @@ export const AIDS_DIR = `${BACKSTAGE_DIR}/Aids`;
 export const SCENE_DB_FILE = "_Scene_Database.md";
 
 // ============================================================
+// 🧠 Refactored Shared Utilities (UI & Logic Helpers)
+// ============================================================
+
+// 1. 共用：大綱/備註 關鍵字雷達
+export const SYNOPSIS_KEYS = ["synopsis", "description", "summary", "note", "大綱", "備註", "簡介"];
+
+export interface ExtractedTags {
+    foundSynopsis: string;
+    dynamicTags: { key: string, value: string }[];
+}
+
+export const extractSynopsisAndTags = (metaLines: string[]): ExtractedTags => {
+    let foundSynopsis = "";
+    const dynamicTags: { key: string, value: string }[] = [];
+
+    metaLines.forEach((metaLine: string) => {
+        const clean = metaLine.replace(/^>\s*/, "").trim();
+        if (clean.startsWith('- ')) {
+            const match = clean.match(/^-\s*(.*?)::\s*(.*)/);
+            if (match) {
+                const key = match[1].trim();
+                const value = match[2].trim();
+                if (!foundSynopsis && SYNOPSIS_KEYS.includes(key.toLowerCase())) {
+                    foundSynopsis = value;
+                } else {
+                    dynamicTags.push({ key, value });
+                }
+            }
+        }
+    });
+    return { foundSynopsis, dynamicTags };
+};
+
+// 2. 共用：從編輯器游標位置尋找 Scene ID (Anchor ID)
+export const getAnchorSceneIdFromCursor = (editor: Editor): string | null => {
+    const cursor = editor.getCursor();
+    for (let i = cursor.line; i >= 0; i--) {
+        const line = editor.getLine(i);
+        if (line.trim().startsWith("######")) {
+            return extractSceneId(line);
+        }
+    }
+    return null;
+};
+
+// ============================================================
 // 🛠️ Shared Utilities
 // ============================================================
 export const ensureFolderExists = async (app: App, folderPath: string) => {
@@ -211,13 +257,12 @@ export function cleanSceneTitle(header: string): string {
 export const RE_EXTRACT_COLOR = /data-color="([a-zA-Z0-9-]+)"/;
 
 export const SCENE_COLORS = [
-    { id: "default", icon: "⚪️", name: "Default (Colorless)", cssClass: "ns-color-grey" },
-    { id: "red", icon: "🔴", name: "Red (Conflict/Villain)", cssClass: "ns-color-red" },
-    { id: "orange", icon: "🟠", name: "Orange (Slice of Life/Suspense)", cssClass: "ns-color-orange" },
-    { id: "green", icon: "🟢", name: "Green (Growth/Supporting)", cssClass: "ns-color-green" },
-    { id: "blue", icon: "🔵", name: "Blue (Calm/Protagonist)", cssClass: "ns-color-blue" },
-    { id: "purple", icon: "🟣", name: "Purple (Mystery/Magic)", cssClass: "ns-color-purple" },
-    //{ id: "grey", icon: "🟤", name: "Grey (Memory/Transition)", cssClass: "ns-color-grey" }
+    { id: "default", icon: "⚪️", name: "Default (Colorless)", cssClass: "ns-color-grey", color: "var(--background-modifier-border)" },
+    { id: "red", icon: "🔴", name: "Red (Conflict/Villain)", cssClass: "ns-color-red", color: "#e5534b" },
+    { id: "orange", icon: "🟠", name: "Orange (Slice of Life/Suspense)", cssClass: "ns-color-orange", color: "#d9813b" },
+    { id: "green", icon: "🟢", name: "Green (Growth/Supporting)", cssClass: "ns-color-green", color: "#4bbf6b" },
+    { id: "blue", icon: "🔵", name: "Blue (Calm/Protagonist)", cssClass: "ns-color-blue", color: "#4b8be5" },
+    { id: "purple", icon: "🟣", name: "Purple (Mystery/Magic)", cssClass: "ns-color-purple", color: "#9c4be5" },
 ];
 
 export const getColorById = (colorId: string | null | undefined) => {
@@ -333,3 +378,22 @@ export function createIconButton(
 
     return btn;
 }
+
+// ============================================================
+// 📁 Global File Scanner (Strict Current Folder Scope)
+// ============================================================
+export const getManuscriptFiles = (app: App, targetFolderPath: string, exportFolderPath?: string): TFile[] => {
+    if (!targetFolderPath) return [];
+
+    return app.vault.getMarkdownFiles()
+        .filter(f => {
+            // 🌟 嚴格鎖定：只掃描「當前筆記所在」嘅同一層資料夾，唔會跨越去其他部曲！
+            if (f.parent?.path !== targetFolderPath) return false;
+
+            if (f.name.startsWith("_") || f.name.startsWith("Script_")) return false;
+            if (f.name === DRAFT_FILENAME) return false;
+            if (exportFolderPath && f.path.startsWith(exportFolderPath)) return false;
+            return true;
+        })
+        .sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true }));
+};

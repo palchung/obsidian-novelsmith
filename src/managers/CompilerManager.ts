@@ -75,9 +75,10 @@ export class CompilerManager {
 
             // B. Remove Scene card
             if (options.removeSceneInfo) {
-                const regexSceneInfo = RE_SCENE_INFO;
-                content = content.replace(regexSceneInfo, "");
 
+                content = content.replace(/^######\s+.*$/gm, "");
+
+                content = content.replace(/^>\s*\[\!NSmith.*?\].*(?:\n>\s*.*)*/gm, "");
             }
 
             // C. Remove comment
@@ -131,12 +132,13 @@ export class CompilerManager {
 
 
             if (options.insertFileNameAsHeading && options.insertFileNameAsHeading !== 'none') {
-
                 const level = parseInt(options.insertFileNameAsHeading, 10);
-
                 const hashes = '#'.repeat(level);
 
-                finalContent += `${hashes} ${file.basename}\n\n`;
+
+                const cleanChapterName = file.basename.replace(/^\d+[\s_\-]+/, "");
+
+                finalContent += `${hashes} ${cleanChapterName}\n\n`;
             }
 
             finalContent += content.trim() + "\n\n";

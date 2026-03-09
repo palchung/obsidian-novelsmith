@@ -1,8 +1,8 @@
 import { ItemView, WorkspaceLeaf, MarkdownView, Notice, Menu, setIcon, MarkdownRenderer, TFolder, TFile } from 'obsidian';
 import Sortable from 'sortablejs';
 import NovelSmithPlugin from '../../main';
-import { SimpleConfirmModal, DashboardBuilderModal, CorkboardModal } from '../modals';
-import { createIconButton, isScriveningsDraft, replaceEntireDocument, extractSceneId, cleanSceneTitle, DRAFT_FILENAME, extractSceneColor, getColorById, SCENE_COLORS } from '../utils';
+import { SimpleConfirmModal, DashboardBuilderModal, CorkboardModal, CorkboardDraftActionModal } from '../modals';
+import { getAnchorSceneIdFromCursor, getManuscriptFiles, createIconButton, isScriveningsDraft, replaceEntireDocument, extractSceneId, cleanSceneTitle, DRAFT_FILENAME, extractSceneColor, getColorById, SCENE_COLORS } from '../utils';
 
 
 export const VIEW_TYPE_STRUCTURE = "novelsmith-structure-view";
@@ -329,20 +329,62 @@ export class StructureView extends ItemView {
             }
         };
 
+
+
         // =========================================================
-        // 🌟 軟木板大綱按鈕 (放喺串聯同匯出中間)
+        // 🌟 Global Corkboard Button (With Vault-wide Draft Radar)
         // =========================================================
         const btnCorkboard = createIconButton(topBtnRow, "layout-dashboard", "Corkboard", {
-            // 加少少背景色等佢同普通掣有啲分別，你唔鍾意可以成個大括號刪走
             backgroundColor: "var(--interactive-normal)"
         });
 
-        btnCorkboard.onclick = () => {
-            if (view && this.plugin.checkInBookFolder(view.file)) {
-                // 🌟 喺 this 後面加多個 view，將當前嘅 Markdown 檔案傳遞入去！
-                new CorkboardModal(this.plugin.app, this, view).open();
+        // =========================================================
+        // 🌟 Global Corkboard Button (Strict Folder Scope & Smart Return)
+        // =========================================================
+        btnCorkboard.onclick = async () => {
+            const currentView = this.getValidMarkdownView();
+
+            // 🌟 修正點 1：使用全域標準攔截器，統一警告字眼，嚴格阻擋！
+            if (!currentView || !this.plugin.checkInBookFolder(currentView.file)) {
+                return; // checkInBookFolder 已經會自動彈出正確嘅 Notice
+            }
+
+            const currentFile = currentView.file;
+            const currentFolder = currentFile.parent;
+            const workingFolderPath = currentFolder ? currentFolder.path : this.plugin.settings.bookFolderPath;
+
+            const draftPath = workingFolderPath === "/" ? `/${DRAFT_FILENAME}` : `${workingFolderPath}/${DRAFT_FILENAME}`;
+            const draftFile = this.plugin.app.vault.getAbstractFileByPath(draftPath);
+
+            // 確保使用 TFile 避免 import() 毒藥
+            if (draftFile && draftFile instanceof TFile) {
+                new CorkboardDraftActionModal(
+                    this.plugin.app,
+                    async () => {
+                        new Notice("Syncing draft...", 2000);
+                        let anchorSceneId: string | null = null;
+                        if (currentFile.name.endsWith(".md")) {
+                            anchorSceneId = getAnchorSceneIdFromCursor(currentView.editor);
+                        }
+
+                        await this.plugin.scrivenerManager.syncBack(draftFile as TFile, currentFolder!);
+                        this.plugin.sceneManager.scheduleGenerateDatabase();
+
+                        // 🌟 修正點 2：傳入 isFromScrivenings = true (標記為來自串聯模式)
+                        new CorkboardModal(this.plugin, anchorSceneId, workingFolderPath, true).open();
+                    },
+                    async () => {
+                        new Notice("Discarding draft...", 2000);
+                        await this.plugin.scrivenerManager.discardDraft(draftFile as TFile);
+
+                        // 🌟 傳入 isFromScrivenings = false (因為捨棄咗，唔想再開返)
+                        new CorkboardModal(this.plugin, null, workingFolderPath, false).open();
+                    }
+                ).open();
+
             } else {
-                new Notice("請先打開一份小說草稿！");
+                const anchorSceneId = getAnchorSceneIdFromCursor(currentView.editor);
+                new CorkboardModal(this.plugin, anchorSceneId, workingFolderPath, false).open();
             }
         };
 
