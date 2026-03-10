@@ -1357,7 +1357,22 @@ export class CorkboardModal extends Modal {
         if (!currentText && cardEl.dataset.isNew === "true") {
             const newColor = cardEl.dataset.colorId || "default";
             const calloutType = newColor === "default" ? "NSmith" : `NSmith-${newColor}`;
-            currentText = `###### ${scene.title} <span class="ns-id" data-scene-id="${cardEl.dataset.sceneId}" data-color="${newColor}" data-warning="⛔️ ID (Do not edit)"></span>\n> [!${calloutType}] Scene Info\n> - Status:: #Writing\n> - Note:: \n\n(Write your scene here...)\n`;
+
+            // 🌟 神級修復：即時去硬碟讀取你專屬嘅 Template 屬性！
+            let metaBlock = `> [!${calloutType}] Scene Info\n> - Status:: #Writing\n> - Note:: `; // 預設底線
+            if (TEMPLATES_DIR) {
+                const tplFile = this.app.vault.getAbstractFileByPath(`${this.plugin.settings.bookFolderPath}/${TEMPLATES_DIR}/NovelSmith_Template.md`);
+                if (tplFile && tplFile instanceof TFile) {
+                    const cachedTemplateText = await this.app.vault.read(tplFile);
+                    const metaBlockMatch = cachedTemplateText.match(/> \[!NSmith\][\s\S]*?(?=\n[^>]|$)/);
+                    if (metaBlockMatch) {
+                        // 搵到 Template！替換做對應顏色嘅 Callout
+                        metaBlock = metaBlockMatch[0].replace(/> \[!NSmith[^\]]*\]/, `> [!${calloutType}]`);
+                    }
+                }
+            }
+
+            currentText = `###### ${scene.title} <span class="ns-id" data-scene-id="${cardEl.dataset.sceneId}" data-color="${newColor}" data-warning="⛔️ ID (Do not edit)"></span>\n${metaBlock}\n\n(Write your scene here...)\n`;
         }
 
         // ==========================================
