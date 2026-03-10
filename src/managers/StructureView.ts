@@ -683,19 +683,24 @@ export class StructureView extends ItemView {
                 const titleContainer = scCard.createDiv({ cls: "ns-scene-title-container" });
                 titleContainer.setCssStyles({
                     display: "flex",
-                    alignItems: "center",
-                    gap: "6px"
+                    alignItems: "flex-start", // 🌟 改為 flex-start，等多行字嗰陣 Icon 保持喺第一行
+                    gap: "6px",
+                    flex: "1",       // 🌟 佔據所有剩餘空間
+                    minWidth: "0"    // 🌟 絕密防禦：話俾 Flexbox 知佢可以縮細，防止被長字撐爆！
                 });
 
                 const iconEl = titleContainer.createSpan({ cls: "ns-scene-icon" });
-                setIcon(iconEl, "clapperboard"); // "file-text", "pen-tool", "clapperboard" 
+                setIcon(iconEl, "clapperboard");
                 iconEl.setCssStyles({
                     opacity: "0.6",
                     display: "flex",
-                    alignItems: "center"
+                    alignItems: "center",
+                    flexShrink: "0", // 🌟 防壓扁：確保 Icon 永遠唔會變形
+                    marginTop: "2px" // 🌟 微調對齊第一行字
                 });
 
-                titleContainer.createSpan({ text: scene.name });
+                // 🌟 套用 CSS 截斷魔法 Class！
+                titleContainer.createSpan({ text: scene.name, cls: "ns-scene-title-text" });
 
 
 
@@ -711,7 +716,8 @@ export class StructureView extends ItemView {
                     marginLeft: "auto",
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center"
+                    justifyContent: "center",
+                    flexShrink: "0" // 🌟 防擠走：確保掣永遠穩如泰山！
                 });
 
 

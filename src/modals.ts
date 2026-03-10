@@ -783,6 +783,18 @@ export class CorkboardModal extends Modal {
     liveSceneMap: Map<string, string> = new Map(); // 記住硬碟最原始嘅字
     pendingEdits: Map<string, string> = new Map(); // 記住你啱啱喺面板改嘅字
 
+    // 🌟 雷達專屬變數
+    activeRadarTokens: { key: string, value: string }[] = [];
+    isRadarMode: boolean = false;
+    radarDrawer: HTMLElement;
+    tokenContainer: HTMLElement;
+    radarStyleEl: HTMLStyleElement;
+
+
+
+
+
+
     constructor(plugin: NovelSmithPlugin, anchorSceneId: string | null = null, workingFolderPath: string, isFromScrivenings: boolean = false) {
         super(plugin.app);
         this.plugin = plugin;
@@ -795,29 +807,107 @@ export class CorkboardModal extends Modal {
         const { contentEl } = this;
         contentEl.empty();
 
+
+        // 🪄 注入雷達專用 CSS 魔法 (Semantic Zoom)
+        this.radarStyleEl = document.createElement("style");
+        this.radarStyleEl.innerHTML = `
+            .ns-corkboard-grid.is-radar-mode .ns-corkboard-card {
+                height: fit-content !important; 
+                min-height: 55px !important;
+                max-height: 80px !important; 
+                padding: 10px 15px !important;
+                overflow: hidden;
+                justify-content: center;
+                transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            }
+            .ns-corkboard-grid.is-radar-mode .ns-corkboard-card h4 {
+                display: -webkit-box !important;
+                -webkit-line-clamp: 2 !important;
+                -webkit-box-orient: vertical !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                font-size: 0.95em !important; /* 縮細少少字體，更符合鳥瞰圖比例 */
+                line-height: 1.3 !important;
+            }
+            .ns-corkboard-grid.is-radar-mode .ns-scene-note,
+            .ns-corkboard-grid.is-radar-mode .ns-scene-footer,
+            .ns-corkboard-grid.is-radar-mode .ns-scene-actions {
+                display: none !important;
+            }
+            .ns-corkboard-grid.is-radar-mode .ns-corkboard-card.is-dimmed {
+                opacity: 0.15 !important;
+                filter: grayscale(100%);
+            }
+            .ns-corkboard-grid.is-radar-mode .ns-corkboard-card.is-highlighted {
+                opacity: 1 !important;
+                box-shadow: 0 0 15px var(--interactive-accent);
+                border-color: var(--interactive-accent);
+                transform: scale(1.03);
+                z-index: 10;
+            }
+            .ns-radar-token {
+                display: flex; align-items: center; gap: 6px;
+                background: var(--interactive-accent); color: var(--text-on-accent);
+                padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold;
+            }
+            .ns-radar-token-close { cursor: pointer; opacity: 0.7; font-size: 1.1em; }
+            .ns-radar-token-close:hover { opacity: 1; }
+        `;
+        document.head.appendChild(this.radarStyleEl);
+
+
         this.modalEl.setCssStyles({ width: "95vw", height: "95vh", maxWidth: "none", maxHeight: "none" });
         contentEl.setCssStyles({ display: "flex", flexDirection: "column", height: "100%" });
         this.modalEl.addClass("ns-corkboard-modal");
 
-        const header = contentEl.createDiv({ cls: "ns-corkboard-header" });
-        header.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "2px solid var(--background-modifier-border)", paddingBottom: "10px", marginBottom: "20px" });
+        // 🌟 隱藏 Obsidian 原生嘅右上角 X 關閉掣 (避免與自訂 Cancel / Save 掣混淆)
+        const defaultCloseBtn = this.modalEl.querySelector('.modal-close-button') as HTMLElement;
+        if (defaultCloseBtn) defaultCloseBtn.setCssStyles({ display: "none" });
 
-        // 顯示當前嘅資料夾名，等用家清楚知道自己改緊邊本書
+        // 🌟 1. 重新抽返個資料夾名出嚟！
         const folderName = this.workingFolderPath.split('/').pop() || "Global";
-        header.createEl("h2", { text: `📌 Corkboard (${folderName})`, attr: { style: "margin: 0; color: var(--text-accent);" } });
 
-        const controls = header.createDiv();
-        controls.setCssStyles({ display: "flex", gap: "10px" });
+        // ==========================================
+        // 🌟 2. 完美重構：三合一頂部 Header (標題 + 搜尋框 + 按鈕)
+        // ==========================================
+        const headerRow = contentEl.createDiv();
+        headerRow.setCssStyles({
+            display: "flex", justifyContent: "space-between", alignItems: "flex-start", // 改用 flex-start 等標籤多嗰陣齊頂
+            marginBottom: "15px", paddingBottom: "10px", borderBottom: "2px solid var(--background-modifier-border)"
+        });
 
-        const btnCancel = controls.createEl("button", { text: "Cancel" });
-        btnCancel.onclick = () => this.cancelCorkboard(); // 🌟 攔截 Cancel 動作！
+        // 👈 左邊：原生 Icon + 標題 + 資料夾名
+        const titleLeft = headerRow.createDiv({ attr: { style: "display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-top: 4px;" } });
 
-        const btnSave = controls.createEl("button", { text: "Save & Close", cls: "mod-cta ns-save-btn" });
+        const titleIcon = titleLeft.createSpan();
+        setIcon(titleIcon, "layout-dashboard");
+        titleIcon.setCssStyles({ color: "var(--interactive-accent)" });
+
+        titleLeft.createEl("h2", { text: "Corkboard", attr: { style: "margin: 0;" } });
+
+        // 🌟 3. 資料夾名加入「智能截斷」！太長會自動變 ...
+        const folderSpan = titleLeft.createSpan({ text: `/ ${folderName}` });
+        folderSpan.setCssStyles({
+            fontSize: "1.1em", opacity: "0.6", fontWeight: "bold", marginLeft: "5px",
+            maxWidth: "15vw", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "inline-block"
+        });
+
+        // 🎯 中間：雷達追蹤器 (直接塞入 Header)
+        const radarConsole = headerRow.createDiv({ cls: "ns-radar-console" });
+        radarConsole.setCssStyles({ flexGrow: "1", minWidth: "0", display: "flex", margin: "0 15px" }); // 留少少左右邊距
+
+        // 👉 右邊：控制按鈕區 (Cancel & Save)
+        const headerControls = headerRow.createDiv({ attr: { style: "display: flex; gap: 10px; align-items: center; flex-shrink: 0; margin-top: 4px;" } });
+        const btnSave = headerControls.createEl("button", { text: "Save & Close", cls: "mod-cta ns-save-btn" });
+        const btnCancel = headerControls.createEl("button", { text: "Cancel" });
+
+
         btnSave.onclick = async () => {
             btnSave.disabled = true;
             btnSave.innerText = "⏳ Saving...";
             await this.saveGlobalCorkboard(gridContainer, btnSave);
         };
+        btnCancel.onclick = () => this.close();
 
         const gridContainer = contentEl.createDiv({ cls: "ns-corkboard-grid" });
         gridContainer.setCssStyles({
@@ -827,7 +917,13 @@ export class CorkboardModal extends Modal {
 
         gridContainer.createEl("h3", { text: "Loading manuscript data...", attr: { style: "opacity: 0.6; margin: auto;" } });
 
+
         await this.renderGlobalCards(gridContainer);
+
+        // 🌟 喺讀取完所有卡片之後，先至構建雷達 (確保 Scan 到最新屬性)
+        this.buildRadarConsole(radarConsole);
+
+
         // 🌟 構建「側滑資料面板 (Slide-over Drawer)」
         this.wikiPanel = contentEl.createDiv({ cls: "ns-corkboard-wiki-panel" });
         this.wikiPanel.setCssStyles({
@@ -838,7 +934,7 @@ export class CorkboardModal extends Modal {
             boxShadow: "-5px 0 20px rgba(0,0,0,0.15)",
             transform: "translateX(100%)", // 預設隱藏喺螢幕右邊出面
             transition: "transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)", // 順滑動畫
-            zIndex: "100", display: "flex", flexDirection: "column"
+            zIndex: "2000", display: "flex", flexDirection: "column"
         });
     }
 
@@ -860,6 +956,19 @@ export class CorkboardModal extends Modal {
         if (scene.isNew) card.dataset.isNew = "true";
 
         this.populateCardInnerDOM(card, scene); // 🚀 呼叫內部渲染器
+        // 🌟 神級優化：成張卡片都可以點擊編輯，支援微縮暗屏模式！
+        card.addEventListener("click", (e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest(".ns-scene-actions, .ns-scene-footer")) return; // 防止撳掣嗰陣誤觸
+
+            // 讀取最新記憶體，確保打開編輯器時係最新狀態！
+            const safeKey = card.dataset.sceneId || card.dataset.sceneTitle || "";
+            const content = this.pendingEdits.get(safeKey) || this.liveSceneMap.get(safeKey) || "";
+            const parsed = parseUniversalScenes(content);
+            const latestScene = parsed.length > 0 ? parsed[0] : scene;
+
+            this.openScenePanel(card, latestScene);
+        });
     }
 
     // 🌟 內部渲染器 (方便隨時清空重畫！)
@@ -872,18 +981,25 @@ export class CorkboardModal extends Modal {
         titleRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "flex-start" });
 
         const titleLeft = titleRow.createDiv();
-        titleLeft.setCssStyles({ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", flex: "1" });
+        // 🌟 1. 移除 flexWrap，改為 flex-start 頂端對齊，確保多行時 Icon 保持喺第一行位置
+        titleLeft.setCssStyles({ display: "flex", alignItems: "flex-start", gap: "6px", flex: "1" });
 
         const iconEl = titleLeft.createSpan();
         setIcon(iconEl, "clapperboard");
-        iconEl.setCssStyles({ opacity: "0.6", display: "flex", alignItems: "center" });
+        // 🌟 2. 加入 flexShrink: "0" 防壓扁，加少少 marginTop 等佢同第一行字平排
+        iconEl.setCssStyles({ opacity: "0.6", display: "flex", alignItems: "center", flexShrink: "0", marginTop: "2px" });
 
-        // 🌟 即時顯示最新標題
-        titleLeft.createEl("h4", { text: card.dataset.sceneTitle, attr: { style: "margin: 0; color: var(--text-accent); font-size: 1.05em; line-height: 1.2;" } });
+        // 🌟 3. 標題加入 flex: 1, word-break: break-word, white-space: normal 強制自動向下換行！
+        titleLeft.createEl("h4", {
+            text: card.dataset.sceneTitle,
+            attr: { style: "margin: 0; color: var(--text-accent); font-size: 1.05em; line-height: 1.3; flex: 1; word-break: break-word; white-space: normal;" }
+        });
 
         const jumpBtn = titleLeft.createDiv();
         setIcon(jumpBtn, "external-link");
-        jumpBtn.setCssStyles({ cursor: "pointer", opacity: "0.4", display: "flex", alignItems: "center", justifyContent: "center", padding: "2px" });
+        // 🌟 4. 加入 flexShrink: "0" 防擠走
+        jumpBtn.setCssStyles({ cursor: "pointer", opacity: "0.4", display: "flex", alignItems: "center", justifyContent: "center", padding: "2px", flexShrink: "0", marginTop: "2px" });
+
         const jumpSvg = jumpBtn.querySelector("svg");
         if (jumpSvg) { jumpSvg.style.width = "14px"; jumpSvg.style.height = "14px"; }
         jumpBtn.addEventListener("mouseover", () => jumpBtn.setCssStyles({ opacity: "1", color: "var(--interactive-accent)" }));
@@ -899,7 +1015,7 @@ export class CorkboardModal extends Modal {
             }).open();
         };
 
-        const titleRight = titleRow.createDiv();
+        const titleRight = titleRow.createDiv({ cls: "ns-scene-actions" });
         titleRight.setCssStyles({ display: "flex", alignItems: "center", gap: "6px" });
 
         if (card.dataset.isNew === "true") {
@@ -955,10 +1071,10 @@ export class CorkboardModal extends Modal {
         const { foundSynopsis, dynamicTags } = extractSynopsisAndTags(scene.meta || []);
 
         const noteText = foundSynopsis || (card.dataset.isNew === "true" ? "(New scene, edit later)" : "(No synopsis)");
-        const noteEl = card.createDiv({ text: noteText });
+        const noteEl = card.createDiv({ text: noteText, cls: "ns-scene-note" });
         noteEl.setCssStyles({ flexGrow: "1", fontSize: "0.9em", opacity: foundSynopsis ? "0.8" : "0.4", whiteSpace: "pre-wrap", maxHeight: "150px", overflow: "hidden", textOverflow: "ellipsis" });
 
-        const footer = card.createDiv();
+        const footer = card.createDiv({ cls: "ns-scene-footer" });
         footer.setCssStyles({ display: "flex", gap: "6px", flexWrap: "wrap", fontSize: "0.8em", marginTop: "auto", paddingTop: "10px", borderTop: "1px solid var(--background-modifier-border)" });
 
         // 即時反映 ✅ 完成狀態！
@@ -980,7 +1096,7 @@ export class CorkboardModal extends Modal {
 
             const wikiCategory = this.plugin.settings.wikiCategories?.find(c => c.name.split(/[,，、]/).map(s => s.trim()).includes(tag.key));
             if (wikiCategory && tag.value) {
-                const rawItems = tag.value.replace(/[\[\]]/g, '').split(/[,，、/|\\;；]+/).map(i => i.trim()).filter(i => i);
+                const rawItems = tag.value.replace(/[\[\]]/g, '').split(/(?=#)|[,，、;；]+/).map(i => i.trim()).filter(i => i);
                 rawItems.forEach((item, index) => {
                     const chip = tagSpan.createSpan({ text: item });
                     chip.setCssStyles({ color: "var(--interactive-accent)", cursor: "pointer", fontWeight: "bold", transition: "filter 0.2s" });
@@ -1191,7 +1307,7 @@ export class CorkboardModal extends Modal {
         this.wikiPanel.setCssStyles({ width: "450px", transform: "translateX(0)" }); // 預設：窄面板 (閱讀)
 
         const headerRow = this.wikiPanel.createDiv();
-        headerRow.setCssStyles({ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 20px", borderBottom: "1px solid var(--background-modifier-border)" });
+        headerRow.setCssStyles({ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "25px 20px 15px 20px", borderBottom: "1px solid var(--background-modifier-border)" });
 
         headerRow.createEl("h3", { text: noteName, attr: { style: "margin: 0; color: var(--interactive-accent);" } });
 
@@ -1278,7 +1394,7 @@ export class CorkboardModal extends Modal {
 
 
         const headerRow = this.wikiPanel.createDiv();
-        headerRow.setCssStyles({ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 20px", borderBottom: "1px solid var(--background-modifier-border)" });
+        headerRow.setCssStyles({ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "25px 20px 15px 20px", borderBottom: "1px solid var(--background-modifier-border)" });
 
         headerRow.createEl("h3", { text: scene.title, attr: { style: "margin: 0; color: var(--interactive-accent);" } });
 
@@ -1354,6 +1470,8 @@ export class CorkboardModal extends Modal {
 
                 new Notice("Edits saved to memory. Press Save & Close board to keep.", 3000);
                 this.openScenePanel(cardEl, updatedScene);
+                // 🌟 魔法聯動：如果處於雷達模式，改完字即刻重新發光！
+                if (this.isRadarMode) this.applyRadarMode();
             });
         };
 
@@ -1373,7 +1491,7 @@ export class CorkboardModal extends Modal {
         this.wikiPanel.setCssStyles({ width: "600px", transform: "translateX(0)" });
 
         const headerRow = this.wikiPanel.createDiv();
-        headerRow.setCssStyles({ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 20px", borderBottom: "1px solid var(--background-modifier-border)" });
+        headerRow.setCssStyles({ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "25px 20px 15px 20px", borderBottom: "1px solid var(--background-modifier-border)" });
 
         headerRow.createEl("h3", { text: title, attr: { style: "margin: 0; color: var(--interactive-accent);" } });
 
@@ -1469,6 +1587,212 @@ export class CorkboardModal extends Modal {
             doCancel();
         }
     }
+
+    // ==========================================
+    // 🔍 終極追蹤雷達引擎 (Dynamic Tracker)
+    // ==========================================
+    buildRadarConsole(container: HTMLElement) {
+        // 🌟 完美融入 Header：移除邊框、背景同 Padding
+        container.setCssStyles({
+            display: "flex", flexDirection: "column", position: "relative", flexGrow: "1", minWidth: "0"
+        });
+        const topRow = container.createDiv({ attr: { style: "display: flex; gap: 10px; align-items: center; width: 100%;" } });
+
+        const catSelect = topRow.createEl("select");
+        catSelect.setCssStyles({ width: "160px", padding: "6px" });
+        catSelect.createEl("option", { text: "Select to track..." }); // 🌟 剷走 Emoji，回歸純粹！
+
+        // 2️⃣ 🌟 第二部分 (移咗過嚟中間！)：控制按鈕群組
+        const btnControls = topRow.createDiv({ attr: { style: "display: flex; gap: 4px;" } });
+
+        // 原生「確定」按鈕 (Check)
+        const btnConfirm = btnControls.createDiv();
+        setIcon(btnConfirm, "check");
+        btnConfirm.setCssStyles({ cursor: "pointer", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center", opacity: "0.7", borderRadius: "4px", transition: "all 0.2s" });
+        btnConfirm.addEventListener("mouseover", () => btnConfirm.setCssStyles({ opacity: "1", backgroundColor: "var(--background-modifier-hover)", color: "var(--interactive-accent)" }));
+        btnConfirm.addEventListener("mouseout", () => btnConfirm.setCssStyles({ opacity: "0.7", backgroundColor: "transparent", color: "initial" }));
+
+        // 原生「清除」按鈕 (X) 
+        const btnClear = btnControls.createDiv();
+        setIcon(btnClear, "x");
+        btnClear.setCssStyles({ cursor: "pointer", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center", opacity: "0.5", borderRadius: "4px", transition: "all 0.2s" });
+        btnClear.addEventListener("mouseover", () => btnClear.setCssStyles({ opacity: "1", backgroundColor: "var(--background-modifier-hover)", color: "var(--text-error)" }));
+        btnClear.addEventListener("mouseout", () => btnClear.setCssStyles({ opacity: "0.5", backgroundColor: "transparent", color: "initial" }));
+
+        // 3️⃣ 🌟 第三部分 (移咗去最右邊！)：標籤收集區 (利用 flexGrow: "1" 填滿剩餘空間)
+        this.tokenContainer = topRow.createDiv();
+        this.tokenContainer.setCssStyles({ display: "flex", gap: "8px", flexWrap: "wrap", flexGrow: "1", padding: "6px", minHeight: "36px", border: "1px dashed var(--background-modifier-border)", borderRadius: "6px", alignItems: "center" });
+        this.renderTokens();
+
+
+
+
+
+
+
+
+        // 抽屜 (Drawer)
+        this.radarDrawer = container.createDiv();
+        this.radarDrawer.setCssStyles({
+            display: "none", flexWrap: "wrap", gap: "8px",
+            maxHeight: "40vh", overflowY: "auto", padding: "12px",
+            backgroundColor: "var(--background-primary)", borderRadius: "8px",
+            border: "1px solid var(--interactive-accent)",
+            position: "absolute", // 🌟 浮出水面，脫離排版流
+            top: "100%", // 🌟 貼住控制台底部
+            left: "0", right: "0", // 🌟 與控制台同寬
+            zIndex: "1000", // 🌟 確保蓋住下便所有大綱卡片
+            boxShadow: "0 10px 25px rgba(0,0,0,0.3)", // 🌟 加強立體陰影
+            marginTop: "5px" // 🌟 留少少呼吸空間
+        });
+        // 瞬間掃描所有屬性
+        const { categories, valueMap } = this.scanAllAttributes();
+        categories.forEach(cat => catSelect.createEl("option", { value: cat, text: cat }));
+
+        catSelect.onchange = () => {
+            const selectedCat = catSelect.value;
+            if (!selectedCat || !categories.includes(selectedCat)) {
+                this.radarDrawer.setCssStyles({ display: "none" }); return;
+            }
+            this.radarDrawer.empty();
+            this.radarDrawer.setCssStyles({ display: "flex" });
+
+            const values = valueMap.get(selectedCat) || [];
+            values.forEach(val => {
+                const chip = this.radarDrawer.createEl("button", { text: val });
+                chip.setCssStyles({ borderRadius: "16px", padding: "6px 14px", backgroundColor: "var(--background-primary-alt)", border: "1px solid var(--background-modifier-border)", cursor: "pointer", transition: "all 0.2s" });
+
+                chip.addEventListener("mouseover", () => chip.setCssStyles({ borderColor: "var(--interactive-accent)", color: "var(--interactive-accent)" }));
+                chip.addEventListener("mouseout", () => chip.setCssStyles({ borderColor: "var(--background-modifier-border)", color: "initial" }));
+
+                chip.onclick = () => {
+                    if (!this.activeRadarTokens.some(t => t.key === selectedCat && t.value === val)) {
+                        this.activeRadarTokens.push({ key: selectedCat, value: val });
+                        this.renderTokens();
+
+                        // 🌟 依然保持即時發光魔法！
+                        this.applyRadarMode();
+
+                        // 🚨 唔好再喺呢度收埋抽屜啦！等用家可以繼續揀第二個伏筆！
+                    }
+                };
+            });
+        };
+
+        // 🌟 撳「確定 (Check)」掣先至收埋抽屜同重置選單！
+        btnConfirm.onclick = () => {
+            this.radarDrawer.setCssStyles({ display: "none" });
+            catSelect.selectedIndex = 0;
+        };
+
+        // 清除按鈕邏輯保持不變
+        btnClear.onclick = () => {
+            this.activeRadarTokens = [];
+            this.renderTokens();
+            this.isRadarMode = false;
+            this.applyRadarMode();
+            this.radarDrawer.setCssStyles({ display: "none" });
+            catSelect.selectedIndex = 0;
+        };
+
+    }
+
+    scanAllAttributes() {
+        const valueMap = new Map<string, Set<string>>();
+        const effectiveMap = new Map<string, string>();
+        for (const [k, v] of this.liveSceneMap.entries()) effectiveMap.set(k, v);
+        for (const [k, v] of this.pendingEdits.entries()) effectiveMap.set(k, v); // 新改嘅字優先！
+
+        for (const text of effectiveMap.values()) {
+            const parsed = parseUniversalScenes(text);
+            if (parsed.length > 0 && parsed[0].meta) {
+                parsed[0].meta.forEach((metaLine: string) => {
+                    const clean = metaLine.replace(/^>\s*/, "").trim();
+                    if (clean.startsWith('- ')) {
+                        const match = clean.match(/^-\s*(.*?)::\s*(.*)/);
+                        if (match) {
+                            const key = match[1].trim(); const value = match[2].trim();
+                            if (["synopsis", "description", "summary", "note", "大綱", "備註", "簡介"].includes(key.toLowerCase())) return;
+
+                            if (!valueMap.has(key)) valueMap.set(key, new Set());
+                            const items = value.replace(/[\[\]]/g, '').split(/(?=#)|[,，、;；]+/).map(i => i.trim()).filter(i => i);
+                            items.forEach(i => valueMap.get(key)!.add(i));
+                        }
+                    }
+                });
+            }
+        }
+        return { categories: Array.from(valueMap.keys()).sort(), valueMap: new Map(Array.from(valueMap.entries()).map(([k, v]) => [k, Array.from(v).sort()])) };
+    }
+
+    renderTokens() {
+        this.tokenContainer.empty();
+        if (this.activeRadarTokens.length === 0) {
+            this.tokenContainer.createSpan({ text: "No attributes selected...", attr: { style: "opacity: 0.5; font-style: italic; padding: 2px;" } }); return;
+        }
+        this.activeRadarTokens.forEach((token, index) => {
+            const tEl = this.tokenContainer.createDiv({ cls: "ns-radar-token" });
+            tEl.createSpan({ text: `${token.key}: ${token.value}` });
+            const xBtn = tEl.createSpan({ text: "✕", cls: "ns-radar-token-close" });
+            xBtn.onclick = () => {
+                this.activeRadarTokens.splice(index, 1);
+                this.renderTokens();
+                if (this.isRadarMode) this.applyRadarMode(); // 即時更新雷達！
+            };
+        });
+    }
+
+    applyRadarMode() {
+        const grid = this.contentEl.querySelector(".ns-corkboard-grid");
+        if (!grid) return;
+
+        if (this.activeRadarTokens.length === 0) {
+            this.isRadarMode = false; grid.removeClass("is-radar-mode");
+            grid.querySelectorAll(".ns-corkboard-card").forEach(c => { c.removeClass("is-highlighted"); c.removeClass("is-dimmed"); });
+            return;
+        }
+
+        this.isRadarMode = true; grid.addClass("is-radar-mode");
+
+        grid.querySelectorAll(".ns-corkboard-card").forEach(card => {
+            const cardEl = card as HTMLElement;
+            const safeKey = cardEl.dataset.sceneId || cardEl.dataset.sceneTitle || "";
+            const content = this.pendingEdits.get(safeKey) || this.liveSceneMap.get(safeKey) || "";
+            let hasMatch = false;
+
+            const parsed = parseUniversalScenes(content);
+            if (parsed.length > 0 && parsed[0].meta) {
+                parsed[0].meta.forEach((metaLine: string) => {
+                    const clean = metaLine.replace(/^>\s*/, "").trim();
+                    if (clean.startsWith('- ')) {
+                        const match = clean.match(/^-\s*(.*?)::\s*(.*)/);
+                        if (match) {
+                            const cardKey = match[1].trim();
+                            // 🌟 補回 .filter(i => i) 確保唔會出現空字串導致配對失敗
+                            const cardItems = match[2].trim().replace(/[\[\]]/g, '').split(/(?=#)|[,，、;；]+/).map(i => i.trim()).filter(i => i);
+
+                            this.activeRadarTokens.forEach(token => {
+                                // 🌟 精準配對：屬性 Key 要同，而且內容要包含 Token 嘅值
+                                if (token.key === cardKey && cardItems.includes(token.value)) {
+                                    hasMatch = true;
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+            if (hasMatch) {
+                cardEl.removeClass("is-dimmed");
+                cardEl.addClass("is-highlighted");
+            } else {
+                cardEl.removeClass("is-highlighted");
+                cardEl.addClass("is-dimmed");
+            }
+        });
+    }
+
+
+
 
     // ==========================================
     // 💾 🌟 Ultimate Settlement Engine (With Crash Protection)
@@ -1627,6 +1951,7 @@ export class CorkboardModal extends Modal {
     }
 
     onClose() {
+        if (this.radarStyleEl) this.radarStyleEl.remove();
         this.sortables.forEach(s => s.destroy());
         this.sortables = [];
         this.contentEl.empty();

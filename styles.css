@@ -93,21 +93,25 @@ body.ns-mode-dialogue .cm-dialogue-text {
     background-color: var(--background-primary);
     border: 1px solid var(--background-modifier-border);
     border-left: 4px solid var(--text-muted);
-    /* Add a line on the left for identification */
     border-radius: 6px;
     padding: 12px 10px;
-    /* Larger padding */
     margin-bottom: 8px;
     cursor: grab;
     transition: transform 0.1s, box-shadow 0.1s;
-
-    /* Prevent text wrapping, truncate with ... */
-    white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;
     font-size: 0.9em;
-
     cursor: pointer;
+}
+
+.ns-scene-title-text {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    line-height: 1.3 !important;
 }
 
 .ns-scene-card:hover {
