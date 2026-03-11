@@ -36,7 +36,7 @@ This plugin has already submitted to Obsidian and awaiting for their approval.
 
 ## 🎮 Try the Demo Vault (Interactive Tutorial)
 
-Before installing NovelSmith on your precious manuscript, **we highly recommend downloading the [NovelSmith Demo Vault](https://github.com/palchung/novelsmith-demo).** This is not just a showcase—it serves as an interactive, hands-on tutorial. You can safely play around with Scrivenings Mode, drag and drop scene cards, and test the atomic backup features using the dummy text provided. It's the fastest way to understand how the plugin works!
+Before installing NovelSmith on your precious manuscript, **I highly recommend downloading the [NovelSmith Demo Vault](https://github.com/palchung/novelsmith-demo).** This is not just a showcase—it serves as an interactive, hands-on tutorial. You can safely play around with Scrivenings Mode, drag and drop scene cards, and test the atomic backup features using the dummy text provided. It's the fastest way to understand how the plugin works!
 
 ---
 
