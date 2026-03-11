@@ -1,3 +1,33 @@
+# 🖋️ NovelSmith: A Writer's Forge for Obsidian
+
+Hello fellow writers.
+
+I am a novelist who primarily writes on an iPad. Like many of you, I fell in love with Obsidian for its sheer simplicity and focus. But as my manuscripts grew longer and more complex, I found myself longing for the structural power of professional writing software—without sacrificing the clean, distraction-free environment of a local markdown vault.
+
+I couldn't find a tool that perfectly fit this workflow, so I built NovelSmith. It was born out of my own struggles with drafting, organizing, and navigating the messy middle of a book. I’m sharing it here, hoping it might help you forge your stories with a little more peace of mind.
+
+NovelSmith is built entirely on four quiet, but firm, philosophies:
+
+### 1. 📱 Mobile First
+Inspiration doesn’t only strike at a desk. Because my primary writing device is an iPad, I designed NovelSmith’s interface to feel natural and responsive on touch screens. Whether you are dragging scene cards across the Corkboard or swiping through your world-building Wiki, the experience remains fluid. You can take your manuscript to a coffee shop and sculpt your story comfortably on a tablet.
+
+### 2. ✍️ Writing First
+A good writing tool should be invisible until you need it. When you sit down to write, you shouldn't have to fill out complex forms, configure YAML frontmatter, or manage databases. You should just face the page. 
+
+You can write thousands of words without even noticing this plugin exists. When you finally feel the need to structure the chaos, simply "Insert Scene Card" (a H6 heading + a callout). NovelSmith quietly wakes up, reads your structure, and offers its help. It adapts to your creative flow, never the other way around.
+
+### 3. 📝 Markdown First
+Your words belong to you. NovelSmith operates with absolute zero lock-in. I don't hide your manuscript or worldbible information inside proprietary JSON files or fragile index documents. 
+
+This philosophy extends to the plugin's most powerful features. When you use the global Corkboard to drag a scene into a completely different chapter, or when you reorder entire chapters, NovelSmith isn't just updating a virtual database. It is quietly and safely moving and renaming your actual, native Markdown files in the background. Your native Obsidian file explorer remains the single source of truth — always clean, always accurate, and entirely yours. If you uninstall NovelSmith tomorrow, your book remains perfectly structured.
+
+### 4. 🤝 Community First
+The Obsidian community has already built incredible tools, and NovelSmith respects that ecosystem. Instead of reinventing the wheel with heavy, custom chart libraries, the Dashboard simply generates standard `Dataview` code. This keeps the plugin remarkably lightweight and allows advanced users to freely customize their writing stats using the tools they already know and love.
+
+This plugin has already submitted to Obsidian and awaiting for their approval. 
+
+---
+
 # ⚔️ NovelSmith (Beta)
 
 **Forge your novel, one scene at a time.** NovelSmith is a comprehensive, Scrivener-inspired writing environment built directly into Obsidian. It transforms your vault into a powerhouse for long-form fiction writing, offering seamless chapter merging, atomic version control, dynamic outlining, intelligent worldbuilding, and no-code data analytics—all without breaking standard Markdown.
