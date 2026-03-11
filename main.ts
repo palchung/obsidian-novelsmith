@@ -9,6 +9,7 @@ import { WikiManager } from './src/managers/WikiManager';
 import { CompilerManager } from './src/managers/CompilerManager';
 import { SceneManager } from './src/managers/SceneManager';
 import { DashboardManager } from './src/managers/DashboardManager';
+import { StatsManager, DEFAULT_STATS, StatsData } from './src/managers/StatsManager';
 import { redundantHighlighter, dialogueHighlighter, structureHighlighter } from './src/decorators';
 import { StructureView, VIEW_TYPE_STRUCTURE } from './src/managers/StructureView';
 import { ST_WARNING, DRAFT_FILENAME, BACKSTAGE_DIR, TEMPLATES_DIR, ensureFolderExists, isScriveningsDraft } from './src/utils';
@@ -25,12 +26,17 @@ export default class NovelSmithPlugin extends Plugin {
     compilerManager: CompilerManager;
     sceneManager: SceneManager;
     dashboardManager: DashboardManager;
+    statsManager: StatsManager;
+
+    // 🌟 2. Cache to track typed characters
+    private fileLengthCache: Map<string, number> = new Map();
 
     // 🔥 Safeguard System: Record the last warning time (for cooldown)
     lastDraftWarningTime: number = 0;
 
-    // 🔥 Extreme Power Saving: Debounce Timer
+    // 🔥 Power Saving: Debounce Timer
     private draftCheckTimer: number | null = null;
+    private inkDropTimer: number | null = null;
 
     async onload() {
         //console.log('NovelSmith booting');
@@ -46,6 +52,22 @@ export default class NovelSmithPlugin extends Plugin {
         this.compilerManager = new CompilerManager(this.app, this.settings);
         this.sceneManager = new SceneManager(this.app, this.settings);
         this.dashboardManager = new DashboardManager(this.app, this.settings);
+
+
+        // 🌟 3. Instantiate the StatsManager and load data
+        this.statsManager = new StatsManager(this);
+        await this.statsManager.loadData(this.settings.statsData);
+
+        // 🌟 4. Listen to file open to baseline the character count
+        this.registerEvent(this.app.workspace.on('file-open', async (file) => {
+            if (file && file.extension === 'md' && this.checkInBookFolderSilent(file)) {
+                const content = await this.app.vault.read(file);
+                this.fileLengthCache.set(file.path, content.length);
+            }
+        }));
+
+
+
 
         this.registerEditorExtension([redundantHighlighter, dialogueHighlighter, structureHighlighter]);
 
@@ -109,6 +131,36 @@ export default class NovelSmithPlugin extends Plugin {
                 }, 1500); // 1500 milliseconds = 1.5 seconds
             })
         );
+
+        // =================================================================
+        // 🏆 Background Silent Tracker: Auto-tally Ink Drops when user pauses typing
+        // =================================================================
+        this.registerEvent(
+            this.app.workspace.on('editor-change', (editor, view) => {
+                if (this.inkDropTimer !== null) window.clearTimeout(this.inkDropTimer);
+
+                // 當用家停低打字 3 秒後，自動結算墨水滴！
+                this.inkDropTimer = window.setTimeout(async () => {
+                    if (view && view.file && this.checkInBookFolderSilent(view.file)) {
+                        const currentText = editor.getValue();
+                        const currentLength = currentText.length;
+                        const previousLength = this.fileLengthCache.get(view.file.path) || currentLength;
+
+                        const inkDropsEarned = currentLength - previousLength;
+
+                        // 只有當字數真係有變動先記錄，避免浪費效能
+                        if (inkDropsEarned !== 0) {
+                            this.fileLengthCache.set(view.file.path, currentLength);
+                            // 🌟 靜靜雞計分，唔會彈 Notice 騷擾用家
+                            await this.statsManager.recordActivity(inkDropsEarned);
+                        }
+                    }
+                }, 3000); // 3000 毫秒 = 3 秒
+            })
+        );
+
+
+
 
         // =================================================================
         // 📊 Dashboard Widget Generator Command
@@ -403,6 +455,7 @@ export default class NovelSmithPlugin extends Plugin {
         } else {
             this.sceneManager.executeAssignIDsSilent(view);
         }
+
     }
 
     // =================================================================
@@ -512,6 +565,8 @@ export default class NovelSmithPlugin extends Plugin {
     }
 
     async saveSettings() {
+        // 🌟 Sync stats data before saving to disk
+        this.settings.statsData = this.statsManager.data;
         await this.saveData(this.settings);
         this.scrivenerManager.updateSettings(this.settings);
         this.historyManager.updateSettings(this.settings);

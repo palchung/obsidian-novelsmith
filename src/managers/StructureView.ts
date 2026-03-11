@@ -62,6 +62,14 @@ export class StructureView extends ItemView {
     private lastInfoTitle: string | null = null;
     private lastInfoHash: string = "";
 
+    // 🔥 Sprint Mode Variables
+    private isSprinting: boolean = false;
+    private sprintRemainingSeconds: number = 0;
+    private sprintStartLength: number = 0;
+    private sprintTimerInterval: number | null = null;
+    private sprintDropsEarned: number = 0;
+
+
 
     private activeTab: 'outline' | 'history' | 'info' = 'outline';
     private selectedSceneId: string | null = null;
@@ -101,9 +109,16 @@ export class StructureView extends ItemView {
                 void this.parseAndRender();
             }
         }));
-        this.registerEvent(this.app.workspace.on('editor-change', () => {
+        this.registerEvent(this.app.workspace.on('editor-change', (editor) => {
+            // 🌟 SPRINT INTERCEPTOR: 如果衝刺緊，只更新數字，絕對唔刷新大綱！
+            if (this.isSprinting) {
+                this.sprintDropsEarned = Math.max(0, editor.getValue().length - this.sprintStartLength);
+                const dropsEl = this.contentEl.querySelector(".ns-sprint-drops");
+                if (dropsEl) dropsEl.textContent = `+ ${this.sprintDropsEarned} Drops`;
+                return;
+            }
+
             if (this.activeTab === 'outline') {
-                // 🔥 Repair：Debounce
                 if (this.renderTimer) window.clearTimeout(this.renderTimer);
                 this.renderTimer = window.setTimeout(() => { void this.parseAndRender(); }, 500);
             }
@@ -150,6 +165,8 @@ export class StructureView extends ItemView {
                 window.setTimeout(() => { void this.parseAndRender(); }, 100);
             }
         });
+
+
     }
 
     async refresh() {
@@ -180,6 +197,16 @@ export class StructureView extends ItemView {
 
             const container = this.contentEl.querySelector(".ns-structure-container");
             if (!container) return;
+
+
+            // 🌟 變身魔法：如果衝刺緊，清空大綱，畫出巨大時鐘，直接 return！
+            if (this.isSprinting) {
+                container.empty();
+                this.renderSprintUI(container);
+                return;
+            }
+
+
 
             const view = this.getValidMarkdownView();
 
@@ -389,6 +416,24 @@ export class StructureView extends ItemView {
         };
 
         // =========================================================
+        // ⏱️ Word Sprint Button
+        // =========================================================
+        const btnSprint = createIconButton(topBtnRow, "timer", "Sprint", {
+            backgroundColor: "var(--color-orange)", // 用醒神嘅橙色！
+            color: "white"
+        });
+        btnSprint.onclick = () => {
+            const currentView = this.getValidMarkdownView();
+            if (!currentView) { new Notice("Please open a draft first!"); return; }
+
+            import('../modals').then(({ SprintSetupModal }) => {
+                new SprintSetupModal(this.plugin.app, (mins) => {
+                    this.startSprint(mins, currentView);
+                }).open();
+            });
+        };
+
+        // =========================================================
         // 🔥 Discard & Compile button
         // =========================================================
         if (isDraftMode) {
@@ -416,6 +461,28 @@ export class StructureView extends ItemView {
                 if (view && this.plugin.checkInBookFolder(view.file)) this.plugin.compilerManager.openCompileModal(view);
             };
         }
+
+        // =========================================================
+        // 🏆 Writer's Journey (Heatmap Dashboard) Button
+        // =========================================================
+        const btnStats = createIconButton(topBtnRow, "trophy", "Journey", {
+            backgroundColor: "transparent",
+            border: "1px solid var(--interactive-accent)",
+            color: "var(--interactive-accent)"
+        });
+
+        // Optional: Make it glow slightly when hovered
+        btnStats.addEventListener("mouseover", () => btnStats.setCssStyles({ backgroundColor: "var(--interactive-accent)", color: "var(--text-on-accent)" }));
+        btnStats.addEventListener("mouseout", () => btnStats.setCssStyles({ backgroundColor: "transparent", color: "var(--interactive-accent)" }));
+
+        btnStats.onclick = () => {
+
+            import('../modals').then(({ StatsDashboardModal }) => {
+                new StatsDashboardModal(this.plugin).open();
+            });
+        };
+
+
 
 
         // =========================================================
@@ -1056,8 +1123,12 @@ export class StructureView extends ItemView {
 
         headerRow.createEl("h3", { text: noteName, attr: { style: "margin: 0; color: var(--interactive-accent);" } });
 
-        const file = this.app.metadataCache.getFirstLinkpathDest(noteName, folderPath || "");
-
+        // 🌟 精準路徑狙擊 (防止同名檔案開錯)
+        const exactPath = folderPath ? `${folderPath}/${noteName}.md` : `${noteName}.md`;
+        let file: TFile | null = this.app.vault.getAbstractFileByPath(exactPath) as TFile | null;
+        if (!file || !(file instanceof TFile)) {
+            file = this.app.metadataCache.getFirstLinkpathDest(noteName, folderPath || ""); // 備用方案
+        }
 
         if (file) {
             const btnEdit = createIconButton(headerRow, "pencil", "");
@@ -1241,7 +1312,9 @@ export class StructureView extends ItemView {
 
 
             const scenes = el.querySelectorAll(".ns-scene-card");
-            scenes.forEach((sc) => {
+            let hasConflict = false; // 🛑 衝突標記
+
+            for (const sc of Array.from(scenes)) {
                 const scEl = sc as HTMLElement;
                 const safeKey = scEl.dataset.safeKey;
 
@@ -1250,11 +1323,20 @@ export class StructureView extends ItemView {
                 if (content && content.trim()) {
                     chunks.push(content.trimEnd());
                 } else {
-                    // fall back to old content from WeakMap
-                    const fallbackContent = this.sceneContentMap.get(scEl);
-                    if (fallbackContent) chunks.push(fallbackContent.trimEnd());
+                    // 🚨 致命危險：畫面同編輯器內容脫節！
+                    // 絕對唔可以盲目用 fallbackContent 覆寫，會導致用家最新打嘅字遺失！
+                    console.error("Sync conflict! Missing live content for key:", safeKey);
+                    hasConflict = true;
+                    break; // 停止處理呢個章節
                 }
-            });
+            }
+
+            // 🛑 如果發現任何一張卡片對唔上，即刻中斷成個 Drag & Drop 儲存過程！
+            if (hasConflict) {
+                new Notice("Outline sync conflict! Drag cancelled to protect your latest typing.", 4000);
+                this.parseAndRender(); // 強制重新讀取最新文字
+                return; // 直接中止，唔好替換文稿！
+            }
         });
 
         // =========================================================
@@ -1266,6 +1348,12 @@ export class StructureView extends ItemView {
 
         this.lastOutlineHash = "";
         void this.parseAndRender();
+
+        // 🌟 1. 自動觸發 Smart Save，確保新卡片即時獲得 ID
+        void this.plugin.executeSmartSave(view);
+
+        // 🌟 2. 給予大綱整理獎勵 (傳入 0 滴字數，但系統會自動 +10 分 Action Point)
+        void this.plugin.statsManager.recordActivity(0);
     }
 
 
@@ -1363,4 +1451,74 @@ export class StructureView extends ItemView {
         if (tree.length === 0) tree.push(currentChapter);
         return tree;
     }
+
+    // =========================================================
+    // ⏱️ Sprint Engine Core
+    // =========================================================
+    startSprint(minutes: number, view: MarkdownView) {
+        this.isSprinting = true;
+        this.sprintRemainingSeconds = minutes * 60;
+        this.sprintStartLength = view.editor.getValue().length;
+        this.sprintDropsEarned = 0;
+
+        this.lastOutlineHash = ""; // 強制刷新畫面
+        void this.parseAndRender();
+
+        if (this.sprintTimerInterval) window.clearInterval(this.sprintTimerInterval);
+
+        // 每一秒鐘扣一秒
+        this.sprintTimerInterval = window.setInterval(() => {
+            this.sprintRemainingSeconds--;
+            if (this.sprintRemainingSeconds <= 0) {
+                this.endSprint(false);
+            } else {
+                const timerEl = this.contentEl.querySelector(".ns-sprint-timer");
+                if (timerEl) {
+                    const m = Math.floor(this.sprintRemainingSeconds / 60).toString().padStart(2, '0');
+                    const s = (this.sprintRemainingSeconds % 60).toString().padStart(2, '0');
+                    timerEl.textContent = `${m}:${s}`;
+                }
+            }
+        }, 1000);
+    }
+
+    endSprint(early: boolean) {
+        if (this.sprintTimerInterval) window.clearInterval(this.sprintTimerInterval);
+        this.isSprinting = false;
+
+        if (!early) {
+            new Notice(`🎉 Sprint Finished! You earned ${this.sprintDropsEarned} ink drops!`, 8000);
+            // 觸發自動儲存，將字數正式寫入熱力圖！
+            const view = this.getValidMarkdownView();
+            if (view) void this.plugin.executeSmartSave(view);
+        } else {
+            new Notice("Sprint cancelled.", 3000);
+        }
+
+        this.lastOutlineHash = "";
+        void this.parseAndRender();
+    }
+
+    renderSprintUI(container: HTMLElement) {
+        const sprintBox = container.createDiv({ cls: "ns-sprint-container" });
+        sprintBox.createEl("h3", { text: "🔥 Focus Mode", attr: { style: "color: var(--color-orange); margin-bottom: 30px;" } });
+
+        const m = Math.floor(this.sprintRemainingSeconds / 60).toString().padStart(2, '0');
+        const s = (this.sprintRemainingSeconds % 60).toString().padStart(2, '0');
+
+        sprintBox.createDiv({ cls: "ns-sprint-timer", text: `${m}:${s}` });
+        sprintBox.createDiv({ cls: "ns-sprint-drops", text: `+ ${this.sprintDropsEarned} Drops` });
+        sprintBox.createDiv({ cls: "ns-sprint-message", text: "Don't look back. Keep writing." });
+
+        const btnStop = sprintBox.createEl("button", { text: "Give Up", cls: "mod-warning" });
+        btnStop.setCssStyles({ marginTop: "auto" });
+        btnStop.onclick = () => {
+            new SimpleConfirmModal(this.plugin.app, "Give up on this sprint?", () => {
+                this.endSprint(true);
+            }).open();
+        }
+    }
+
+
+
 }

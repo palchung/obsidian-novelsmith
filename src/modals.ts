@@ -1,6 +1,7 @@
 import { App, TFolder, Menu, setIcon, FuzzySuggestModal, Modal, Setting, TFile, Notice, MarkdownView, MarkdownRenderer } from 'obsidian';
 import { extractSynopsisAndTags, TEMPLATES_DIR, getColorById, generateSceneId, SCENE_COLORS, createIconButton, replaceEntireDocument, cleanSceneTitle, extractSceneId, getManuscriptFiles, parseUniversalScenes, parseContent } from './utils';
 import { StructureView } from './managers/StructureView';
+import { HEATMAP_LEVELS, TROPHIES_CONFIG } from './managers/StatsManager';
 import Sortable from 'sortablejs';
 import NovelSmithPlugin from '../main';
 
@@ -117,9 +118,10 @@ export class CompileModal extends Modal {
         hashtagAction: 'none'
     };
 
-    onSubmit: (options: CompileOptions) => void;
+    // 🌟 新增 format 參數，分辨用家揀咗 MD 定 HTML
+    onSubmit: (options: CompileOptions, format: 'md' | 'html') => void;
 
-    constructor(app: App, onSubmit: (options: CompileOptions) => void) {
+    constructor(app: App, onSubmit: (options: CompileOptions, format: 'md' | 'html') => void) {
         super(app);
         this.onSubmit = onSubmit;
     }
@@ -217,24 +219,31 @@ export class CompileModal extends Modal {
             );
 
         // ==========================================
-        // 🛠️ Mobile UI Rescue: Create an "always-at-bottom" button area
+        // 🛠️ 升級版雙按鈕區：支援 Markdown 與 HTML 匯出
         // ==========================================
         const buttonArea = contentEl.createDiv();
         buttonArea.setCssStyles({
             marginTop: "20px",
-            paddingTop: "10px",
+            paddingTop: "15px",
             borderTop: "1px solid var(--background-modifier-border)",
             display: "flex",
-            justifyContent: "flex-end" // Push buttons to the right
+            justifyContent: "flex-end",
+            gap: "10px" // 🌟 兩個掣之間留白
         });
 
         new Setting(buttonArea)
             .addButton(btn => btn
-                .setButtonText('Start compilation')
+                .setButtonText('Export as HTML (Beta Reader)')
+                .onClick(() => {
+                    this.close();
+                    this.onSubmit(this.options, 'html');
+                }))
+            .addButton(btn => btn
+                .setButtonText('Export as Markdown')
                 .setCta()
                 .onClick(() => {
                     this.close();
-                    this.onSubmit(this.options);
+                    this.onSubmit(this.options, 'md');
                 }));
     }
 
@@ -697,12 +706,18 @@ export class DashboardBuilderModal extends Modal {
         if (this.config.chartType === 'bar') chartText = '**[Bar chart]**';
         if (this.config.chartType === 'table' && this.config.tableStyle === 'progress') chartText = '**[progress table (group by chapters)]**';
 
-        // eslint-disable-next-line @microsoft/sdl/no-inner-html
-        this.summaryContainer.innerHTML = `
-            💡 <b>A chart to be insert:</b><br>
-            novelsmith will read all scene data from ${attrText}, and shown as ${chartText}<br>
-            ${this.config.chartType === 'table' ? '<span style="color:var(--text-accent)">Hint: it is DQL code, try customize yourself.</span>' : ''}
-        `;
+        this.summaryContainer.empty();
+        this.summaryContainer.createEl("b", { text: "A chart to be insert:" });
+        this.summaryContainer.createEl("br");
+        this.summaryContainer.createSpan({ text: "Novelsmith will read all scene data from " });
+        this.summaryContainer.createSpan({ text: attrText, attr: { style: "font-weight: bold;" } });
+        this.summaryContainer.createSpan({ text: " and shown as " });
+        this.summaryContainer.createSpan({ text: chartText, attr: { style: "font-weight: bold;" } });
+
+        if (this.config.chartType === 'table') {
+            this.summaryContainer.createEl("br");
+            this.summaryContainer.createSpan({ text: "Hint: it is DQL code, try customize yourself.", attr: { style: "color:var(--text-accent)" } });
+        }
     }
 
     onClose() {
@@ -907,7 +922,7 @@ export class CorkboardModal extends Modal {
             btnSave.innerText = "⏳ Saving...";
             await this.saveGlobalCorkboard(gridContainer, btnSave);
         };
-        btnCancel.onclick = () => this.close();
+        btnCancel.onclick = () => this.cancelCorkboard();
 
         const gridContainer = contentEl.createDiv({ cls: "ns-corkboard-grid" });
         gridContainer.setCssStyles({
@@ -962,7 +977,7 @@ export class CorkboardModal extends Modal {
             if (target.closest(".ns-scene-actions, .ns-scene-footer")) return; // 防止撳掣嗰陣誤觸
 
             // 讀取最新記憶體，確保打開編輯器時係最新狀態！
-            const safeKey = card.dataset.sceneId || card.dataset.sceneTitle || "";
+            const safeKey = scene.safeKey || card.dataset.sceneId || card.dataset.sceneTitle || "";
             const content = this.pendingEdits.get(safeKey) || this.liveSceneMap.get(safeKey) || "";
             const parsed = parseUniversalScenes(content);
             const latestScene = parsed.length > 0 ? parsed[0] : scene;
@@ -1252,29 +1267,48 @@ export class CorkboardModal extends Modal {
     }
 
     async renderGlobalCards(container: HTMLElement) {
-        // 🌟 傳入 workingFolderPath，只讀取當前部曲嘅檔案！
         const files = getManuscriptFiles(this.app, this.workingFolderPath, this.plugin.settings.exportFolderPath);
         container.empty();
 
-        // 🌟 修正點 1：打開軟木板時，即刻將所有卡片嘅真實文字載入記憶體！
-        for (const file of files) {
+        // 🌟 設立防撞名計數器
+        const titleCollisionCount = new Map<string, number>();
+
+        // 🌟 神級優化：合二為一！一次迴圈搞掂「載入記憶體」同埋「畫畫面」
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
             const content = await this.app.vault.read(file);
+
+            // 1. 寫入記憶體 (liveSceneMap)
             const parsedData = parseContent(content, true, this.app, file);
             for (const card of parsedData.cards) {
                 let sceneFullText = card.rawHeader + "\n";
                 if (card.meta && card.meta.length > 0) sceneFullText += card.meta.join("\n") + "\n";
                 sceneFullText += "\n" + card.body;
-                const safeKey = card.id || card.key;
-                this.liveSceneMap.set(safeKey, sceneFullText.trimEnd()); // 存入記憶體
+
+                // 🛡️ 防禦機制：如果有 ID 就用 ID，冇 ID 且撞名，就自動加後綴！
+                let safeKey = card.id || card.key;
+                if (!safeKey) {
+                    const count = titleCollisionCount.get(card.title) || 0;
+                    safeKey = count === 0 ? card.title : `${card.title}_${count}`;
+                    titleCollisionCount.set(card.title, count + 1);
+                }
+                this.liveSceneMap.set(safeKey, sceneFullText.trimEnd());
             }
-        }
 
-
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            const content = await this.app.vault.read(file);
+            // 2. 繪製畫面欄目
             const scenes = parseUniversalScenes(content);
-            this.buildColumnDOM(container, file.basename, file.path, scenes);
+            // 🛡️ 同步防撞名機制落去畫面 Dataset，確保編輯嗰陣搵得返對應嘅字！
+            const scenesWithSafeKey = scenes.map(s => {
+                let sKey = s.id;
+                if (!sKey) {
+                    const c = titleCollisionCount.get(s.title + "_ui") || 0;
+                    sKey = c === 0 ? s.title : `${s.title}_${c}`;
+                    titleCollisionCount.set(s.title + "_ui", c + 1);
+                }
+                return { ...s, safeKey: sKey };
+            });
+
+            this.buildColumnDOM(container, file.basename, file.path, scenesWithSafeKey);
         }
 
         const addColBtn = container.createDiv({ cls: "ns-corkboard-column" });
@@ -1316,7 +1350,12 @@ export class CorkboardModal extends Modal {
         // Wiki 鉛筆按鈕
         const btnEdit = createIconButton(controls, "pencil", "");
         btnEdit.onclick = async () => {
-            const file = this.app.metadataCache.getFirstLinkpathDest(noteName, folderPath || "");
+            // 🌟 精準路徑狙擊 (防止同名檔案開錯)
+            const exactPath = folderPath ? `${folderPath}/${noteName}.md` : `${noteName}.md`;
+            let file = this.app.vault.getAbstractFileByPath(exactPath);
+            if (!file || !(file instanceof TFile)) {
+                file = this.app.metadataCache.getFirstLinkpathDest(noteName, folderPath || ""); // 備用方案
+            }
             // 🌟 修正點 2：移除 import('obsidian') 毒藥，直接用 TFile！
             if (file && file instanceof TFile) {
                 const content = await this.app.vault.read(file);
@@ -1334,7 +1373,12 @@ export class CorkboardModal extends Modal {
         const contentWrapper = this.wikiPanel.createDiv({ cls: "markdown-rendered" });
         contentWrapper.setCssStyles({ padding: "20px", overflowY: "auto", flexGrow: "1", fontSize: "0.95em" });
 
-        const file = this.app.metadataCache.getFirstLinkpathDest(noteName, folderPath || "");
+        // 🌟 精準路徑狙擊 (防止同名檔案開錯)
+        const exactPath = folderPath ? `${folderPath}/${noteName}.md` : `${noteName}.md`;
+        let file: TFile | null = this.app.vault.getAbstractFileByPath(exactPath) as TFile | null;;
+        if (!file || !(file instanceof TFile)) {
+            file = this.app.metadataCache.getFirstLinkpathDest(noteName, folderPath || ""); // 備用方案
+        }
         if (file && file instanceof TFile) {
             const content = await this.app.vault.read(file);
             await MarkdownRenderer.render(this.app, content, contentWrapper, file.path, this);
@@ -1852,7 +1896,7 @@ export class CorkboardModal extends Modal {
             const columns = container.querySelectorAll(".ns-corkboard-list");
 
             // ==========================================
-            // 🗑️ 🌟 智能垃圾桶結算：對比畫面與硬碟
+            // 🗑️ 🌟 智能垃圾桶結算：對比畫面與硬碟 (Step 1: 先鎖定要刪除嘅目標)
             // ==========================================
             const keptFilePaths = new Set<string>();
             columns.forEach(listEl => {
@@ -1860,12 +1904,13 @@ export class CorkboardModal extends Modal {
                 if (path) keptFilePaths.add(path);
             });
 
+            // 🌟 核心防護：提早將真正要刪除嘅 TFile 實體放入陣列鎖定
+            const filesToTrash: TFile[] = [];
+
             for (const file of allFiles) {
-                // 如果硬碟有呢個檔案，但畫面上已經搵唔到佢個 path，證明用家喺板上 Delete 咗佢！
                 if (!keptFilePaths.has(file.path)) {
-                    console.log("Trashing deleted chapter:", file.path);
-                    await this.app.fileManager.trashFile(file); // 實體掉落垃圾桶
-                    fileObjMap.delete(file.path); // 喺 Map 移除，等陣唔好再處理佢
+                    filesToTrash.push(file); // 🌟 鎖死目標，無視之後嘅 path 改變
+                    fileObjMap.delete(file.path);
                 }
             }
 
@@ -1922,7 +1967,9 @@ export class CorkboardModal extends Modal {
                 const newContent = chunks.join("").trim() + "\n";
 
 
-                const cleanTitle = el.dataset.cleanTitle || "Untitled_Chapter";
+                // 🌟 加入非法字元過濾 (Sanitization)，防止 Windows/Mac 寫入崩潰！
+                const rawTitle = el.dataset.cleanTitle || "Untitled_Chapter";
+                const cleanTitle = rawTitle.replace(/[\\/:*?"<>|]/g, "_");
                 const prefix = chapterIndex < 10 ? `0${chapterIndex}_` : `${chapterIndex}_`;
                 const newName = `${prefix}${cleanTitle}.md`;
                 // 🌟 修正點 3：智能過濾路徑，防止出現 // 雙斜線崩潰
@@ -1939,25 +1986,40 @@ export class CorkboardModal extends Modal {
 
 
                     // 🌟 完美改名！
-                    const newPath = `${safeParentPath}/${newName}`;
+                    const newPath = safeParentPath ? `${safeParentPath}/${newName}` : newName;
                     if (file.path !== newPath) {
                         try { await this.app.fileManager.renameFile(file, newPath); } catch (e) { /* ignore */ }
                     }
                 } else {
-                    const newPath = `${safeWorkingPath}/${newName}`;
+                    const newPath = safeWorkingPath ? `${safeWorkingPath}/${newName}` : newName;
                     try { await this.app.vault.create(newPath, newContent); }
                     catch (e) { console.error("Create new file failed", e); }
                 }
                 chapterIndex++;
             }
 
-            new Notice("✅ Corkboard saved successfully!");
+
+            // ==========================================
+            // 🗑️ 🌟 第二階段提交 (2-Phase Commit)：確保全部寫入成功後，先處理刪除！
+            // ==========================================
+            for (const file of filesToTrash) { // 🌟 只遍歷一早鎖定好嘅清單！
+                console.log("Trashing deleted chapter safely:", file.path);
+                await this.app.fileManager.trashFile(file);
+            }
+            // ==========================================
+            // 🏆 Tracker Hook: Reward Corkboard Organization!
+            // ==========================================
+            // Send 0 drops, but user gets +10 base action points for organizing
+            await this.plugin.statsManager.recordActivity(0);
+
+
+            new Notice("Corkboard saved successfully!");
             this.close();
 
         } catch (error) {
             // 🛡️ 防死機保護罩：如果出錯，解除鎖定，彈出警告！
             console.error("Corkboard save error:", error);
-            new Notice("❌ Error saving corkboard. Please try again.", 5000);
+            new Notice("Error saving corkboard. Please try again.", 5000);
             if (btnSaveEl) {
                 btnSaveEl.innerText = "Save & Close";
                 btnSaveEl.disabled = false;
@@ -2019,3 +2081,222 @@ export class CorkboardModal extends Modal {
         }
     }
 }
+
+
+// ============================================================
+// 🏆 Writer's Journey Dashboard Modal (Elegant Dynamic Edition)
+// ============================================================
+export class StatsDashboardModal extends Modal {
+    plugin: NovelSmithPlugin;
+    selectedScope: string; // 🌟 可是 'All' 或者具體年份如 '2026'
+
+    constructor(plugin: NovelSmithPlugin) {
+        super(plugin.app);
+        this.plugin = plugin;
+        this.selectedScope = "All"; // 預設打開歷史總計
+    }
+
+    onOpen() {
+        this.modalEl.setCssStyles({ width: "85vw", height: "85vh", maxWidth: "1000px" });
+        this.renderDashboard();
+    }
+
+    renderDashboard() {
+        const { contentEl } = this;
+        contentEl.empty();
+
+        const statsData = this.plugin.statsManager.data;
+
+        // ==========================================
+        // 📊 智能結算引擎：過濾數據，動態計算該年份的獎盃與數據
+        // ==========================================
+        const yearsSet = new Set<string>();
+        yearsSet.add(new Date().getFullYear().toString());
+        Object.keys(statsData.dailyStats).forEach(dateStr => yearsSet.add(dateStr.split('-')[0]));
+        const availableScopes = ["All", ...Array.from(yearsSet).sort((a, b) => parseInt(b) - parseInt(a))];
+
+        // 動態變數
+        let scopeDrops = 0;
+        let scopeActiveDays = 0;
+        let scopeBestStreak = 0;
+        let scopeMaxDaily = 0;
+        let scopeMaxActions = 0;
+
+        // 篩選出該範圍內的日子，並排序
+        const sortedDates = Object.keys(statsData.dailyStats)
+            .filter(d => this.selectedScope === "All" || d.startsWith(this.selectedScope))
+            .sort();
+
+        let currentTempStreak = 0;
+        let lastDate: Date | null = null;
+
+        // 嚴格計算該範圍內的最高連續紀錄
+        sortedDates.forEach(dateStr => {
+            const stat = statsData.dailyStats[dateStr];
+
+            // 🌟 Check and update the highest daily actions
+            if (stat.actionCount && stat.actionCount > scopeMaxActions) {
+                scopeMaxActions = stat.actionCount;
+            }
+            if (stat.inkDrops > 0) {
+                scopeDrops += stat.inkDrops;
+                scopeActiveDays++;
+                if (stat.inkDrops > scopeMaxDaily) scopeMaxDaily = stat.inkDrops;
+
+                const currDate = new Date(dateStr);
+                if (lastDate) {
+                    const diffTime = currDate.getTime() - lastDate.getTime();
+                    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                    if (diffDays === 1) {
+                        currentTempStreak++;
+                    } else {
+                        currentTempStreak = 1; // 斷更重置
+                    }
+                } else {
+                    currentTempStreak = 1;
+                }
+                if (currentTempStreak > scopeBestStreak) scopeBestStreak = currentTempStreak;
+                lastDate = currDate;
+            }
+        });
+
+        // ==========================================
+        // 🎨 構建優雅書卷氣 UI
+        // ==========================================
+        const headerRow = contentEl.createDiv();
+        headerRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" });
+        headerRow.createEl("h2", { text: "Writer's Journey", attr: { style: "margin: 0; font-family: 'Georgia', serif; font-style: italic;" } });
+
+        const mainContainer = contentEl.createDiv({ cls: "ns-dashboard-container" });
+
+        // 👉 左邊：優雅文字超連結側邊欄 (Sidebar)
+        const sidebar = mainContainer.createDiv({ cls: "ns-dashboard-sidebar" });
+        availableScopes.forEach(scope => {
+            const btnText = scope === "All" ? "All Time" : scope;
+            const btn = sidebar.createEl("button", { text: btnText, cls: `ns-year-link ${scope === this.selectedScope ? 'is-active' : ''}` });
+            btn.onclick = () => {
+                this.selectedScope = scope;
+                this.renderDashboard(); // 即時切換並重算！
+            };
+        });
+
+        // 👉 右邊：動態內容區
+        const contentArea = mainContainer.createDiv({ cls: "ns-dashboard-content" });
+
+        // --- 1. 動態數據橫幅 ---
+        const heroContainer = contentArea.createDiv({ cls: "ns-stats-hero" });
+        const createStatItem = (label: string, value: string) => {
+            const box = heroContainer.createDiv({ cls: "ns-stat-item" });
+            box.createDiv({ text: value, cls: "ns-stat-value" });
+            box.createDiv({ text: label, cls: "ns-stat-label" });
+        };
+
+        const prefix = this.selectedScope === "All" ? "Total" : "Yearly";
+        createStatItem(`${prefix} Ink Drops`, scopeDrops.toLocaleString());
+        createStatItem("Active Days", `${scopeActiveDays}`);
+        createStatItem("Longest Streak", `${scopeBestStreak}`);
+        createStatItem("Best Day", scopeMaxDaily.toLocaleString());
+
+        // --- 2. 互動式熱力圖 (只在選擇具體年份時顯示) ---
+        if (this.selectedScope !== "All") {
+            contentArea.createEl("h3", { text: `Momentum of ${this.selectedScope}`, cls: "ns-literary-h3" });
+            const heatmapWrapper = contentArea.createDiv({ cls: "ns-heatmap-wrapper" });
+            const heatmapGrid = heatmapWrapper.createDiv({ cls: "ns-heatmap-grid" });
+
+            const isCurrentYear = this.selectedScope === new Date().getFullYear().toString();
+            let endDate = new Date(parseInt(this.selectedScope), 11, 31, 12, 0, 0);
+            if (isCurrentYear) endDate = new Date();
+            endDate.setMinutes(endDate.getMinutes() - endDate.getTimezoneOffset());
+
+            for (let i = 364; i >= 0; i--) {
+                const targetDate = new Date(endDate);
+                targetDate.setDate(targetDate.getDate() - i);
+                const dateStr = targetDate.toISOString().split('T')[0];
+
+                const drops = statsData.dailyStats[dateStr]?.inkDrops || 0;
+                const cell = heatmapGrid.createDiv({ cls: "ns-heatmap-cell" });
+
+                let cellColor = "var(--background-modifier-border)";
+                if (drops > 0) {
+                    const level = [...HEATMAP_LEVELS].reverse().find(l => drops >= l.min);
+                    if (level) cellColor = level.color;
+                }
+                cell.setCssStyles({ backgroundColor: cellColor });
+                cell.title = `${dateStr}: ${drops.toLocaleString()} drops`;
+            }
+            setTimeout(() => { heatmapWrapper.scrollLeft = heatmapWrapper.scrollWidth; }, 10);
+        }
+
+        // --- 3. 動態榮譽陳列室 (Trophy Room) ---
+        const roomTitle = this.selectedScope === "All" ? "Eternal Hall of Fame" : `Trophies Unlocked in ${this.selectedScope}`;
+        contentArea.createEl("h3", { text: roomTitle, cls: "ns-literary-h3" });
+
+        const trophyRoom = contentArea.createDiv({ cls: "ns-trophy-room" });
+
+        // 🌟 核心魔法：根據這個 Scope 的數據，即時推算有冇資格獲得獎盃！
+        TROPHIES_CONFIG.forEach(trophy => {
+            let isUnlocked = false;
+
+            if (trophy.type === "streak" && scopeBestStreak >= trophy.threshold) isUnlocked = true;
+            if (trophy.type === "total_drops" && scopeDrops >= trophy.threshold) isUnlocked = true;
+            if (trophy.type === "daily_record" && scopeMaxDaily >= trophy.threshold) isUnlocked = true;
+            if (trophy.type === "daily_actions" && scopeMaxActions >= trophy.threshold) isUnlocked = true;
+
+            const card = trophyRoom.createDiv({
+                cls: `ns-trophy-card ${isUnlocked ? 'is-unlocked' : 'is-locked'}`
+            });
+
+            const iconContainer = card.createDiv({ cls: "ns-trophy-icon" });
+            setIcon(iconContainer, isUnlocked ? trophy.icon : "lock");
+            if (iconContainer.querySelector("svg")) iconContainer.querySelector("svg")!.style.width = "30px";
+
+            card.createDiv({ text: trophy.name, cls: "ns-trophy-name" });
+            card.createDiv({ text: trophy.desc, cls: "ns-trophy-desc" });
+        });
+    }
+
+    onClose() {
+        this.contentEl.empty();
+    }
+}
+
+
+// ============================================================
+// ⏱️ Word Sprint Setup Modal
+// ============================================================
+export class SprintSetupModal extends Modal {
+    onSubmit: (minutes: number) => void;
+    minutes: number = 20; // 預設 20 分鐘
+
+    constructor(app: App, onSubmit: (minutes: number) => void) {
+        super(app);
+        this.onSubmit = onSubmit;
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.empty();
+        contentEl.createEl('h2', { text: '⏱️ Writing Sprint (Zen Mode)' });
+        contentEl.createEl('p', { text: 'Set a timer, ignore all distractions, and write as much as you can. The sidebar will enter Focus Mode.', cls: 'setting-item-description' });
+
+        new Setting(contentEl)
+            .setName('Sprint duration (minutes)')
+            .addSlider(slider => slider
+                .setLimits(5, 60, 5) // 最少 5 分鐘，最多 60 分鐘
+                .setValue(this.minutes)
+                .setDynamicTooltip()
+                .onChange(val => this.minutes = val)
+            );
+
+        const btnRow = contentEl.createDiv({ attr: { style: "display: flex; justify-content: flex-end; margin-top: 20px;" } });
+        btnRow.createEl('button', { text: 'Start Sprinting!', cls: 'mod-cta' }).onclick = () => {
+            this.close();
+            this.onSubmit(this.minutes);
+        };
+    }
+
+    onClose() {
+        this.contentEl.empty();
+    }
+}
+

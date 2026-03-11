@@ -1,4 +1,22 @@
 /* ============================================================
+   🛠️ Editor Fixes (修正 Obsidian 預設 H6 強制大楷問題)
+   ============================================================ */
+/* 編輯器模式 (Source View / Live Preview) */
+.markdown-source-view .HyperMD-header-6,
+.markdown-source-view .HyperMD-header-6 * {
+    text-transform: none !important;
+    font-variant: normal !important;
+}
+
+/* 閱讀模式 (Reading View) */
+.markdown-rendered h6 {
+    text-transform: none !important;
+    font-variant: normal !important;
+}
+
+
+
+/* ============================================================
    Redundant words and Dialogue mode (remains unchanged)
    ============================================================ */
 .cm-redundant-text {
@@ -431,4 +449,245 @@ body.ns-mode-dialogue .cm-dialogue-text {
     background-color: var(--interactive-accent) !important;
     color: var(--text-on-accent) !important;
     transition: all 0.2s ease;
+}
+
+/* ============================================================
+   🏆 Writer's Journey Dashboard (Elegant Literary Edition)
+   ============================================================ */
+
+/* 1. Main Layout: Sidebar + Content */
+.ns-dashboard-container {
+    display: flex;
+    gap: 40px;
+    height: 100%;
+    padding: 10px;
+}
+
+/* --- Left Sidebar (Year Links) --- */
+.ns-dashboard-sidebar {
+    min-width: 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    border-right: 1px solid var(--background-modifier-border);
+    padding-right: 20px;
+    padding-top: 20px;
+}
+
+.ns-year-link {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    text-align: right;
+    font-size: 1.2em;
+    color: var(--text-muted) !important;
+    cursor: pointer;
+    padding: 2px 0 !important;
+    border-bottom: 1px solid transparent !important;
+    border-radius: 0 !important;
+    transition: all 0.3s ease;
+    font-family: "Georgia", "Times New Roman", serif;
+    /* 優雅的襯線字體 */
+    font-style: italic;
+}
+
+.ns-year-link:hover {
+    color: var(--text-normal) !important;
+}
+
+.ns-year-link.is-active {
+    color: var(--interactive-accent) !important;
+    border-bottom-color: var(--interactive-accent) !important;
+    font-weight: bold;
+}
+
+/* --- Right Content Area --- */
+.ns-dashboard-content {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding-right: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 35px;
+}
+
+/* 2. Elegant Stats Banner */
+.ns-stats-hero {
+    display: flex;
+    justify-content: space-around;
+    padding: 20px 0;
+    border-top: 1px solid var(--background-modifier-border);
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.ns-stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.ns-stat-value {
+    font-size: 2.2em;
+    font-weight: normal;
+    /* 移除粗獷的粗體 */
+    color: var(--text-normal);
+    line-height: 1;
+    font-family: "Georgia", "Times New Roman", serif;
+    /* 書卷氣字體 */
+}
+
+.ns-stat-label {
+    font-size: 0.85em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    /* 拉寬字距，增加優雅感 */
+}
+
+/* 3. Heatmap Grid */
+.ns-heatmap-wrapper {
+    overflow-x: auto;
+    padding-bottom: 10px;
+}
+
+.ns-heatmap-grid {
+    display: grid;
+    grid-template-rows: repeat(7, 13px);
+    grid-auto-flow: column;
+    gap: 4px;
+    width: max-content;
+}
+
+.ns-heatmap-cell {
+    width: 13px;
+    height: 13px;
+    border-radius: 2px;
+    background-color: var(--background-modifier-border);
+    transition: transform 0.1s, box-shadow 0.1s;
+    cursor: pointer;
+}
+
+.ns-heatmap-cell:hover {
+    transform: scale(1.2);
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+    z-index: 10;
+}
+
+/* 4. Elegant Trophy Room */
+.ns-trophy-room {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+.ns-trophy-card {
+    background-color: transparent;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    /* 減弱圓角，更像紙本卡片 */
+    padding: 20px 15px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.ns-trophy-card.is-locked {
+    opacity: 0.35;
+    filter: grayscale(100%);
+}
+
+.ns-trophy-card.is-unlocked {
+    border-color: var(--interactive-accent);
+    background: rgba(var(--interactive-accent-rgb), 0.05);
+    /* 非常微弱的背景光 */
+}
+
+.ns-trophy-icon {
+    margin-bottom: 12px;
+    color: var(--interactive-accent);
+}
+
+.ns-trophy-name {
+    font-size: 1.05em;
+    font-family: "Georgia", "Times New Roman", serif;
+    /* 獎盃名稱使用襯線體 */
+    font-weight: bold;
+    color: var(--text-normal);
+    margin-bottom: 6px;
+}
+
+.ns-trophy-desc {
+    font-size: 0.85em;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+/* Literary Headers */
+.ns-literary-h3 {
+    font-family: "Georgia", "Times New Roman", serif;
+    font-style: italic;
+    color: var(--text-muted);
+    border-bottom: none !important;
+    margin: 0;
+}
+
+/* ============================================================
+   ⏱️ Word Sprint UI (Zen Mode)
+   ============================================================ */
+.ns-sprint-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 80vh;
+    /* 佔據大部分側邊欄空間 */
+    padding: 20px;
+    text-align: center;
+    background: linear-gradient(180deg, rgba(var(--color-orange-rgb), 0.1) 0%, transparent 100%);
+    border-radius: 12px;
+    border: 2px solid var(--color-orange);
+    /* 🌟 心跳呼吸燈特效，營造衝刺緊張感！ */
+    animation: ns-pulse-border 2s infinite;
+}
+
+@keyframes ns-pulse-border {
+    0% {
+        box-shadow: 0 0 10px rgba(var(--color-orange-rgb), 0.1);
+    }
+
+    50% {
+        box-shadow: 0 0 25px rgba(var(--color-orange-rgb), 0.4);
+    }
+
+    100% {
+        box-shadow: 0 0 10px rgba(var(--color-orange-rgb), 0.1);
+    }
+}
+
+.ns-sprint-timer {
+    font-size: 5em;
+    font-weight: 900;
+    color: var(--text-normal);
+    font-family: 'Courier New', Courier, monospace;
+    margin-bottom: 15px;
+    line-height: 1;
+    text-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.ns-sprint-drops {
+    font-size: 1.8em;
+    color: var(--color-orange);
+    font-weight: bold;
+    margin-bottom: 25px;
+}
+
+.ns-sprint-message {
+    font-family: "Georgia", serif;
+    font-style: italic;
+    font-size: 1.1em;
+    color: var(--text-muted);
+    margin-bottom: 30px;
 }

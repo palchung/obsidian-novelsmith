@@ -1,5 +1,6 @@
 import { App, PluginSettingTab, Setting, Notice, setIcon } from 'obsidian';
 import NovelSmithPlugin from './../main';
+import { StatsData, DEFAULT_STATS } from 'src/managers/StatsManager';
 
 
 
@@ -15,6 +16,7 @@ export interface NovelSmithSettings {
     wikiFolderPath: string;
     exportFolderPath: string;
     wikiCategories: WikiCategory[];
+    statsData: StatsData;
 }
 
 export const DEFAULT_SETTINGS: NovelSmithSettings = {
@@ -22,7 +24,8 @@ export const DEFAULT_SETTINGS: NovelSmithSettings = {
     keepDraftOnSync: false,
     exportFolderPath: '',
     wikiFolderPath: '',
-    wikiCategories: []
+    wikiCategories: [],
+    statsData: DEFAULT_STATS
 }
 
 export class NovelSmithSettingTab extends PluginSettingTab {
