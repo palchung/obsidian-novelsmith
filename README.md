@@ -24,7 +24,9 @@ This philosophy extends to the plugin's most powerful features. When you use the
 ### 4. 🤝 Community First
 The Obsidian community has already built incredible tools, and NovelSmith respects that ecosystem. Instead of reinventing the wheel with heavy, custom chart libraries, the Dashboard simply generates standard `Dataview` code. This keeps the plugin remarkably lightweight and allows advanced users to freely customize their writing stats using the tools they already know and love.
 
-This plugin has already submitted to Obsidian and awaiting for their approval. 
+This plugin has already submitted to Obsidian and awaiting for their approval. You may find more features of this plugin from below introduction. 
+
+Mates, happy writing. Share the world of your masterpieces !
 
 ---
 
