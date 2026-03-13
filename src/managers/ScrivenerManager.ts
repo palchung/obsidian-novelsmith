@@ -78,11 +78,11 @@ export class ScrivenerManager {
                     }
                 }
 
-                // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Modal UI callback needs async execution
+
                 new ChapterSelectionModal(this.app, validFiles, async (selectedFiles) => {
                     new Notice("Compiling scrivenings draft...");
                     await this.compileDraft(currentFolder, selectedFiles, targetFileName, targetSceneRaw);
-                }).open();
+                }, "Enter Scrivenings Mode").open();
             };
 
 
@@ -138,7 +138,7 @@ export class ScrivenerManager {
         if (draftFile instanceof TFile) {
             const leaf = this.app.workspace.getLeaf(false);
             await leaf.openFile(draftFile);
-            new Notice(`Compilation complete！Total ${files.length} chapters`);
+            new Notice(`Compilation complete! Total ${files.length} chapters`);
 
             setTimeout(() => {
                 const newView = this.app.workspace.getActiveViewOfType(MarkdownView);

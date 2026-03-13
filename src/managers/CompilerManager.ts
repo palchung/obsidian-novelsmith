@@ -27,7 +27,7 @@ export class CompilerManager {
             new CompileModal(this.app, (options, format) => { // 🌟 加入 format
                 void this.executeCompile(view, selectedFiles, options, format);
             }).open();
-        }).open();
+        }, "Next step (set cleanup options)").open();
     }
 
 

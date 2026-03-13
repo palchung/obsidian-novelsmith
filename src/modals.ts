@@ -270,12 +270,19 @@ export class ChapterSelectionModal extends Modal {
     allFiles: TFile[];
     selectedSet: Set<TFile>;
     onNext: (selected: TFile[]) => void;
+    confirmText: string;
 
-    constructor(app: App, files: TFile[], onNext: (selected: TFile[]) => void) {
+    constructor(
+        app: App,
+        files: TFile[],
+        onNext: (selected: TFile[]) => void,
+        confirmText: string = "Next step (set cleanup options)" // 👈 就係加咗呢度！
+    ) {
         super(app);
         this.allFiles = files;
-        this.selectedSet = new Set(files); // Default select all
+        this.selectedSet = new Set(files);
         this.onNext = onNext;
+        this.confirmText = confirmText;
     }
 
     onOpen() {
@@ -333,7 +340,7 @@ export class ChapterSelectionModal extends Modal {
         // --- Next Step Button ---
         new Setting(buttonArea)
             .addButton(btn => btn
-                .setButtonText('Next step (set cleanup options)')
+                .setButtonText(this.confirmText)
                 .setCta()
                 .onClick(() => {
                     // Filter out selected files (maintaining original order)
