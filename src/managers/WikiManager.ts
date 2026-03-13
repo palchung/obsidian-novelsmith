@@ -38,6 +38,7 @@ export class WikiManager {
 
         // 🌟 加入 (?=#) 邏輯，遇到 Hashtag 識得自動切開，同雷達系統睇齊！
         const separatorRegex = /(?=#)|[,，、/|\\;；]+/;
+        const calloutRegex = /^(>\s*-\s*)(.*?)::(.*)$/;
 
         for (let i = 0; i < lineCount; i++) {
             const line = editor.getLine(i);
@@ -46,7 +47,7 @@ export class WikiManager {
             if (line.trim().startsWith("> - ") && line.includes("::")) {
 
 
-                const match = line.match(/^(>\s*-\s*)(.*?)::(.*)$/);
+                const match = line.match(calloutRegex);
                 if (!match) continue;
 
                 const prefix = match[1];
@@ -69,7 +70,7 @@ export class WikiManager {
                     if (!cleanItem) continue;
 
                     // 🌟 終極過濾：清走括號、#號，以及所有 Windows/Mac 嚴禁做檔名嘅非法字元！
-                    cleanItem = cleanItem.replace(/[\[\]#<>:"|?*]/g, '').trim();
+                    cleanItem = cleanItem.replace(/[[\]#<>:"|?*]/g, '').trim();
 
                     // 確保清完之後唔係空字串，先至繼續處理
                     if (!cleanItem) continue;

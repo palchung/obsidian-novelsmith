@@ -93,7 +93,7 @@ export class StatsManager {
         this.data = DEFAULT_STATS;
     }
 
-    async loadData(savedData: any) {
+    async loadData(savedData: unknown) {
         this.data = Object.assign({}, DEFAULT_STATS, savedData);
     }
 

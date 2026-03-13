@@ -1,27 +1,61 @@
 /* ============================================================
-   🛠️ Editor Fixes (修正 Obsidian 預設 H6 強制大楷問題)
+   NovelSmith Stylesheet
+   結構：1. Overrides | 2. Layouts | 3. Components | 4. Utilities
    ============================================================ */
-/* 編輯器模式 (Source View / Live Preview) */
-.markdown-source-view .HyperMD-header-6,
-.markdown-source-view .HyperMD-header-6 * {
-    text-transform: none !important;
-    font-variant: normal !important;
-}
-
-/* 閱讀模式 (Reading View) */
-.markdown-rendered h6 {
-    text-transform: none !important;
-    font-variant: normal !important;
-}
-
 
 
 /* ============================================================
-   Redundant words and Dialogue mode (remains unchanged)
+   1. OVERRIDES (精準擴充 Obsidian 原生樣式，零全域污染)
    ============================================================ */
+
+/* 🛠️ 劇情卡片 H6 大細楷修正 (使用 :has() 確保只影響 NovelSmith 卡片) */
+.markdown-source-view .HyperMD-header-6:has(.ns-id),
+.markdown-source-view .HyperMD-header-6:has(.ns-id) * {
+    text-transform: none !important;
+    font-variant: normal !important;
+}
+
+.markdown-rendered h6:has(.ns-id) {
+    text-transform: none !important;
+    font-variant: normal !important;
+}
+
+/* 🏷️ 專屬場景卡片 Callout: [!NSmith] */
+.callout[data-callout^="nsmith"] {
+    --callout-icon: lucide-clapperboard;
+    transition: all 0.2s ease;
+}
+
+.callout[data-callout="nsmith"],
+.callout[data-callout="nsmith-default"],
+.callout[data-callout="nsmith-grey"] {
+    --callout-color: var(--color-base-60-rgb);
+}
+
+.callout[data-callout="nsmith-red"] {
+    --callout-color: var(--color-red-rgb);
+}
+
+.callout[data-callout="nsmith-orange"] {
+    --callout-color: var(--color-orange-rgb);
+}
+
+.callout[data-callout="nsmith-green"] {
+    --callout-color: var(--color-green-rgb);
+}
+
+.callout[data-callout="nsmith-blue"] {
+    --callout-color: var(--color-blue-rgb);
+}
+
+.callout[data-callout="nsmith-purple"] {
+    --callout-color: var(--color-purple-rgb);
+}
+
+/* 🎭 對白模式 (Dialogue Mode) 與 冗詞標示 (Redundant Words) */
 .cm-redundant-text {
-    background-color: rgba(255, 80, 80, 0.25);
-    border-bottom: 2px solid rgba(255, 0, 0, 0.6);
+    background-color: rgba(var(--color-red-rgb), 0.25);
+    border-bottom: 2px solid rgba(var(--color-red-rgb), 0.6);
     border-radius: 4px;
     padding: 0 2px;
 }
@@ -39,149 +73,61 @@ body.ns-mode-dialogue .cm-dialogue-text {
     opacity: 1 !important;
 }
 
-/* ============================================================
-   🙈 Structure Decorators - Safe scaled-down version
-   ============================================================ */
-
-/* 1. File Main Header (# 📄 File name): Elegantly centered, like a physical book chapter */
-.ns-small-header {
-    display: block !important;
-    text-align: center !important;
-    font-size: var(--h2-size) !important;
-    color: var(--text-normal) !important;
-    font-weight: 700;
-    background-color: transparent !important;
-    border-bottom: none !important;
-    padding-top: 25px !important;
-    letter-spacing: 2px;
-}
-
-/* 2. Ensure CodeMirror decorators do not interfere with our sacred barriers */
-.ns-small-id {
-    display: none !important;
-}
 
 /* ============================================================
-   📱 Touch-friendly Outline (Structure View)
+   2. LAYOUTS (軟木板、側邊欄大結構)
    ============================================================ */
 
-/* Container for the entire panel */
+/* 📱 側邊欄大綱主體 */
 .ns-structure-container {
     padding: 15px 10px;
     height: 100%;
     overflow-y: auto;
     overflow-x: hidden !important;
-    /* 🔥 Absolutely locked: Horizontal scrolling strictly prohibited! */
+    /* 禁止橫向捲動 */
 }
 
-/* Chapter container (like individual boxes) */
-.ns-chapter-box {
-    background-color: var(--background-secondary);
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 8px;
-    margin-bottom: 15px;
-    padding: 8px;
-    word-wrap: break-word;
-    /* 🔥 Ensure long text in the info panel wraps automatically, preventing layout breaks */
-    overflow-wrap: break-word;
-}
-
-/* Chapter header card */
-.ns-chapter-card {
-    background-color: var(--interactive-accent);
-    color: var(--text-on-accent);
-    font-weight: bold;
+/* 📌 軟木板主畫布 */
+.ns-corkboard-grid {
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
     padding: 10px;
-    border-radius: 6px;
-    margin-bottom: 8px;
-    text-align: center;
-    cursor: grab;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    align-items: stretch;
+    overflow-x: auto;
+    overflow-y: hidden;
+    height: 100%;
 }
 
-/* 2. Scene list (where cards are placed) */
-.ns-scene-list {
-    min-height: 20px;
-    /* Can be dragged into even if empty */
-    padding: 2px;
+/* 軟木板頂部控制台 */
+.ns-corkboard-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--background-modifier-border);
 }
 
-/* Scene card (Extra large for easy touch) */
-.ns-scene-card {
-    background-color: var(--background-primary);
-    border: 1px solid var(--background-modifier-border);
-    border-left: 4px solid var(--text-muted);
-    border-radius: 6px;
-    padding: 12px 10px;
-    margin-bottom: 8px;
-    cursor: grab;
-    transition: transform 0.1s, box-shadow 0.1s;
-    overflow: hidden;
-    font-size: 0.9em;
-    cursor: pointer;
-}
-
-.ns-scene-title-text {
-    display: -webkit-box !important;
-    -webkit-line-clamp: 2 !important;
-    -webkit-box-orient: vertical !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: normal !important;
-    word-break: break-word !important;
-    line-height: 1.3 !important;
-}
-
-.ns-scene-card:hover {
-    border-color: var(--interactive-accent);
-    /* Border color change */
-    background-color: var(--background-primary-alt);
-    /* Slight background change */
-    transform: translateY(-1px);
-    /* Slight lift effect */
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-
-/* Drag and drop visual effects */
-.ns-sortable-ghost {
-    opacity: 0.4;
-    background-color: var(--interactive-accent);
-}
-
-.ns-sortable-drag {
-    cursor: grabbing;
-    transform: scale(1.02);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-}
-
-/* Refresh button */
-.ns-refresh-btn {
-    width: 100%;
-    margin-bottom: 10px;
-}
 
 /* ============================================================
-   🎛️ Control Panel UI
+   3. COMPONENTS (UI 獨立元件)
    ============================================================ */
 
-/* Container for top buttons and tabs (🔥 Ultimate sticky header) */
+/* --- 🎛️ 側邊欄控制台 (Sticky Header) --- */
 .ns-control-header {
     display: flex;
     flex-direction: column;
     gap: 8px;
     border-bottom: 1px solid var(--background-modifier-border);
-
-    /* 🔥 Fix: Precisely offset the 10px margin, not a single pixel out of bounds! */
     margin: -15px -10px 10px -10px;
     padding: 15px 10px 10px 10px;
-
     position: sticky;
     top: -15px;
     background-color: var(--background-primary);
     z-index: 99;
 }
 
-/* Horizontal button row */
 .ns-button-row {
     display: flex;
     gap: 5px;
@@ -194,9 +140,15 @@ body.ns-mode-dialogue .cm-dialogue-text {
     font-size: 0.85em;
     cursor: pointer;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+
+    /* 🌟 解除 iPad/iOS 的強制原生藥丸外觀 */
+    -webkit-appearance: none;
+    appearance: none;
+
+    /* 🌟 強制使用 Obsidian 標準微圓角 (確保 Mac/Windows/iPad 視覺完全統一) */
+    border-radius: var(--radius-s);
 }
 
-/* Tab row */
 .ns-tabs-row {
     display: flex;
     gap: 5px;
@@ -228,9 +180,440 @@ body.ns-mode-dialogue .cm-dialogue-text {
     color: var(--text-normal);
 }
 
-/* ============================================================
-   🕰️ History Tab
-   ============================================================ */
+/* --- 📝 側邊欄大綱卡片 --- */
+.ns-chapter-box {
+    background-color: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    margin-bottom: 15px;
+    padding: 8px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.ns-chapter-card {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    font-weight: bold;
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    text-align: center;
+    cursor: grab;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.ns-scene-list {
+    min-height: 20px;
+    padding: 2px;
+}
+
+/* 側邊欄場景卡片 (自動適應顏色) */
+.ns-scene-card {
+    background-color: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-left: 4px solid transparent;
+    border-radius: 6px;
+    padding: 12px 10px;
+    margin-bottom: 8px;
+    cursor: grab;
+    transition: transform 0.1s, box-shadow 0.1s, filter 0.2s;
+    overflow: hidden;
+    font-size: 0.9em;
+}
+
+.ns-scene-card:hover {
+    filter: brightness(0.95);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.theme-dark .ns-scene-card:hover {
+    filter: brightness(1.15);
+}
+
+/* 卡片顏色系統 */
+.ns-scene-card.ns-color-red {
+    background-color: rgba(var(--color-red-rgb), 0.15) !important;
+    border-left-color: var(--color-red) !important;
+}
+
+.ns-scene-card.ns-color-orange {
+    background-color: rgba(var(--color-orange-rgb), 0.15) !important;
+    border-left-color: var(--color-orange) !important;
+}
+
+.ns-scene-card.ns-color-green {
+    background-color: rgba(var(--color-green-rgb), 0.15) !important;
+    border-left-color: var(--color-green) !important;
+}
+
+.ns-scene-card.ns-color-blue {
+    background-color: rgba(var(--color-blue-rgb), 0.15) !important;
+    border-left-color: var(--color-blue) !important;
+}
+
+.ns-scene-card.ns-color-purple {
+    background-color: rgba(var(--color-purple-rgb), 0.15) !important;
+    border-left-color: var(--color-purple) !important;
+}
+
+.ns-scene-card.ns-color-grey {
+    background-color: rgba(var(--color-base-60-rgb), 0.15) !important;
+    border-left-color: var(--text-muted) !important;
+}
+
+.ns-scene-title-text {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    line-height: 1.3 !important;
+}
+
+/* --- 📌 軟木板欄目與卡片 --- */
+.ns-corkboard-column {
+    display: flex;
+    flex-direction: column;
+    min-width: 320px;
+    max-width: 320px;
+    background-color: var(--background-secondary-alt);
+    border-radius: 10px;
+    padding: 12px;
+    max-height: 100%;
+    border: 1px solid var(--background-modifier-border);
+}
+
+.ns-corkboard-column h3 {
+    margin: 0 0 15px 0;
+    font-size: 1.1em;
+    color: var(--text-normal);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 2px solid var(--background-modifier-border);
+    padding-bottom: 10px;
+}
+
+.ns-corkboard-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    overflow-y: auto;
+    flex-grow: 1;
+    padding-right: 5px;
+}
+
+.ns-corkboard-folder-name {
+    font-size: 1.1em;
+    opacity: 0.6;
+    font-weight: bold;
+    margin-left: 5px;
+    max-width: 15vw;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+}
+
+/* --- 🔍 雷達系統 (Radar Semantic Zoom) --- */
+.ns-radar-console {
+    flex-grow: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    margin: 0 15px;
+}
+
+.ns-radar-drawer {
+    display: none;
+    flex-wrap: wrap;
+    gap: 8px;
+    max-height: 40vh;
+    overflow-y: auto;
+    padding: 12px;
+    background-color: var(--background-primary);
+    border-radius: 8px;
+    border: 1px solid var(--interactive-accent);
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    margin-top: 5px;
+}
+
+.ns-radar-token {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+.ns-radar-token-close {
+    cursor: pointer;
+    opacity: 0.7;
+    font-size: 1.1em;
+}
+
+.ns-radar-token-close:hover {
+    opacity: 1;
+}
+
+.ns-corkboard-grid.is-radar-mode .ns-corkboard-card {
+    height: fit-content !important;
+    min-height: 55px !important;
+    max-height: 80px !important;
+    padding: 10px 15px !important;
+    overflow: hidden;
+    justify-content: center;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.ns-corkboard-grid.is-radar-mode .ns-corkboard-card h4 {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 0.95em !important;
+    line-height: 1.3 !important;
+}
+
+.ns-corkboard-grid.is-radar-mode .ns-scene-note,
+.ns-corkboard-grid.is-radar-mode .ns-scene-footer,
+.ns-corkboard-grid.is-radar-mode .ns-scene-actions {
+    display: none !important;
+}
+
+.ns-corkboard-grid.is-radar-mode .ns-corkboard-card.is-dimmed {
+    opacity: 0.15 !important;
+    filter: grayscale(100%);
+}
+
+.ns-corkboard-grid.is-radar-mode .ns-corkboard-card.is-highlighted {
+    opacity: 1 !important;
+    box-shadow: 0 0 15px var(--interactive-accent);
+    border-color: var(--interactive-accent);
+    transform: scale(1.03);
+    z-index: 10;
+}
+
+/* --- 📖 側滑 Wiki 面板 (Slide-over Panel) --- */
+.ns-corkboard-wiki-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 450px;
+    max-width: 90%;
+    height: 100%;
+    background-color: var(--background-primary);
+    border-left: 1px solid var(--background-modifier-border);
+    box-shadow: -5px 0 20px rgba(0, 0, 0, 0.15);
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), width 0.3s ease;
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+}
+
+.ns-wiki-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 25px 20px 15px 20px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.ns-wiki-panel-header h3 {
+    margin: 0;
+    color: var(--interactive-accent);
+}
+
+.ns-wiki-panel-content {
+    padding: 20px;
+    overflow-y: auto;
+    flex-grow: 1;
+    font-size: 0.95em;
+}
+
+/* --- 🏆 作家旅程 (Writer's Journey Dashboard) --- */
+.ns-dashboard-container {
+    display: flex;
+    gap: 40px;
+    height: 100%;
+    padding: 10px;
+}
+
+.ns-dashboard-sidebar {
+    min-width: 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    border-right: 1px solid var(--background-modifier-border);
+    padding-right: 20px;
+    padding-top: 20px;
+}
+
+.ns-year-link {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    text-align: right;
+    font-size: 1.2em;
+    color: var(--text-muted) !important;
+    cursor: pointer;
+    padding: 2px 0 !important;
+    border-bottom: 1px solid transparent !important;
+    border-radius: 0 !important;
+    transition: all 0.3s ease;
+    font-family: "Georgia", "Times New Roman", serif;
+    font-style: italic;
+}
+
+.ns-year-link:hover {
+    color: var(--text-normal) !important;
+}
+
+.ns-year-link.is-active {
+    color: var(--interactive-accent) !important;
+    border-bottom-color: var(--interactive-accent) !important;
+    font-weight: bold;
+}
+
+.ns-dashboard-content {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding-right: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 35px;
+}
+
+.ns-stats-hero {
+    display: flex;
+    justify-content: space-around;
+    padding: 20px 0;
+    border-top: 1px solid var(--background-modifier-border);
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.ns-stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.ns-stat-value {
+    font-size: 2.2em;
+    font-weight: normal;
+    color: var(--text-normal);
+    line-height: 1;
+    font-family: "Georgia", "Times New Roman", serif;
+}
+
+.ns-stat-label {
+    font-size: 0.85em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.ns-heatmap-wrapper {
+    overflow-x: auto;
+    padding-bottom: 10px;
+}
+
+.ns-heatmap-grid {
+    display: grid;
+    grid-template-rows: repeat(7, 13px);
+    grid-auto-flow: column;
+    gap: 4px;
+    width: max-content;
+}
+
+.ns-heatmap-cell {
+    width: 13px;
+    height: 13px;
+    border-radius: 2px;
+    background-color: var(--background-modifier-border);
+    transition: transform 0.1s, box-shadow 0.1s;
+    cursor: pointer;
+}
+
+.ns-heatmap-cell:hover {
+    transform: scale(1.2);
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+    z-index: 10;
+}
+
+.ns-trophy-room {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+.ns-trophy-card {
+    background-color: transparent;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    padding: 20px 15px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.ns-trophy-card.is-locked {
+    opacity: 0.35;
+    filter: grayscale(100%);
+}
+
+.ns-trophy-card.is-unlocked {
+    border-color: var(--interactive-accent);
+    background: rgba(var(--interactive-accent-rgb), 0.05);
+}
+
+.ns-trophy-icon {
+    margin-bottom: 12px;
+    color: var(--interactive-accent);
+}
+
+.ns-trophy-name {
+    font-size: 1.05em;
+    font-family: "Georgia", "Times New Roman", serif;
+    font-weight: bold;
+    color: var(--text-normal);
+    margin-bottom: 6px;
+}
+
+.ns-trophy-desc {
+    font-size: 0.85em;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.ns-literary-h3 {
+    font-family: "Georgia", "Times New Roman", serif;
+    font-style: italic;
+    color: var(--text-muted);
+    border-bottom: none !important;
+    margin: 0;
+}
+
+/* --- 🕰️ 備份歷史面板 (History Tab) --- */
 .ns-history-list {
     display: flex;
     flex-direction: column;
@@ -264,10 +647,6 @@ body.ns-mode-dialogue .cm-dialogue-text {
     padding: 2px 5px;
 }
 
-/* ============================================================ */
-/* History Panel Buttons (Preview, Recover, Delete)         */
-/* ============================================================ */
-
 .ns-history-btn {
     background-color: transparent !important;
     box-shadow: none !important;
@@ -289,367 +668,18 @@ body.ns-mode-dialogue .cm-dialogue-text {
     color: var(--text-error) !important;
 }
 
-
-/* ============================================================
-   🏷️ Exclusive Scene Card Callout: [!NSmith]
-   ============================================================ */
-.callout[data-callout="nsmith"] {
-    --callout-color: 100, 150, 255;
-    /* Blue theme, rgb values can be freely changed */
-    --callout-icon: lucide-film;
-    /* Movie scene icon */
-    background-color: rgba(var(--callout-color), 0.1);
-    border-left: 4px solid rgb(var(--callout-color));
-}
-
-/* ============================================================
-   🥷 Exclusive Scene Card ID Invisibility Cloak
-   ============================================================ */
-.ns-id {
-    display: none;
-}
-
-/* 3. File ID (<span class="ns-file-id">): From invisible to 'System Defense Line' */
-.ns-file-id {
-    display: inline-block;
-    width: 100%;
-    text-align: center;
-    font-size: 0 !important;
-    /* Perfectly hide the original obtrusive ID gibberish */
-    color: transparent !important;
-    user-select: none !important;
-    /* Reduce the chance of accidental mouse selection */
-    pointer-events: none !important;
-    /* Mouse clicks will pass straight through */
-    margin-bottom: 30px;
-}
-
-/* 4. Use CSS pseudo-elements to magically conjure a warning divider! */
-.ns-file-id::before {
-    content: "━━━━━━━━ System File Boundary ‧ Do Not Delete ━━━━━━━━";
-    font-size: 12px;
-    color: var(--text-faint);
-    letter-spacing: 2px;
-    opacity: 0.6;
-}
-
-/* ============================================================
-   🎨 NovelSmith Scene Card Color System (Auto-adapts to Dark/Light modes)
-   ============================================================ */
-
-/* Default border color, looks good even before a color is picked */
-.ns-scene-card {
-    border-left: 4px solid transparent;
-    transition: all 0.2s ease-in-out;
-}
-
-/* Slightly darken on hover for better tactile feel */
-.ns-scene-card:hover {
-    filter: brightness(0.95);
-}
-
-.theme-dark .ns-scene-card:hover {
-    filter: brightness(1.15);
-}
-
-/* 6 main colors with transparent watercolor background + solid left border */
-.ns-scene-card.ns-color-red {
-    background-color: rgba(var(--color-red-rgb), 0.15) !important;
-    border-left-color: var(--color-red) !important;
-}
-
-.ns-scene-card.ns-color-orange {
-    background-color: rgba(var(--color-orange-rgb), 0.15) !important;
-    border-left-color: var(--color-orange) !important;
-}
-
-.ns-scene-card.ns-color-green {
-    background-color: rgba(var(--color-green-rgb), 0.15) !important;
-    border-left-color: var(--color-green) !important;
-}
-
-.ns-scene-card.ns-color-blue {
-    background-color: rgba(var(--color-blue-rgb), 0.15) !important;
-    border-left-color: var(--color-blue) !important;
-}
-
-.ns-scene-card.ns-color-purple {
-    background-color: rgba(var(--color-purple-rgb), 0.15) !important;
-    border-left-color: var(--color-purple) !important;
-}
-
-.ns-scene-card.ns-color-grey {
-    /* Grey uses Obsidian's default base color for maximum harmony */
-    background-color: rgba(var(--color-base-60-rgb), 0.15) !important;
-    border-left-color: var(--text-muted) !important;
-}
-
-/* ============================================================
-   🎨 Scene Card Callout Linked Colors (Supports Dark/Light modes)
-   ============================================================ */
-
-/* Default (Compatible with older cards) */
-.callout[data-callout="nsmith"],
-.callout[data-callout="nsmith-default"] {
-    --callout-color: var(--color-base-60-rgb);
-    --callout-icon: lucide-clapperboard;
-}
-
-/* Colorful transformations */
-.callout[data-callout="nsmith-red"] {
-    --callout-color: var(--color-red-rgb);
-    --callout-icon: lucide-clapperboard;
-}
-
-.callout[data-callout="nsmith-orange"] {
-    --callout-color: var(--color-orange-rgb);
-    --callout-icon: lucide-clapperboard;
-}
-
-.callout[data-callout="nsmith-green"] {
-    --callout-color: var(--color-green-rgb);
-    --callout-icon: lucide-clapperboard;
-}
-
-.callout[data-callout="nsmith-blue"] {
-    --callout-color: var(--color-blue-rgb);
-    --callout-icon: lucide-clapperboard;
-}
-
-.callout[data-callout="nsmith-purple"] {
-    --callout-color: var(--color-purple-rgb);
-    --callout-icon: lucide-clapperboard;
-}
-
-.callout[data-callout="nsmith-grey"] {
-    --callout-color: var(--color-base-60-rgb);
-    --callout-icon: lucide-clapperboard;
-}
-
-/* ============================================================
-   ✨ 按鈕點擊特效 (Button Animation Effects)
-   ============================================================ */
-@keyframes ns-button-click-pulse {
-    0% {
-        transform: scale(1);
-    }
-
-    50% {
-        transform: scale(0.92);
-        opacity: 0.8;
-    }
-
-    100% {
-        transform: scale(1);
-    }
-}
-
-.ns-btn-flash {
-    animation: ns-button-click-pulse 0.3s ease-out !important;
-    background-color: var(--interactive-accent) !important;
-    color: var(--text-on-accent) !important;
-    transition: all 0.2s ease;
-}
-
-/* ============================================================
-   🏆 Writer's Journey Dashboard (Elegant Literary Edition)
-   ============================================================ */
-
-/* 1. Main Layout: Sidebar + Content */
-.ns-dashboard-container {
-    display: flex;
-    gap: 40px;
-    height: 100%;
-    padding: 10px;
-}
-
-/* --- Left Sidebar (Year Links) --- */
-.ns-dashboard-sidebar {
-    min-width: 80px;
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-    border-right: 1px solid var(--background-modifier-border);
-    padding-right: 20px;
-    padding-top: 20px;
-}
-
-.ns-year-link {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    text-align: right;
-    font-size: 1.2em;
-    color: var(--text-muted) !important;
-    cursor: pointer;
-    padding: 2px 0 !important;
-    border-bottom: 1px solid transparent !important;
-    border-radius: 0 !important;
-    transition: all 0.3s ease;
-    font-family: "Georgia", "Times New Roman", serif;
-    /* 優雅的襯線字體 */
-    font-style: italic;
-}
-
-.ns-year-link:hover {
-    color: var(--text-normal) !important;
-}
-
-.ns-year-link.is-active {
-    color: var(--interactive-accent) !important;
-    border-bottom-color: var(--interactive-accent) !important;
-    font-weight: bold;
-}
-
-/* --- Right Content Area --- */
-.ns-dashboard-content {
-    flex-grow: 1;
-    overflow-y: auto;
-    padding-right: 15px;
-    display: flex;
-    flex-direction: column;
-    gap: 35px;
-}
-
-/* 2. Elegant Stats Banner */
-.ns-stats-hero {
-    display: flex;
-    justify-content: space-around;
-    padding: 20px 0;
-    border-top: 1px solid var(--background-modifier-border);
-    border-bottom: 1px solid var(--background-modifier-border);
-}
-
-.ns-stat-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 5px;
-}
-
-.ns-stat-value {
-    font-size: 2.2em;
-    font-weight: normal;
-    /* 移除粗獷的粗體 */
-    color: var(--text-normal);
-    line-height: 1;
-    font-family: "Georgia", "Times New Roman", serif;
-    /* 書卷氣字體 */
-}
-
-.ns-stat-label {
-    font-size: 0.85em;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    /* 拉寬字距，增加優雅感 */
-}
-
-/* 3. Heatmap Grid */
-.ns-heatmap-wrapper {
-    overflow-x: auto;
-    padding-bottom: 10px;
-}
-
-.ns-heatmap-grid {
-    display: grid;
-    grid-template-rows: repeat(7, 13px);
-    grid-auto-flow: column;
-    gap: 4px;
-    width: max-content;
-}
-
-.ns-heatmap-cell {
-    width: 13px;
-    height: 13px;
-    border-radius: 2px;
-    background-color: var(--background-modifier-border);
-    transition: transform 0.1s, box-shadow 0.1s;
-    cursor: pointer;
-}
-
-.ns-heatmap-cell:hover {
-    transform: scale(1.2);
-    box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
-    z-index: 10;
-}
-
-/* 4. Elegant Trophy Room */
-.ns-trophy-room {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 20px;
-}
-
-.ns-trophy-card {
-    background-color: transparent;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 4px;
-    /* 減弱圓角，更像紙本卡片 */
-    padding: 20px 15px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    transition: all 0.3s ease;
-}
-
-.ns-trophy-card.is-locked {
-    opacity: 0.35;
-    filter: grayscale(100%);
-}
-
-.ns-trophy-card.is-unlocked {
-    border-color: var(--interactive-accent);
-    background: rgba(var(--interactive-accent-rgb), 0.05);
-    /* 非常微弱的背景光 */
-}
-
-.ns-trophy-icon {
-    margin-bottom: 12px;
-    color: var(--interactive-accent);
-}
-
-.ns-trophy-name {
-    font-size: 1.05em;
-    font-family: "Georgia", "Times New Roman", serif;
-    /* 獎盃名稱使用襯線體 */
-    font-weight: bold;
-    color: var(--text-normal);
-    margin-bottom: 6px;
-}
-
-.ns-trophy-desc {
-    font-size: 0.85em;
-    color: var(--text-muted);
-    line-height: 1.4;
-}
-
-/* Literary Headers */
-.ns-literary-h3 {
-    font-family: "Georgia", "Times New Roman", serif;
-    font-style: italic;
-    color: var(--text-muted);
-    border-bottom: none !important;
-    margin: 0;
-}
-
-/* ============================================================
-   ⏱️ Word Sprint UI (Zen Mode)
-   ============================================================ */
+/* --- ⏱️ 寫作衝刺 (Word Sprint Zen Mode) --- */
 .ns-sprint-container {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     height: 80vh;
-    /* 佔據大部分側邊欄空間 */
     padding: 20px;
     text-align: center;
     background: linear-gradient(180deg, rgba(var(--color-orange-rgb), 0.1) 0%, transparent 100%);
     border-radius: 12px;
     border: 2px solid var(--color-orange);
-    /* 🌟 心跳呼吸燈特效，營造衝刺緊張感！ */
     animation: ns-pulse-border 2s infinite;
 }
 
@@ -690,4 +720,116 @@ body.ns-mode-dialogue .cm-dialogue-text {
     font-size: 1.1em;
     color: var(--text-muted);
     margin-bottom: 30px;
+}
+
+
+/* ============================================================
+   4. UTILITIES (工具類、共用微調、隱藏標記)
+   ============================================================ */
+
+/* Modal 通用區域 */
+.ns-modal-scroll-area {
+    max-height: 55vh;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+.ns-modal-button-area {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid var(--background-modifier-border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* 藥丸標籤 (Chips) */
+.ns-chip {
+    border-radius: 16px;
+    padding: 4px 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background-color: var(--background-secondary);
+    color: var(--text-normal);
+    border: 1px solid var(--background-modifier-border);
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+.ns-chip:hover {
+    filter: brightness(1.2);
+}
+
+.ns-chip.is-active {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-color: var(--interactive-accent);
+}
+
+/* 拖拽視覺特效 */
+.ns-sortable-ghost {
+    opacity: 0.4;
+    background-color: var(--interactive-accent);
+}
+
+.ns-sortable-drag {
+    cursor: grabbing;
+    transform: scale(1.02);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* 按鈕點擊閃爍特效 */
+@keyframes ns-button-click-pulse {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(0.92);
+        opacity: 0.8;
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.ns-btn-flash {
+    animation: ns-button-click-pulse 0.3s ease-out !important;
+    background-color: var(--interactive-accent) !important;
+    color: var(--text-on-accent) !important;
+    transition: all 0.2s ease;
+}
+
+/* 🥷 系統隱藏標記 */
+.ns-id {
+    display: none !important;
+}
+
+/* 虛擬合併檔分隔線 (++ FILE_ID ++) */
+.ns-file-id {
+    display: inline-block;
+    width: 100%;
+    text-align: center;
+    font-size: 0 !important;
+    color: transparent !important;
+    user-select: none !important;
+    pointer-events: none !important;
+    margin-bottom: 30px;
+}
+
+.ns-file-id::before {
+    content: "━━━━━━━━ System File Boundary ‧ Do Not Delete ━━━━━━━━";
+    font-size: 12px;
+    color: var(--text-faint);
+    letter-spacing: 2px;
+    opacity: 0.6;
+}
+
+/* 📝 串聯草稿模式：專屬章節標題置中 */
+.markdown-source-view .HyperMD-header-1:has(.ns-chapter-center),
+.markdown-rendered h1:has(.ns-chapter-center) {
+    text-align: center !important;
+    border-bottom: none !important;
+    margin-top: 2em !important;
 }

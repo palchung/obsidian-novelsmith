@@ -20,8 +20,9 @@ export class ScrivenerManager {
     }
 
 
-    async toggleScrivenings() {
-        const activeFile = this.app.workspace.getActiveFile();
+    async toggleScrivenings(targetFile?: TFile) {
+        // 🌟 優先使用傳入嘅檔案，徹底解決側邊欄搶走 Focus 導致找不到筆記嘅 Bug！
+        const activeFile = targetFile || this.app.workspace.getActiveFile();
         if (!activeFile) { new Notice("Please open a file first!"); return; }
 
         const currentFolder = activeFile.parent;
@@ -111,7 +112,7 @@ export class ScrivenerManager {
 
             const parsedData = parseContent(content, true, this.app, file);
 
-            contentChunks.push(`\n\n# 📄 ${file.name}\n`);
+            contentChunks.push(`\n\n# 📄 ${file.name} <span class="ns-chapter-center"></span>\n`);
             contentChunks.push(`<span class="ns-file-id">++ FILE_ID: ${file.name} ++</span>\n\n`);
 
 
@@ -146,11 +147,19 @@ export class ScrivenerManager {
                     let targetLine = 0;
                     if (targetSceneRaw) {
                         for (let i = 0; i < editor.lineCount(); i++) {
-                            if (editor.getLine(i).includes(targetSceneRaw)) { targetLine = i; break; }
+                            if (editor.getLine(i).includes(targetSceneRaw)) {
+                                // 🌟 如果搵到劇情卡，將鼠標放喺標題嘅「下一行」，避免暴露 <span class="ns-id">
+                                targetLine = Math.min(i + 1, editor.lineCount() - 1);
+                                break;
+                            }
                         }
                     } else if (targetFileName) {
                         for (let i = 0; i < editor.lineCount(); i++) {
-                            if (editor.getLine(i).includes(`++ FILE_ID: ${targetFileName} ++`)) { targetLine = i; break; }
+                            if (editor.getLine(i).includes(`++ FILE_ID: ${targetFileName} ++`)) {
+                                // 🌟 如果搵到檔案 ID，將鼠標放喺標記嘅「下兩行」(直接進入正文區)，避免暴露 ns-file-id
+                                targetLine = Math.min(i + 2, editor.lineCount() - 1);
+                                break;
+                            }
                         }
                     }
                     if (targetLine > 0) {
@@ -350,11 +359,17 @@ export class ScrivenerManager {
                 updatedCount++;
             }
         }
-        // 🔥 Protection 1C：Execute sync after snapshorts are in place.
+        // 🔥 Protection 1C：Execute sync after snapshorts are in place. (iPad 安全版)
+        // 使用 for...of 確保檔案一個寫完先寫下一個，絕對唔會塞死系統！
         if (snapshotPromises.length > 0) {
-            await Promise.all(snapshotPromises);
+            for (const p of snapshotPromises) {
+                try { await p; } catch (e) { console.error("Snapshot error:", e); }
+            }
         }
-        await Promise.all(writePromises);
+
+        for (const p of writePromises) {
+            try { await p; } catch (e) { console.error("Write error:", e); }
+        }
 
         // =========================================================
         // 🔥 Execute draft saving

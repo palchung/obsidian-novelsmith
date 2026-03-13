@@ -2,7 +2,7 @@ import { ItemView, WorkspaceLeaf, MarkdownView, Notice, Menu, setIcon, MarkdownR
 import Sortable from 'sortablejs';
 import NovelSmithPlugin from '../../main';
 import { SimpleConfirmModal, DashboardBuilderModal, CorkboardModal, CorkboardDraftActionModal } from '../modals';
-import { getAnchorSceneIdFromCursor, getManuscriptFiles, createIconButton, isScriveningsDraft, replaceEntireDocument, extractSceneId, cleanSceneTitle, DRAFT_FILENAME, extractSceneColor, getColorById, SCENE_COLORS } from '../utils';
+import { getAnchorSceneIdFromCursor, createIconButton, isScriveningsDraft, replaceEntireDocument, extractSceneId, cleanSceneTitle, DRAFT_FILENAME, extractSceneColor, getColorById, SCENE_COLORS } from '../utils';
 
 
 export const VIEW_TYPE_STRUCTURE = "novelsmith-structure-view";
@@ -72,6 +72,8 @@ export class StructureView extends ItemView {
 
 
     private activeTab: 'outline' | 'history' | 'info' = 'outline';
+    private lastTab: string = "";
+    private lastDraftMode: boolean = false;
     private selectedSceneId: string | null = null;
     private selectedSceneTitle: string | null = null;
 
@@ -148,21 +150,30 @@ export class StructureView extends ItemView {
                 }, 1000);
             }
         }));
-        this.registerDomEvent(document, 'mouseup', (e: MouseEvent) => {
 
-            if (this.contentEl.contains(e.target as Node)) {
-                return;
-            }
+        // 🔋 iPad 終極慳電版：全域游標監聽器 (加入重度節流閥)
+        let cursorTimer: number | null = null;
 
+        const handleCursorMove = () => {
+            // 只有當打開咗需要游標嘅面板，先至消耗 CPU 資源！
             if (this.activeTab === 'history' || this.activeTab === 'info') {
-                window.setTimeout(() => {
+                if (cursorTimer) window.clearTimeout(cursorTimer);
+                // 延遲 400ms，確保用家真係停低咗先去解析文稿
+                cursorTimer = window.setTimeout(() => {
                     void this.parseAndRender();
-                }, 100);
+                }, 400);
             }
+        };
+
+        this.registerDomEvent(document, 'mouseup', (e: MouseEvent) => {
+            if (this.contentEl.contains(e.target as Node)) return; // 點擊面板自己唔理
+            handleCursorMove();
         });
+
         this.registerDomEvent(document, 'keyup', (e: KeyboardEvent) => {
-            if ((this.activeTab === 'history' || this.activeTab === 'info') && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-                window.setTimeout(() => { void this.parseAndRender(); }, 100);
+            // 只監聽方向鍵
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                handleCursorMove();
             }
         });
 
@@ -280,20 +291,48 @@ export class StructureView extends ItemView {
 
 
 
-            container.empty();
-            this.renderHeader(container, view);
+            // ==========================================
+            // 🚀 神級優化：防止頻繁清空整個側邊欄 (DOM Reuse)
+            // ==========================================
+            let header = container.querySelector(":scope > .ns-control-header");
+            let contentDiv = container.querySelector(":scope > .ns-tab-content");
 
-            const contentDiv = container.createDiv({ cls: "ns-tab-content" });
-            contentDiv.setCssStyles({ marginTop: "10px" });
+            const isDraftMode = view && view.file && view.file.name === DRAFT_FILENAME;
+            const draftModeChanged = this.lastDraftMode !== !!isDraftMode;
+
+            // 🌟 當「切換 Tab」、第一次載入、或「進出草稿模式」時，強制重畫頂部按鈕！
+            if (!header || !contentDiv || this.lastTab !== this.activeTab || draftModeChanged) {
+                container.empty();
+                this.renderHeader(container, view);
+                contentDiv = container.createDiv({ cls: "ns-tab-content" });
+                contentDiv.setCssStyles({ marginTop: "10px" });
+                this.lastTab = this.activeTab;
+                this.lastDraftMode = !!isDraftMode; // 更新狀態
+
+                this.sortables.forEach(s => s.destroy());
+                this.sortables = [];
+            }
+
+
 
             if (!view) {
+                contentDiv.empty();
                 contentDiv.setText("Please open a draft");
                 return;
             }
 
-            if (this.activeTab === 'outline') this.renderOutline(contentDiv, view);
-            else if (this.activeTab === 'info') this.renderInfo(contentDiv, view);
-            else await this.renderHistory(contentDiv, view);
+            // 🌟 將重用嘅 contentDiv 交畀對應嘅函數做局部更新！
+            if (this.activeTab === 'outline') {
+                this.renderOutline(contentDiv, view);
+            }
+            else if (this.activeTab === 'info') {
+                contentDiv.empty(); // Info 暫時保留清空重畫
+                this.renderInfo(contentDiv, view);
+            }
+            else {
+                contentDiv.empty(); // History 暫時保留清空重畫
+                await this.renderHistory(contentDiv, view);
+            }
 
         } finally {
 
@@ -308,232 +347,35 @@ export class StructureView extends ItemView {
 
     renderHeader(container: HTMLElement, view: MarkdownView | null) {
         const header = container.createDiv({ cls: "ns-control-header" });
-        const topBtnRow = header.createDiv({ cls: "ns-button-row" });
-        topBtnRow.setCssStyles({ marginBottom: "5px" });
-
-
         const isDraftMode = view && view.file && view.file.name === DRAFT_FILENAME;
 
-        // Scrivenings Button
-        const btnScrivenings = createIconButton(
-            topBtnRow,
-            isDraftMode ? "save" : "book-open",
-            isDraftMode ? "Sync & close" : "Scrivenering",
-            {
-                backgroundColor: "var(--interactive-accent)",
-                color: "var(--text-on-accent)"
-            }
-        );
-
-
-
-        btnScrivenings.setCssStyles({
-            backgroundColor: "var(--interactive-accent)",
-            color: "var(--text-on-accent)"
-        });
-
-
-        btnScrivenings.onclick = () => {
-            if (view && this.plugin.checkInBookFolder(view.file)) {
-                const file = view.file;
-                const content = view.editor.getValue();
-
-
-                if (file.name === DRAFT_FILENAME) {
-                    void this.plugin.executeSmartSave(view);
-                }
-                else if (isScriveningsDraft(content)) {
-                    new Notice("Abort: this is a archived draft, scrivenering may cause infinite loop.");
-                }
-                else {
-                    const folder = file.parent;
-                    if (folder) {
-                        void this.plugin.sceneManager.assignIDsToAllFiles(folder).then(() => {
-                            void this.plugin.scrivenerManager.toggleScrivenings();
-                        });
-                    }
-                }
-            }
-        };
-
-
-
-        // =========================================================
-        // 🌟 Global Corkboard Button (With Vault-wide Draft Radar)
-        // =========================================================
-        const btnCorkboard = createIconButton(topBtnRow, "layout-dashboard", "Corkboard", {
-            backgroundColor: "var(--interactive-normal)"
-        });
-
-        // =========================================================
-        // 🌟 Global Corkboard Button (Strict Folder Scope & Smart Return)
-        // =========================================================
-        btnCorkboard.onclick = async () => {
-            const currentView = this.getValidMarkdownView();
-
-            // 🌟 修正點 1：使用全域標準攔截器，統一警告字眼，嚴格阻擋！
-            if (!currentView || !this.plugin.checkInBookFolder(currentView.file)) {
-                return; // checkInBookFolder 已經會自動彈出正確嘅 Notice
-            }
-
-            const currentFile = currentView.file;
-            const currentFolder = currentFile.parent;
-            const workingFolderPath = currentFolder ? currentFolder.path : this.plugin.settings.bookFolderPath;
-
-            const draftPath = workingFolderPath === "/" ? `/${DRAFT_FILENAME}` : `${workingFolderPath}/${DRAFT_FILENAME}`;
-            const draftFile = this.plugin.app.vault.getAbstractFileByPath(draftPath);
-
-            // 確保使用 TFile 避免 import() 毒藥
-            if (draftFile && draftFile instanceof TFile) {
-                new CorkboardDraftActionModal(
-                    this.plugin.app,
-                    async () => {
-                        new Notice("Syncing draft...", 2000);
-                        let anchorSceneId: string | null = null;
-                        if (currentFile.name.endsWith(".md")) {
-                            anchorSceneId = getAnchorSceneIdFromCursor(currentView.editor);
-                        }
-
-                        await this.plugin.scrivenerManager.syncBack(draftFile as TFile, currentFolder!);
-                        this.plugin.sceneManager.scheduleGenerateDatabase();
-
-                        // 🌟 修正點 2：傳入 isFromScrivenings = true (標記為來自串聯模式)
-                        new CorkboardModal(this.plugin, anchorSceneId, workingFolderPath, true).open();
-                    },
-                    async () => {
-                        new Notice("Discarding draft...", 2000);
-                        await this.plugin.scrivenerManager.discardDraft(draftFile as TFile);
-
-                        // 🌟 傳入 isFromScrivenings = false (因為捨棄咗，唔想再開返)
-                        new CorkboardModal(this.plugin, null, workingFolderPath, false).open();
-                    }
-                ).open();
-
-            } else {
-                const anchorSceneId = getAnchorSceneIdFromCursor(currentView.editor);
-                new CorkboardModal(this.plugin, anchorSceneId, workingFolderPath, false).open();
-            }
-        };
-
-        // =========================================================
-        // ⏱️ Word Sprint Button
-        // =========================================================
-        const btnSprint = createIconButton(topBtnRow, "timer", "Sprint", {
-            backgroundColor: "var(--color-orange)", // 用醒神嘅橙色！
-            color: "white"
-        });
-        btnSprint.onclick = () => {
-            const currentView = this.getValidMarkdownView();
-            if (!currentView) { new Notice("Please open a draft first!"); return; }
-
-            import('../modals').then(({ SprintSetupModal }) => {
-                new SprintSetupModal(this.plugin.app, (mins) => {
-                    this.startSprint(mins, currentView);
-                }).open();
-            });
-        };
-
-        // =========================================================
-        // 🔥 Discard & Compile button
-        // =========================================================
-        if (isDraftMode) {
-
-
-            const btnDiscard = createIconButton(topBtnRow, "trash-2", "Discard", {
-                backgroundColor: "var(--background-modifier-error)",
-                color: "white"
-            });
-
-            btnDiscard.onclick = () => {
-                new SimpleConfirmModal(
-                    this.plugin.app,
-                    "Are you sure to discard this darft?\n\nWill close & delete this file, all your word will not be synced",
-                    () => {
-                        void this.plugin.scrivenerManager.discardDraft(view.file);
-                    }
-                ).open();
-            };
-        } else {
-            const btnCompile = createIconButton(topBtnRow, "file-output", "Compile draft");
-
-
-            btnCompile.onclick = () => {
-                if (view && this.plugin.checkInBookFolder(view.file)) this.plugin.compilerManager.openCompileModal(view);
-            };
-        }
-
-        // =========================================================
-        // 🏆 Writer's Journey (Heatmap Dashboard) Button
-        // =========================================================
-        const btnStats = createIconButton(topBtnRow, "trophy", "Journey", {
-            backgroundColor: "transparent",
-            border: "1px solid var(--interactive-accent)",
-            color: "var(--interactive-accent)"
-        });
-
-        // Optional: Make it glow slightly when hovered
-        btnStats.addEventListener("mouseover", () => btnStats.setCssStyles({ backgroundColor: "var(--interactive-accent)", color: "var(--text-on-accent)" }));
-        btnStats.addEventListener("mouseout", () => btnStats.setCssStyles({ backgroundColor: "transparent", color: "var(--interactive-accent)" }));
-
-        btnStats.onclick = () => {
-
-            import('../modals').then(({ StatsDashboardModal }) => {
-                new StatsDashboardModal(this.plugin).open();
-            });
-        };
-
-
-
-
-        // =========================================================
-        // 🔥 Split & Merge
-        // =========================================================
-        const btnRow = header.createDiv({ cls: "ns-button-row" });
-        btnRow.setCssStyles({ marginBottom: "5px" });
-
-
         const isArchivedDraft = (file: unknown, content: string) => {
-            return file.name !== DRAFT_FILENAME &&
-                (isScriveningsDraft(content));
+            return file.name !== DRAFT_FILENAME && (isScriveningsDraft(content));
         };
 
-        const btnInsert = createIconButton(btnRow, "file-plus", "Scene card");
+        // =========================================================
+        // 🌟 Row 1: 全域模式與存檔 (Sync | Corkboard | Scrivenings/Discard)
+        // =========================================================
+        const row1 = header.createDiv({ cls: "ns-button-row" });
+        row1.setCssStyles({ marginBottom: "5px" });
 
-
-
-        btnInsert.onclick = () => {
-            if (view && this.plugin.checkInBookFolder(view.file)) {
-                if (isArchivedDraft(view.file, view.editor.getValue())) {
-                    new Notice("This is a archived draft, please return to your working file to insert scene card.");
-                    return;
-                }
-                void this.plugin.plotManager.insertSceneCard(view);
-            }
-        };
-
-        const btnSave = createIconButton(btnRow, "save", "Sync");
-
+        // 1. 👈 左邊：同步 (Sync) 掣 
+        const btnSave = createIconButton(row1, "save", "Sync", { backgroundColor: "var(--interactive-accent)", color: "var(--text-on-accent)" });
         btnSave.onclick = async () => {
-            if (view && this.plugin.checkInBookFolder(view.file)) {
-
-
+            const currentView = this.getValidMarkdownView(); // 🌟 即時獲取最新視窗
+            if (currentView && this.plugin.checkInBookFolder(currentView.file)) {
                 btnSave.classList.add("ns-btn-flash");
                 const originalText = btnSave.innerText;
                 btnSave.innerText = "Syncing...";
                 btnSave.disabled = true;
 
                 try {
-                    if (isArchivedDraft(view.file, view.editor.getValue())) {
+                    if (isArchivedDraft(currentView.file, currentView.editor.getValue())) {
                         new Notice("Draft saved.");
                     } else {
-                        await this.plugin.executeSmartSave(view);
-
-                        if (view.file.name !== DRAFT_FILENAME) {
-                            new Notice("Sync & smart save complete!");
-                        }
+                        await this.plugin.executeSmartSave(currentView);
                     }
                 } finally {
-
                     setTimeout(() => {
                         btnSave.innerText = originalText;
                         btnSave.disabled = false;
@@ -543,133 +385,198 @@ export class StructureView extends ItemView {
             }
         };
 
-        // =========================================================
-        // 🔥 Spilt, merge and tools
-        // =========================================================
-        const btnRow2 = header.createDiv({ cls: "ns-button-row" });
+        // 2. 🎯 中間：軟木板 (Corkboard) 掣
+        const btnCorkboard = createIconButton(row1, "layout-dashboard", "Corkboard", { backgroundColor: "var(--interactive-normal)" });
+        btnCorkboard.onclick = async () => {
+            const currentView = this.getValidMarkdownView(); // 🌟 即時獲取最新視窗
+            if (!currentView || !this.plugin.checkInBookFolder(currentView.file)) return;
 
-        const btnSplit = createIconButton(btnRow2, "scissors", "Split");
+            const currentFile = currentView.file;
+            const currentFolder = currentFile.parent;
+            const workingFolderPath = currentFolder ? currentFolder.path : this.plugin.settings.bookFolderPath;
+            const draftPath = workingFolderPath === "/" ? `/${DRAFT_FILENAME}` : `${workingFolderPath}/${DRAFT_FILENAME}`;
+            const draftFile = this.plugin.app.vault.getAbstractFileByPath(draftPath);
+
+            if (draftFile && draftFile instanceof TFile) {
+                new CorkboardDraftActionModal(
+                    this.plugin.app,
+                    async () => {
+                        new Notice("Syncing draft...", 2000);
+                        let anchorSceneId: string | null = null;
+                        if (currentFile.name.endsWith(".md")) anchorSceneId = getAnchorSceneIdFromCursor(currentView.editor);
+                        await this.plugin.scrivenerManager.syncBack(draftFile, currentFolder);
+                        this.plugin.sceneManager.scheduleGenerateDatabase();
+                        new CorkboardModal(this.plugin, anchorSceneId, workingFolderPath, true).open();
+                    },
+                    async () => {
+                        new Notice("Discarding draft...", 2000);
+                        await this.plugin.scrivenerManager.discardDraft(draftFile);
+                        new CorkboardModal(this.plugin, null, workingFolderPath, false).open();
+                    }
+                ).open();
+            } else {
+                const anchorSceneId = getAnchorSceneIdFromCursor(currentView.editor);
+                new CorkboardModal(this.plugin, anchorSceneId, workingFolderPath, false).open();
+            }
+        };
+
+        // 3. 👉 右邊：串聯模式 (Scrivenings) OR 捨棄草稿 (Discard)
+        if (isDraftMode) {
+            const btnDiscard = createIconButton(row1, "trash-2", "Discard", { backgroundColor: "var(--background-modifier-error)", color: "white" });
+            btnDiscard.onclick = () => {
+                const currentView = this.getValidMarkdownView(); // 🌟 即時獲取最新視窗
+                if (currentView) {
+                    new SimpleConfirmModal(
+                        this.plugin.app,
+                        "Are you sure to discard this darft?\n\nWill close & delete this file, all your word will not be synced",
+                        () => { void this.plugin.scrivenerManager.discardDraft(currentView.file); }
+                    ).open();
+                }
+            };
+        } else {
+            const btnScrivenings = createIconButton(row1, "book-open", "Scrivenering");
+            btnScrivenings.onclick = () => {
+                const currentView = this.getValidMarkdownView(); // 🌟 即時獲取最新視窗
+                if (currentView && this.plugin.checkInBookFolder(currentView.file)) {
+                    const content = currentView.editor.getValue();
+                    if (isArchivedDraft(currentView.file, content)) {
+                        new Notice("Abort: this is a archived draft, scrivenering may cause infinite loop.");
+                    } else {
+                        const folder = currentView.file.parent;
+                        if (folder) {
+                            void this.plugin.sceneManager.assignIDsToAllFiles(folder).then(() => {
+                                // 🌟 將 currentView.file 傳入，完美解決 "Please open a file first" Bug！
+                                void this.plugin.scrivenerManager.toggleScrivenings(currentView.file);
+                            });
+                        }
+                    }
+                }
+            };
+        }
+
+        // =========================================================
+        // 🌟 Row 2: 結構編輯與工具 (Micro Actions)
+        // =========================================================
+        const row2 = header.createDiv({ cls: "ns-button-row" });
+
+        const btnInsert = createIconButton(row2, "file-plus", "Scene");
+        btnInsert.onclick = () => {
+            const currentView = this.getValidMarkdownView(); // 🌟 即時獲取最新視窗
+            if (currentView && this.plugin.checkInBookFolder(currentView.file)) {
+                if (isArchivedDraft(currentView.file, currentView.editor.getValue())) {
+                    new Notice("This is a archived draft, please return to your working file to insert scene card.");
+                    return;
+                }
+                void this.plugin.plotManager.insertSceneCard(currentView);
+            }
+        };
+
+        const btnSplit = createIconButton(row2, "scissors", "Split");
         btnSplit.onclick = () => {
-            if (view && this.plugin.checkInBookFolder(view.file)) {
-                if (isArchivedDraft(view.file, view.editor.getValue())) {
+            const currentView = this.getValidMarkdownView();
+            if (currentView && this.plugin.checkInBookFolder(currentView.file)) {
+                if (isArchivedDraft(currentView.file, currentView.editor.getValue())) {
                     new Notice("This is archived draft, please don't split scene here.");
                     return;
                 }
-                void this.plugin.plotManager.splitScene(view);
+                void this.plugin.plotManager.splitScene(currentView);
             }
         };
 
-        const btnMerge = createIconButton(btnRow2, "combine", "Merge");
+        const btnMerge = createIconButton(row2, "combine", "Merge");
         btnMerge.onclick = () => {
-            if (view && this.plugin.checkInBookFolder(view.file)) {
-                if (isArchivedDraft(view.file, view.editor.getValue())) {
+            const currentView = this.getValidMarkdownView();
+            if (currentView && this.plugin.checkInBookFolder(currentView.file)) {
+                if (isArchivedDraft(currentView.file, currentView.editor.getValue())) {
                     new Notice("This is archived draft, please don't merge scene here.");
                     return;
                 }
-                this.plugin.plotManager.mergeScene(view);
+                this.plugin.plotManager.mergeScene(currentView);
             }
         };
 
-
-        const btnTools = createIconButton(btnRow2, "wrench", "Tools");
+        const btnTools = createIconButton(row2, "wrench", "Tools");
         btnTools.onclick = (e: MouseEvent) => {
-            const currentView = this.getValidMarkdownView();
-
-
+            const currentView = this.getValidMarkdownView(); // 🌟 即時獲取最新視窗
             if (!currentView) return;
 
-
             const isInBookFolder = this.plugin.checkInBookFolderSilent(currentView.file);
-
             const menu = new Menu();
 
 
+
+            menu.addItem((item) => {
+                item.setTitle("Writer's journey").setIcon("trophy").onClick(() => {
+                    import('../modals').then(({ StatsDashboardModal }) => { new StatsDashboardModal(this.plugin).open(); });
+                });
+            });
+
+            menu.addItem((item) => {
+                item.setTitle("Focus sprint").setIcon("timer").onClick(() => {
+                    import('../modals').then(({ SprintSetupModal }) => {
+                        new SprintSetupModal(this.plugin.app, (mins) => { this.startSprint(mins, currentView); }).open();
+                    });
+                });
+            });
+
+
+            menu.addSeparator();
+
             if (isInBookFolder) {
-                menu.addItem((item) => {
-                    item.setTitle("Typo correction")
-                        .setIcon("pencil")
-                        .onClick(() => { void this.plugin.writingManager.correctNames(currentView); });
-                });
-
-                menu.addItem((item) => {
-                    item.setTitle("Clean draft")
-                        .setIcon("eraser")
-                        .onClick(() => { this.plugin.writingManager.cleanDraft(currentView); });
-                });
-
+                menu.addItem((item) => { item.setTitle("Auto wiki").setIcon("book").onClick(() => { void this.plugin.wikiManager.scanAndCreateWiki(currentView); }); });
+                menu.addItem((item) => { item.setTitle("Typo correction").setIcon("pencil").onClick(() => { void this.plugin.writingManager.correctNames(currentView); }); });
                 menu.addSeparator();
-
-                menu.addItem((item) => {
-                    item.setTitle("Dialogue mode")
-                        .setIcon("message-circle")
-                        .onClick(() => { this.plugin.writingManager.toggleDialogueMode(currentView); });
-                });
-
-                menu.addItem((item) => {
-                    item.setTitle("Redundant mode")
-                        .setIcon("search")
-                        .onClick(() => { void this.plugin.writingManager.toggleRedundantMode(currentView); });
-                });
-
+                menu.addItem((item) => { item.setTitle("Dialogue mode").setIcon("message-circle").onClick(() => { this.plugin.writingManager.toggleDialogueMode(currentView); }); });
+                menu.addItem((item) => { item.setTitle("Redundant mode").setIcon("search").onClick(() => { void this.plugin.writingManager.toggleRedundantMode(currentView); }); });
                 menu.addSeparator();
-
-
-                menu.addItem((item) => {
-                    item.setTitle("Auto wiki")
-                        .setIcon("book")
-                        .onClick(() => { void this.plugin.wikiManager.scanAndCreateWiki(currentView); });
-                });
-
+                menu.addItem((item) => { item.setTitle("Clean draft").setIcon("eraser").onClick(() => { this.plugin.writingManager.cleanDraft(currentView); }); });
+                if (!isDraftMode) {
+                    menu.addItem((item) => {
+                        item.setTitle("Compile draft").setIcon("file-output").onClick(() => {
+                            if (currentView && this.plugin.checkInBookFolder(currentView.file)) {
+                                this.plugin.compilerManager.openCompileModal(currentView);
+                            }
+                        });
+                    });
+                }
                 menu.addSeparator();
             }
 
-
             menu.addItem((item) => {
-                item.setTitle("Insert dashboard")
-                    .setIcon("bar-chart-3")
-                    .onClick(async () => {
-                        const availableAttributes = await this.plugin.dashboardManager.getAvailableAttributes();
-                        if (availableAttributes.length === 0) return;
-
-                        new DashboardBuilderModal(this.plugin.app, availableAttributes, (config) => {
-                            const generatedCode = this.plugin.dashboardManager.generateDashboardCode(config);
-                            currentView.editor.replaceSelection(generatedCode + "\n\n");
-                            new Notice("Dashboard inserted! (ensure dataview is enabled to see the render)");
-                        }).open();
-                    });
+                item.setTitle("Insert dashboard").setIcon("bar-chart-3").onClick(async () => {
+                    const availableAttributes = await this.plugin.dashboardManager.getAvailableAttributes();
+                    if (availableAttributes.length === 0) return;
+                    new DashboardBuilderModal(this.plugin.app, availableAttributes, (config) => {
+                        const generatedCode = this.plugin.dashboardManager.generateDashboardCode(config);
+                        currentView.editor.replaceSelection(generatedCode + "\n\n");
+                        new Notice("Dashboard inserted!");
+                    }).open();
+                });
             });
 
             menu.showAtMouseEvent(e);
         };
 
-
-
-
-
-
-
+        // =========================================================
+        // 🌟 Row 3: 導航分頁 (Tabs)
+        // =========================================================
         const tabsRow = header.createDiv({ cls: "ns-tabs-row" });
 
-        // 1. Outline Tab
         const tabOutline = createIconButton(tabsRow, "list-tree", "Outline");
         tabOutline.className = "ns-tab-btn" + (this.activeTab === 'outline' ? " is-active" : "");
         tabOutline.onclick = () => { this.activeTab = 'outline'; this.lastOutlineHash = ""; void this.parseAndRender(); };
 
-        // 2. Info Tab
         const tabInfo = createIconButton(tabsRow, "info", "Info");
         tabInfo.className = "ns-tab-btn" + (this.activeTab === 'info' ? " is-active" : "");
         tabInfo.onclick = () => {
             this.activeTab = 'info';
-
             this.activeWikiNoteToRestore = null;
             this.currentWikiFile = null;
-
             this.lastInfoTitle = null;
             this.lastInfoHash = "";
-
             void this.parseAndRender();
         };
-        // 3. Backup Tab
+
         const tabHistory = createIconButton(tabsRow, "history", "Backup");
         tabHistory.className = "ns-tab-btn" + (this.activeTab === 'history' ? " is-active" : "");
         tabHistory.onclick = () => { this.activeTab = 'history'; void this.parseAndRender(); };
@@ -679,173 +586,195 @@ export class StructureView extends ItemView {
         const text = view.editor.getValue();
         if (!text.trim()) { container.setText("This file is empty"); return; }
 
-        const fileNameEl = container.createEl("h3");
+        // 1. 處理頂部標題區 (只更新文字，不摧毀 DOM)
+        let headerContainer = container.querySelector(".ns-outline-header");
+        if (!headerContainer) {
+            headerContainer = container.createDiv({ cls: "ns-outline-header" });
+            const fName = headerContainer.createEl("h3");
+            fName.setCssStyles({ marginTop: "0", borderBottom: "1px solid var(--background-modifier-border)", paddingBottom: "8px", marginBottom: "10px" });
+        }
+
+        const fileNameEl = headerContainer.querySelector("h3") as HTMLElement;
         if (view.file && view.file.name === DRAFT_FILENAME) {
-            fileNameEl.innerText = "Scrivenering draft";
+            if (fileNameEl.innerText !== "Scrivenering draft") fileNameEl.innerText = "Scrivenering draft";
             fileNameEl.setCssStyles({ color: "var(--interactive-accent)" });
         } else if (view.file) {
-            fileNameEl.innerText = `${view.file.basename}`;
+            if (fileNameEl.innerText !== view.file.basename) fileNameEl.innerText = `${view.file.basename}`;
             fileNameEl.setCssStyles({ color: "var(--text-accent)" });
         }
-        fileNameEl.setCssProps({ marginTop: "0" });
-        fileNameEl.setCssProps({ borderBottom: "1px solid var(--background-modifier-border)" });
-        fileNameEl.setCssProps({ paddingBottom: "8px" });
-        fileNameEl.setCssProps({ marginBottom: "10px" });
 
         const tree = this.parseDocument(text);
 
+        if (tree.length === 0) {
+            let emptyMsg = container.querySelector(".ns-empty-msg");
+            if (!emptyMsg) container.createDiv({ text: "Chapter or scene ID do not found", cls: "ns-empty-msg" });
+            return;
+        }
+        const existingEmptyMsg = container.querySelector(".ns-empty-msg");
+        if (existingEmptyMsg) existingEmptyMsg.remove();
 
-        this.sortables.forEach((s: unknown) => s.destroy());
-        this.sortables = [];
+        // 2. 處理大綱主體區
+        let bodyContainer = container.querySelector(".ns-outline-body");
+        if (!bodyContainer) {
+            bodyContainer = container.createDiv({ cls: "ns-outline-body" });
+        }
 
-        if (tree.length === 0) { container.setText("Chapter or scene ID do not found"); return; }
-
-        // 🔥 Hanle duplicated scene ID
         const renderNameCount = new Map<string, number>();
 
-        tree.forEach((chapter, chIndex) => {
+        // ==========================================
+        // 🌟 DOM Diffing 魔法開始：只更新有變動嘅卡片！
+        // ==========================================
+        const existingChapters = Array.from(bodyContainer.querySelectorAll(":scope > .ns-chapter-box"));
+        const chapterMap = new Map<string, HTMLElement>();
+        existingChapters.forEach(ch => chapterMap.set(ch.dataset.name || "", ch));
+
+        let chIndex = 0;
+        tree.forEach((chapter) => {
             if (chapter.name === "root" && chapter.scenes.length === 0) return;
 
-            const chapterBox = container.createDiv({ cls: "ns-chapter-box" });
-            chapterBox.dataset.name = chapter.name;
+            let chapterBox = chapterMap.get(chapter.name);
+            if (!chapterBox) {
+                // 👉 情況 A：畫面上冇呢個章節，建立新嘅！
+                chapterBox = document.createElement("div");
+                chapterBox.className = "ns-chapter-box";
+                chapterBox.dataset.name = chapter.name;
+
+                if (chapter.name !== "root") {
+                    const chCard = chapterBox.createDiv({ cls: "ns-chapter-card" });
+                    chCard.innerText = `${chapter.name}`;
+                }
+
+                const sceneList = chapterBox.createDiv({ cls: "ns-scene-list" });
+                this.sortables.push(new Sortable(sceneList, {
+                    group: 'scenes', animation: 150, ghostClass: 'ns-sortable-ghost', dragClass: 'ns-sortable-drag',
+                    delay: 100, delayOnTouchOnly: true,
+                    onEnd: (evt: unknown) => {
+                        if (evt.newIndex !== evt.oldIndex || evt.from !== evt.to) this.saveChanges(container, view);
+                    }
+                }));
+            }
+
+            // 確保 DOM 順序與 Markdown 結構一致
+            bodyContainer.appendChild(chapterBox);
+            chapterMap.delete(chapter.name); // 從刪除名單剔除
+
             this.chapterPreambleMap.set(chapterBox, chapter.preamble);
 
             if (chapter.name !== "root") {
-                const chCard = chapterBox.createDiv({ cls: "ns-chapter-card" });
-                chCard.innerText = `${chapter.name}`;
-                chCard.addEventListener("click", (e) => { e.stopPropagation(); e.preventDefault(); this.jumpToLine(chapter.lineNumber); });
+                const chCard = chapterBox.querySelector(".ns-chapter-card");
+                chCard.onclick = (e) => { e.stopPropagation(); e.preventDefault(); this.jumpToLine(chapter.lineNumber); };
             }
 
-            const sceneList = chapterBox.createDiv({ cls: "ns-scene-list" });
+            const sceneList = chapterBox.querySelector(".ns-scene-list");
             sceneList.dataset.chapterIndex = chIndex.toString();
 
-            chapter.scenes.forEach((scene) => {
-                const scCard = sceneList.createDiv({ cls: "ns-scene-card" });
+            // --- 處理 Scene Card (卡片層級比對) ---
+            const existingScenes = Array.from(sceneList.querySelectorAll(":scope > .ns-scene-card"));
+            const sceneMap = new Map<string, HTMLElement>();
+            existingScenes.forEach(sc => sceneMap.set(sc.dataset.safeKey || "", sc));
 
-                // ==========================================
-                // 🔥 Generate Safe Key！
-                // ==========================================
+            chapter.scenes.forEach((scene) => {
                 let safeKey = scene.id;
                 if (!safeKey) {
                     const count = renderNameCount.get(scene.name) || 0;
                     safeKey = `NO_ID_${scene.name}_${count}`;
                     renderNameCount.set(scene.name, count + 1);
                 }
-                scCard.dataset.safeKey = safeKey;
 
+                let scCard = sceneMap.get(safeKey);
+                if (!scCard) {
+                    // 👉 全新場景卡片，即刻畫！
+                    scCard = document.createElement("div");
+                    scCard.className = "ns-scene-card";
+                    scCard.dataset.safeKey = safeKey;
+                    scCard.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" });
 
+                    const titleContainer = scCard.createDiv({ cls: "ns-scene-title-container" });
+                    titleContainer.setCssStyles({ display: "flex", alignItems: "flex-start", gap: "6px", flex: "1", minWidth: "0" });
+
+                    const iconEl = titleContainer.createSpan({ cls: "ns-scene-icon" });
+                    setIcon(iconEl, "clapperboard");
+                    iconEl.setCssStyles({ opacity: "0.6", display: "flex", alignItems: "center", flexShrink: "0", marginTop: "2px" });
+
+                    titleContainer.createSpan({ cls: "ns-scene-title-text" });
+
+                    const colorBtn = scCard.createDiv();
+                    setIcon(colorBtn, "palette");
+                    colorBtn.setCssStyles({ cursor: "pointer", opacity: "0.3", marginLeft: "auto", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: "0" });
+                    colorBtn.addEventListener("mouseover", () => colorBtn.setCssProps({ opacity: "1" }));
+                    colorBtn.addEventListener("mouseout", () => colorBtn.setCssProps({ opacity: "0.3" }));
+                }
+
+                // 👉 情況 B：畫面上已經有呢張卡，我哋只更新「有變動嘅資料」！
                 scCard.dataset.sceneId = scene.id || "";
                 scCard.dataset.sceneName = scene.name || "";
 
-
+                // 處理顏色更新
                 const colorObj = getColorById(scene.colorId);
+                scCard.className = "ns-scene-card"; // Reset
                 if (colorObj.cssClass) scCard.addClass(colorObj.cssClass);
 
-                scCard.setCssStyles({
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    width: "100%"
-                });
-                const titleContainer = scCard.createDiv({ cls: "ns-scene-title-container" });
-                titleContainer.setCssStyles({
-                    display: "flex",
-                    alignItems: "flex-start", // 🌟 改為 flex-start，等多行字嗰陣 Icon 保持喺第一行
-                    gap: "6px",
-                    flex: "1",       // 🌟 佔據所有剩餘空間
-                    minWidth: "0"    // 🌟 絕密防禦：話俾 Flexbox 知佢可以縮細，防止被長字撐爆！
-                });
-
-                const iconEl = titleContainer.createSpan({ cls: "ns-scene-icon" });
-                setIcon(iconEl, "clapperboard");
-                iconEl.setCssStyles({
-                    opacity: "0.6",
-                    display: "flex",
-                    alignItems: "center",
-                    flexShrink: "0", // 🌟 防壓扁：確保 Icon 永遠唔會變形
-                    marginTop: "2px" // 🌟 微調對齊第一行字
-                });
-
-                // 🌟 套用 CSS 截斷魔法 Class！
-                titleContainer.createSpan({ text: scene.name, cls: "ns-scene-title-text" });
-
-
-
-
-
-
-                // 🔥 2. Add 🎨 color change button
-                const colorBtn = scCard.createDiv();
-                setIcon(colorBtn, "palette");
-                colorBtn.setCssStyles({
-                    cursor: "pointer",
-                    opacity: "0.3",
-                    marginLeft: "auto",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: "0" // 🌟 防擠走：確保掣永遠穩如泰山！
-                });
-
-
-
-                colorBtn.addEventListener("mouseover", () => colorBtn.setCssProps({ opacity: "1" }));
-                colorBtn.addEventListener("mouseout", () => colorBtn.setCssProps({ opacity: "0.3" }));
-
-                colorBtn.addEventListener("click", (e) => {
-                    e.stopPropagation();
-                    const menu = new Menu();
-                    SCENE_COLORS.forEach(c => {
-                        menu.addItem((item) => {
-                            item.setTitle(c.name)
-                                .setIcon("lucide-palette")
-                                .onClick(() => {
-
-                                    this.isMenuClicking = true;
-                                    this.changeSceneColor(view, scene.lineNumber, c.id)
-
-                                    setTimeout(() => this.isMenuClicking = false, 200);
-                                });
-                        });
-                    });
-                    menu.showAtMouseEvent(e);
-                });
-
-                // 🔥 WeakMap to save mega content
-                this.sceneContentMap.set(scCard, scene.content);
-
+                // 處理高亮狀態
                 if (this.selectedSceneId === scene.id) {
-
-                    scCard.setCssProps({ borderLeftWidth: "4px" });
-                    scCard.setCssProps({ filter: "brightness(0.9)" });
+                    scCard.setCssProps({ borderLeftWidth: "4px", filter: "brightness(0.9)" });
+                } else {
+                    scCard.setCssProps({ borderLeftWidth: "", filter: "" });
                 }
 
-                scCard.addEventListener("click", (e) => {
+                // 處理標題更新 (唔好盲目覆寫，避免浪費效能)
+                const titleText = scCard.querySelector(".ns-scene-title-text");
+                if (titleText.innerText !== scene.name) titleText.innerText = scene.name;
 
-                    if (this.isMenuClicking) {
+                // 重新綁定事件
+                const colorBtn = scCard.querySelector(".lucide-palette")?.parentElement;
+                if (colorBtn) {
+                    colorBtn.onclick = (e) => {
                         e.stopPropagation();
-                        e.preventDefault();
-                        return;
-                    }
+                        const menu = new Menu();
+                        SCENE_COLORS.forEach(c => {
+                            menu.addItem((item) => {
+                                item.setTitle(c.name).setIcon("lucide-palette").onClick(() => {
+                                    this.isMenuClicking = true;
+                                    this.changeSceneColor(view, scene.lineNumber, c.id);
+                                    setTimeout(() => this.isMenuClicking = false, 200);
+                                });
+                            });
+                        });
+                        menu.showAtMouseEvent(e);
+                    };
+                }
+
+                scCard.onclick = (e) => {
+                    if (this.isMenuClicking) { e.stopPropagation(); e.preventDefault(); return; }
                     e.stopPropagation(); e.preventDefault();
                     this.selectedSceneId = scene.id || null;
                     this.selectedSceneTitle = scene.name;
                     this.jumpToLine(scene.lineNumber);
                     this.lastOutlineHash = "";
                     void this.parseAndRender();
-                });
+                };
+
+                this.sceneContentMap.set(scCard, scene.content); // 更新 WeakMap 內容
+                sceneList.appendChild(scCard); // 確保順序
+                sceneMap.delete(safeKey); // 從刪除名單剔除
             });
 
-            this.sortables.push(new Sortable(sceneList, {
-                group: 'scenes', animation: 150, ghostClass: 'ns-sortable-ghost', dragClass: 'ns-sortable-drag',
-                delay: 100, delayOnTouchOnly: true,
+            // 👉 清除已經喺 Markdown 刪除咗嘅舊場景卡片
+            sceneMap.forEach(sc => sc.remove());
+            chIndex++;
+        });
 
-
-                onEnd: (evt: unknown) => {
-
-                    if (evt.newIndex !== evt.oldIndex || evt.from !== evt.to) this.saveChanges(container, view);
+        // 👉 清除已經刪除咗嘅舊章節 (順手回收 Sortable 記憶體)
+        chapterMap.forEach(ch => {
+            const list = ch.querySelector(".ns-scene-list");
+            if (list) {
+                const sIndex = this.sortables.findIndex(s => s.el === list);
+                if (sIndex > -1) {
+                    this.sortables[sIndex].destroy();
+                    this.sortables.splice(sIndex, 1);
                 }
-            }));
+            }
+            ch.remove();
         });
     }
 
@@ -878,7 +807,7 @@ export class StructureView extends ItemView {
         }
 
         const titleEl = container.createEl("h4");
-        titleEl.innerText = `Backup of ${this.selectedSceneTitle}'`;
+        titleEl.innerText = `Backup of ${this.selectedSceneTitle}`;
         titleEl.setCssProps({ color: "var(--text-accent)" }); titleEl.setCssProps({ marginBottom: "8px" });
 
         const btnSaveVersion = createIconButton(container, "save", "Save current version", {
@@ -1305,7 +1234,7 @@ export class StructureView extends ItemView {
             if (chName === "root") {
                 if (rootPreamble.trim()) chunks.push(rootPreamble.trim());
             } else if (chName && chName !== "root") {
-                chunks.push(`# 📄 ${chName}\n<span class="ns-file-id">++ FILE_ID: ${chName} ++</span>`);
+                chunks.push(`# 📄 ${chName} <span class="ns-chapter-center"></span>\n<span class="ns-file-id">++ FILE_ID: ${chName} ++</span>`);
                 const chPreamble = liveChapterPreambleMap.get(chName) || "";
                 if (chPreamble.trim()) chunks.push(chPreamble.trim());
             }
@@ -1429,7 +1358,9 @@ export class StructureView extends ItemView {
 
             if (trimLine.startsWith("# 📄")) {
                 flushChapter();
-                currentChapter = { id: trimLine, name: trimLine.replace("# 📄", "").trim(), preamble: '', lineNumber: i, scenes: [], type: 'chapter' };
+                // 🌟 清除置中標籤，還原乾淨檔名
+                const cleanName = trimLine.replace("# 📄", "").replace('<span class="ns-chapter-center"></span>', "").trim();
+                currentChapter = { id: trimLine, name: cleanName, preamble: '', lineNumber: i, scenes: [], type: 'chapter' };
                 currentScene = null; buffer = []; continue;
             }
 
@@ -1501,7 +1432,7 @@ export class StructureView extends ItemView {
 
     renderSprintUI(container: HTMLElement) {
         const sprintBox = container.createDiv({ cls: "ns-sprint-container" });
-        sprintBox.createEl("h3", { text: "🔥 Focus Mode", attr: { style: "color: var(--color-orange); margin-bottom: 30px;" } });
+        sprintBox.createEl("h3", { text: "Focus mode", attr: { style: "color: var(--color-orange); margin-bottom: 30px;" } });
 
         const m = Math.floor(this.sprintRemainingSeconds / 60).toString().padStart(2, '0');
         const s = (this.sprintRemainingSeconds % 60).toString().padStart(2, '0');
@@ -1510,7 +1441,7 @@ export class StructureView extends ItemView {
         sprintBox.createDiv({ cls: "ns-sprint-drops", text: `+ ${this.sprintDropsEarned} Drops` });
         sprintBox.createDiv({ cls: "ns-sprint-message", text: "Don't look back. Keep writing." });
 
-        const btnStop = sprintBox.createEl("button", { text: "Give Up", cls: "mod-warning" });
+        const btnStop = sprintBox.createEl("button", { text: "Give up", cls: "mod-warning" });
         btnStop.setCssStyles({ marginTop: "auto" });
         btnStop.onclick = () => {
             new SimpleConfirmModal(this.plugin.app, "Give up on this sprint?", () => {
@@ -1519,6 +1450,33 @@ export class StructureView extends ItemView {
         }
     }
 
+    // =========================================================
+    // 🧹 防死機大掃除 (清除所有背景計時器，防止記憶體洩漏)
+    // =========================================================
+    async onClose() {
+        // 1. 清除大綱重新渲染計時器
+        if (this.renderTimer) {
+            window.clearTimeout(this.renderTimer);
+            this.renderTimer = null;
+        }
 
+        // 2. 清除側滑 Wiki 筆記更新計時器
+        if (this.wikiUpdateTimer) {
+            window.clearTimeout(this.wikiUpdateTimer);
+            this.wikiUpdateTimer = null;
+        }
+
+        // 3. 🚨 最重要：清除番茄鐘倒數器！
+        if (this.sprintTimerInterval) {
+            window.clearInterval(this.sprintTimerInterval);
+            this.sprintTimerInterval = null;
+        }
+
+        // 4. 強制解除衝刺狀態
+        this.isSprinting = false;
+
+        // 5. 清空畫面
+        this.contentEl.empty();
+    }
 
 }

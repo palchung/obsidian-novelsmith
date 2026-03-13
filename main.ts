@@ -9,7 +9,7 @@ import { WikiManager } from './src/managers/WikiManager';
 import { CompilerManager } from './src/managers/CompilerManager';
 import { SceneManager } from './src/managers/SceneManager';
 import { DashboardManager } from './src/managers/DashboardManager';
-import { StatsManager, DEFAULT_STATS, StatsData } from './src/managers/StatsManager';
+import { StatsManager } from './src/managers/StatsManager';
 import { redundantHighlighter, dialogueHighlighter, structureHighlighter } from './src/decorators';
 import { StructureView, VIEW_TYPE_STRUCTURE } from './src/managers/StructureView';
 import { ST_WARNING, DRAFT_FILENAME, BACKSTAGE_DIR, TEMPLATES_DIR, ensureFolderExists, isScriveningsDraft } from './src/utils';

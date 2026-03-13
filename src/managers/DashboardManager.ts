@@ -27,7 +27,7 @@ export class DashboardManager {
         const content = await this.app.vault.read(dbFile);
 
 
-        const regex = /\[\s*([^\]\[\s:]+)\s*::/g;
+        const regex = /\[\s*([^\][\s:]+)\s*::/g;
         const matches = [...content.matchAll(regex)];
 
         const keys = new Set<string>();

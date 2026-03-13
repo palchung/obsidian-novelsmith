@@ -1,7 +1,7 @@
 import { App, Notice, MarkdownView, TFile, Component, MarkdownRenderer } from 'obsidian';
 import { NovelSmithSettings } from '../settings';
 import { CompileModal, CompileOptions, ChapterSelectionModal } from '../modals';
-import { ensureFolderExists, DRAFT_FILENAME, RE_FILE_ID_HEADING, RE_FOLDER_HEADING, RE_SCENE_INFO } from '../utils';
+import { ensureFolderExists, DRAFT_FILENAME, RE_FILE_ID_HEADING, RE_FOLDER_HEADING } from '../utils';
 
 export class CompilerManager {
     app: App;
@@ -65,7 +65,7 @@ export class CompilerManager {
             if (options.removeYaml) content = content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
             if (options.removeSceneInfo) {
                 content = content.replace(/^######\s+.*$/gm, "");
-                content = content.replace(/^>\s*\[\!NSmith.*?\].*(?:\n>\s*.*)*/gm, "");
+                content = content.replace(/^>\s*\[!NSmith.*?\].*(?:\n>\s*.*)*/gm, "");
             }
             if (options.removeComments) content = content.replace(/%%[\s\S]*?%%/g, "");
             if (options.removeStrikethrough) content = content.replace(/~~[\s\S]*?~~/g, "");
@@ -83,7 +83,7 @@ export class CompilerManager {
             if (options.insertFileNameAsHeading && options.insertFileNameAsHeading !== 'none') {
                 const level = parseInt(options.insertFileNameAsHeading, 10);
                 const hashes = '#'.repeat(level);
-                const cleanChapterName = file.basename.replace(/^\d+[\s_\-]+/, "");
+                const cleanChapterName = file.basename.replace(/^\d+[\s_-]+/, "");
                 finalContent += `${hashes} ${cleanChapterName}\n\n`;
             }
 
