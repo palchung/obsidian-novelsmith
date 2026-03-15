@@ -107,7 +107,7 @@ export class WikiManager {
                         const tplFile = this.app.vault.getAbstractFileByPath(tplPath);
 
 
-                        let fileContent = `# ${cleanItem}\n\n> [!info] ${key} Info\n> - Tags:: #${key}\n> - Note:: \n\n`;
+                        let fileContent = `---\ntags:\n  - ${key}\n---\n# ${cleanItem}\n\n`;
 
 
                         if (tplFile instanceof TFile) {

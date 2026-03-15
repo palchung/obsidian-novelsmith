@@ -7,6 +7,8 @@ import { StatsData, DEFAULT_STATS } from 'src/managers/StatsManager';
 export interface WikiCategory {
     name: string;       // e.g Location
     folderPath: string; // path to Location
+    layoutMode: 'network' | 'hierarchy'; // 🌟 新增：畫布排版模式
+    parentKey: string;                   // 🌟 新增：父層級屬性名 (只限樹狀圖)
 }
 
 
@@ -159,12 +161,40 @@ export class NovelSmithSettingTab extends PluginSettingTab {
                         await this.plugin.saveSettings();
                     }));
 
+            // 🌟 新增：畫布排版模式設定
+            new Setting(box)
+                .setName('Canvas layout mode')
+                .setDesc('Network (for character relations) or Hierarchy (for locations/magic trees)')
+                .addDropdown(drop => drop
+                    .addOption('network', 'Network (Physics/Free form)')
+                    .addOption('hierarchy', 'Hierarchy (Strict Tree)')
+                    .setValue(category.layoutMode || 'network')
+                    .onChange(async (value) => {
+                        category.layoutMode = value as 'network' | 'hierarchy';
+                        await this.plugin.saveSettings();
+                        this.display(); // 重新渲染以顯示/隱藏 Parent Key
+                    }));
+
+            // 🌟 新增：如果係樹狀圖，顯示 Parent Key 輸入框
+            if (category.layoutMode === 'hierarchy') {
+                new Setting(box)
+                    .setName('Parent attribute key')
+                    .setDesc('Which attribute defines the parent node? (e.g., "Belongs to" or "所屬地區")')
+                    .addText(text => text
+                        .setPlaceholder('e.g., Belongs to')
+                        .setValue(category.parentKey || '')
+                        .onChange(async (value) => {
+                            category.parentKey = value;
+                            await this.plugin.saveSettings();
+                        }));
+            }
 
             const btnRow = box.createDiv();
             btnRow.setCssStyles({ display: "flex", justifyContent: "flex-end", marginTop: "10px" });
             const btnTemplate = btnRow.createEl("button", { text: "Generate template" });
-            btnTemplate.onclick = () => {
+            btnTemplate.onclick = async () => {
                 void this.plugin.ensureWikiTemplateExists(category.name);
+                await this.plugin.syncSceneTemplateWithCategories();
             };
         });
 
@@ -174,7 +204,7 @@ export class NovelSmithSettingTab extends PluginSettingTab {
                 .setButtonText('Add wiki category')
                 .setCta()
                 .onClick(async () => {
-                    this.plugin.settings.wikiCategories.push({ name: "", folderPath: "" });
+                    this.plugin.settings.wikiCategories.push({ name: "", folderPath: "", layoutMode: 'network', parentKey: "" });
                     await this.plugin.saveSettings();
                     this.display();
                 }));
@@ -188,10 +218,19 @@ export class NovelSmithSettingTab extends PluginSettingTab {
         new Setting(containerEl)
             .setName('Regenerate: scene card template')
             .addButton(button => button
-                .setIcon('refresh-cw')  // 
+                .setIcon('refresh-cw')
                 .setButtonText('Rebuild template')
-                .onClick(() => {
-                    void this.plugin.ensureTemplateFileExists(true);
+                .onClick(async () => {
+                    const tplPath = `${this.plugin.settings.bookFolderPath}/_Backstage/Templates/NovelSmith_Template.md`;
+                    const file = this.plugin.app.vault.getAbstractFileByPath(tplPath);
+                    if (file) {
+                        // 🌟 如果檔案已存在，就執行「逆向同步」，幫佢補返齊啲屬性！
+                        await this.plugin.syncSceneTemplateWithCategories();
+                        new Notice("Template updated with current Wiki categories!");
+                    } else {
+                        // 如果檔案唔存在，就由頭建立一個全新嘅！
+                        void this.plugin.ensureTemplateFileExists(true);
+                    }
                 }));
 
         new Setting(containerEl)

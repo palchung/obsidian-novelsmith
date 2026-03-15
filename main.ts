@@ -1,4 +1,4 @@
-import { MarkdownView, Notice, Plugin, TFile } from 'obsidian';
+import { MarkdownView, Notice, Plugin, TFile, debounce } from 'obsidian';
 import { WorkspaceLeaf } from 'obsidian';
 import { NovelSmithSettings, DEFAULT_SETTINGS, NovelSmithSettingTab } from './src/settings';
 import { ScrivenerManager } from './src/managers/ScrivenerManager';
@@ -12,6 +12,7 @@ import { DashboardManager } from './src/managers/DashboardManager';
 import { StatsManager } from './src/managers/StatsManager';
 import { redundantHighlighter, dialogueHighlighter, structureHighlighter } from './src/decorators';
 import { StructureView, VIEW_TYPE_STRUCTURE } from './src/managers/StructureView';
+import { WorldboardView, VIEW_TYPE_WORLDBOARD } from './src/managers/WorldboardView';
 import { ST_WARNING, DRAFT_FILENAME, BACKSTAGE_DIR, TEMPLATES_DIR, ensureFolderExists, isScriveningsDraft } from './src/utils';
 import { DashboardBuilderModal } from './src/modals';
 
@@ -76,12 +77,30 @@ export default class NovelSmithPlugin extends Plugin {
             (leaf) => new StructureView(leaf, this)
         );
 
+        this.registerView(
+            VIEW_TYPE_WORLDBOARD,
+            (leaf) => new WorldboardView(leaf, this)
+        );
+
 
         // =================================================================
         // 🔥 Thoughtful UX 1: Add a physical button to the left Ribbon
         // =================================================================
         this.addRibbonIcon('book-open', 'Open novelsmith panel', () => {
             void this.activateView();
+        });
+
+        // =================================================================
+        // 🌍 Worldboard Entry (With gatekeeper protection!)
+        // =================================================================
+        this.addRibbonIcon('globe', 'Open worldboard', () => {
+            const folder = this.settings.bookFolderPath;
+            // 防呆攔截：未 Initialize 唔畀入！
+            if (!folder || folder.trim() === "") {
+                new Notice("Welcome to novelsmith! Please go to the settings page to initialize your workspace before exploring the Worldboard.");
+                return;
+            }
+            void this.activateWorldboardView();
         });
 
         // =================================================================
@@ -403,6 +422,55 @@ export default class NovelSmithPlugin extends Plugin {
         // });
     }
 
+    // =================================================================
+    // 🔥 Phase 3: Reverse Sync Engine (逆向同步劇情卡模板)
+    // =================================================================
+
+    async syncSceneTemplateWithCategories() {
+        const folder = this.settings.bookFolderPath;
+        if (!folder || folder.trim() === "") return;
+
+        const tplPath = `${folder}/_Backstage/Templates/NovelSmith_Template.md`;
+        const tplFile = this.app.vault.getAbstractFileByPath(tplPath);
+        if (!(tplFile instanceof TFile)) return;
+
+        let content = await this.app.vault.read(tplFile);
+        let modified = false;
+
+        const categories = this.settings.wikiCategories || [];
+        for (const cat of categories) {
+            if (!cat.name.trim()) continue;
+            const primaryName = cat.name.split(/[,，、]/)[0].trim();
+
+            // 檢查 Template 入面係咪已經有呢個屬性
+            const regex = new RegExp(`> - ${primaryName}::`, 'i');
+            if (!regex.test(content)) {
+                // 如果有 > - Note::，就完美咁插喺佢前面
+                if (content.includes("> - Note::")) {
+                    content = content.replace("> - Note::", `> - ${primaryName}:: \n> - Note::`);
+                } else {
+                    // 如果冇 Note，就夾硬搵個 Callout 最尾一行加落去
+                    const lines = content.split('\n');
+                    let lastCalloutIdx = -1;
+                    for (let i = 0; i < lines.length; i++) {
+                        if (lines[i].startsWith(">")) lastCalloutIdx = i;
+                    }
+                    if (lastCalloutIdx !== -1) {
+                        lines.splice(lastCalloutIdx + 1, 0, `> - ${primaryName}:: `);
+                        content = lines.join('\n');
+                    }
+                }
+                modified = true;
+            }
+        }
+
+        // 只有真係加咗嘢，先至 Save 檔案，並且彈 Notice 提示用家！
+        if (modified) {
+            await this.app.vault.modify(tplFile, content);
+            new Notice(`🪄 Auto-Sync: Scene Card template updated with new worldboard categories!`);
+        }
+    }
+
     public checkInBookFolderSilent(file: TFile | null): boolean {
         if (!file) return false;
         const bookFolder = this.settings.bookFolderPath;
@@ -472,7 +540,18 @@ export default class NovelSmithPlugin extends Plugin {
 
         const file = this.app.vault.getAbstractFileByPath(tplPath);
         if (!file) {
-            const defaultTemplate = `###### {{SceneName}} <span class="ns-id" data-scene-id="{{UUID}}" data-warning="${ST_WARNING}"></span>\n> [!NSmith] Scene Info\n> - Time:: \n> - POV:: \n> - Status:: #Writing\n> - Note:: \n\nWrite your story here...`;
+            // 動態讀取 Wiki 分類，預先加落 Template！
+            let catLines = "";
+            if (this.settings.wikiCategories && this.settings.wikiCategories.length > 0) {
+                catLines = this.settings.wikiCategories.map(c => {
+                    const p = c.name.split(/[,，、]/)[0].trim();
+                    return p ? `> - ${p}:: ` : "";
+                }).filter(Boolean).join("\n");
+                if (catLines) catLines += "\n";
+            }
+
+            const defaultTemplate = `###### {{SceneName}} <span class="ns-id" data-scene-id="{{UUID}}" data-warning="${ST_WARNING}"></span>\n> [!NSmith] Scene Info\n> - Time:: \n> - POV:: \n> - Status:: #Writing\n${catLines}> - Note:: \n\nWrite your story here...`;
+
             try {
                 const newFile = await this.app.vault.create(tplPath, defaultTemplate);
 
@@ -515,7 +594,7 @@ export default class NovelSmithPlugin extends Plugin {
 
         const file = this.app.vault.getAbstractFileByPath(tplPath);
         if (!file) {
-            const defaultTemplate = `# {{WikiName}}\n\n> [!info] ${primaryName} Info\n> - Tags:: #${primaryName}\n> - Note:: \n\nWrite the details of this ${primaryName} here...`;
+            const defaultTemplate = `---\ntags:\n  - ${primaryName}\naliases:\nnote: ""\n---\n# {{WikiName}}\n\nWrite the details of this ${primaryName} here...`;
             try {
                 const newFile = await this.app.vault.create(tplPath, defaultTemplate);
 
@@ -553,6 +632,19 @@ export default class NovelSmithPlugin extends Plugin {
         if (leaf) void workspace.revealLeaf(leaf);
     }
 
+    async activateWorldboardView() {
+        const { workspace } = this.app;
+        let leaf = workspace.getLeavesOfType(VIEW_TYPE_WORLDBOARD)[0];
+
+        if (!leaf) {
+            // 🌟 核心分別：唔係開喺 RightLeaf，而係開喺主編輯區 (Tab)！
+            leaf = workspace.getLeaf('tab');
+            await leaf.setViewState({ type: VIEW_TYPE_WORLDBOARD, active: true });
+        }
+        workspace.revealLeaf(leaf);
+    }
+
+
     onunload() {
         //console.log('NovelSmith shutting down');
         // 🔥 Defense Upgrade 2: When the plugin is disabled or updated, completely detach the panel to prevent ghost panels from multiplying infinitely!
@@ -575,5 +667,6 @@ export default class NovelSmithPlugin extends Plugin {
         this.wikiManager.updateSettings(this.settings);
         this.compilerManager.settings = this.settings;
         this.sceneManager.settings = this.settings;
+
     }
 }

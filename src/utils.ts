@@ -53,6 +53,15 @@ export interface ExtractedTags {
     dynamicTags: { key: string, value: string }[];
 }
 
+
+// ============================================================
+// 🧹 檔名過濾器 (確保建立檔案時唔會因為特殊符號報錯)
+// ============================================================
+export const sanitizeFileName = (name: string): string => {
+    return name.replace(/[\[\]#<>:"|?*\\/]/g, '').trim();
+};
+
+
 export const extractSynopsisAndTags = (metaLines: string[]): ExtractedTags => {
     let foundSynopsis = "";
     const dynamicTags: { key: string, value: string }[] = [];
