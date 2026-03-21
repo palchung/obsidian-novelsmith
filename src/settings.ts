@@ -19,6 +19,7 @@ export interface NovelSmithSettings {
     exportFolderPath: string;
     wikiCategories: WikiCategory[];
     statsData: StatsData;
+    worldboardCoords: Record<string, { x: number, y: number }>;
 }
 
 export const DEFAULT_SETTINGS: NovelSmithSettings = {
@@ -27,7 +28,8 @@ export const DEFAULT_SETTINGS: NovelSmithSettings = {
     exportFolderPath: '',
     wikiFolderPath: '',
     wikiCategories: [],
-    statsData: DEFAULT_STATS
+    statsData: DEFAULT_STATS,
+    worldboardCoords: {}
 }
 
 export class NovelSmithSettingTab extends PluginSettingTab {
@@ -66,19 +68,23 @@ export class NovelSmithSettingTab extends PluginSettingTab {
             .addButton(btn => btn
                 .setButtonText("Initialize now")
                 .setCta() // Turn into a prominent CTA button color
-                .onClick(() => {
+                .onClick(async () => { // 🌟 改成 async
                     const folder = this.plugin.settings.bookFolderPath;
                     if (!folder || folder.trim() === "") {
                         new Notice("Please enter your desired 'folder name' above first!");
                         return;
                     }
 
-                    // Call the powerful generator in main.ts!
-                    // forceShowNotice = true, openAfterCreate = true
-                    void this.plugin.ensureTemplateFileExists(true, true).then(() => {
-                        new Notice(`Initialization successful! Your writing workspace [${folder}] is ready!`);
-                    });
+                    // 🌟 1. 強制儲存設定，確保啱啱入嘅 Wiki Categories 已經寫入記憶體
+                    await this.plugin.saveSettings();
 
+                    // 🌟 2. 建立資料夾及 Template (如果未有)
+                    await this.plugin.ensureTemplateFileExists(true, true);
+
+                    // 🌟 3. 神級補救：即使 Template 已經存在，都強制執行一次同步，將屬性補返入去！
+                    await this.plugin.syncSceneTemplateWithCategories();
+
+                    new Notice(`Initialization successful! Your writing workspace [${folder}] is ready!`);
                 })
             );
 

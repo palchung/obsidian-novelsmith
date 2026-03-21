@@ -11,7 +11,11 @@ export class WorldboardView extends ItemView {
     network: Network | null = null;
 
     pendingFocusNode: string | null = null;
-    showSatellites: boolean = true; // 🌟 新增：控制衛星顯示嘅全域狀態
+    showSatellites: boolean = true;
+
+    // 🌟 新增：雙向跳躍記憶系統
+    lastSelectedLocalNode: string | null = null;
+    returnJumpTarget: { tab: string, node: string, label: string } | null = null;
 
     currentEditingFile: TFile | null = null;
     currentProperties: Record<string, any> = {};
@@ -39,7 +43,7 @@ export class WorldboardView extends ItemView {
         const headerEl = contentEl.createDiv({ cls: "ns-worldboard-header" });
         headerEl.setCssStyles({
             display: "flex", gap: "10px", padding: "10px", borderBottom: "1px solid var(--background-modifier-border)",
-            backgroundColor: "var(--background-secondary)", overflowX: "auto", alignItems: "center"
+            backgroundColor: "var(--background-primary)", overflowX: "auto", alignItems: "center"
         });
 
         const categories = this.plugin.settings.wikiCategories || [];
@@ -58,6 +62,49 @@ export class WorldboardView extends ItemView {
             return;
         }
 
+        // ==========================================
+        // 🛠️ 最左邊工具列：重新整理、衛星開關、新增屬性 (三位一體)
+        // ==========================================
+        const leftToolsBox = headerEl.createDiv();
+        leftToolsBox.setCssStyles({ display: "flex", gap: "4px", borderRight: "1px solid var(--background-modifier-border)", paddingRight: "10px", marginRight: "5px" });
+
+        // 1. 🔄 重新整理
+        const btnRefresh = leftToolsBox.createEl("button", { cls: "clickable-icon" });
+        setIcon(btnRefresh, "refresh-cw");
+        btnRefresh.title = "Refresh canvas";
+        btnRefresh.setCssStyles({ padding: "4px 8px", backgroundColor: "transparent", boxShadow: "none", cursor: "pointer" });
+        btnRefresh.onclick = () => {
+            new Notice("Canvas refreshed");
+            this.renderWorkspace();
+        };
+
+        // 2. 👁️ 衛星開關
+        const btnToggleSat = leftToolsBox.createEl("button", { cls: "clickable-icon" });
+        setIcon(btnToggleSat, this.showSatellites ? "eye" : "eye-off");
+        btnToggleSat.title = this.showSatellites ? "Hide satellite nodes" : "Show satellite nodes";
+        btnToggleSat.setCssStyles({ padding: "4px 8px", backgroundColor: "transparent", boxShadow: "none", cursor: "pointer" });
+        btnToggleSat.onclick = () => {
+            this.showSatellites = !this.showSatellites;
+            setIcon(btnToggleSat, this.showSatellites ? "eye" : "eye-off");
+            btnToggleSat.title = this.showSatellites ? "Hide satellite nodes" : "Show satellite nodes";
+            this.renderWorkspace();
+        };
+
+        // 3. ➕ 新增屬性 (搬咗嚟呢度！)
+        const addTabBtn = leftToolsBox.createEl("button", { cls: "clickable-icon" });
+        setIcon(addTabBtn, "plus");
+        addTabBtn.setCssStyles({ padding: "4px 8px", backgroundColor: "transparent", boxShadow: "none", color: "var(--text-muted)", cursor: "pointer" });
+        addTabBtn.title = "Add new worldboard category";
+        addTabBtn.onclick = () => {
+            new AddWikiCategoryModal(this.app, this.plugin, (newCatName) => {
+                this.activeTabName = newCatName;
+                this.onOpen();
+            }).open();
+        };
+
+        // ==========================================
+        // 🗂️ 右邊：分類 Tabs (依家佢哋會緊貼住工具列)
+        // ==========================================
         if (!this.activeTabName) this.activeTabName = categories[0].name.split(/[,，、]/)[0].trim();
 
         categories.forEach(cat => {
@@ -70,23 +117,10 @@ export class WorldboardView extends ItemView {
 
             tabBtn.onclick = () => {
                 this.activeTabName = primaryName;
+                this.returnJumpTarget = null; // 🌟 如果手動轉 Tab，清除返回記憶
                 this.onOpen();
             };
         });
-
-        // ==========================================
-        // ➕ 頂部「+ 新增屬性」按鈕
-        // ==========================================
-        const addTabBtn = headerEl.createEl("button", { cls: "clickable-icon" });
-        setIcon(addTabBtn, "plus");
-        addTabBtn.setCssStyles({ padding: "4px 8px", backgroundColor: "transparent", boxShadow: "none", color: "var(--text-muted)", cursor: "pointer" });
-        addTabBtn.title = "Add new worldboard category";
-        addTabBtn.onclick = () => {
-            new AddWikiCategoryModal(this.app, this.plugin, (newCatName) => {
-                this.activeTabName = newCatName;
-                this.onOpen();
-            }).open();
-        };
 
         await this.renderWorkspace();
     }
@@ -104,7 +138,7 @@ export class WorldboardView extends ItemView {
         const panelContainer = workspaceEl.createDiv({ cls: "ns-worldboard-panel" });
         panelContainer.setCssStyles({
             width: "450px", borderLeft: "1px solid var(--background-modifier-border)",
-            backgroundColor: "var(--background-secondary)", padding: "15px", overflowY: "auto",
+            backgroundColor: "var(--background-primary)", padding: "15px", overflowY: "auto",
             display: "flex", flexDirection: "column", gap: "15px", position: "absolute",
             right: "0", top: "0", height: "100%", zIndex: "50",
             boxShadow: "-5px 0 15px rgba(0,0,0,0.1)", transform: "translateX(100%)",
@@ -147,29 +181,7 @@ export class WorldboardView extends ItemView {
             });
         };
 
-        // ==========================================
-        // 🛠️ 畫布右上角：重新整理與衛星開關掣
-        // ==========================================
-        const toolsBox = canvasContainer.createDiv();
-        toolsBox.setCssStyles({ position: "absolute", top: "15px", right: "15px", zIndex: "40", display: "flex", gap: "8px", backgroundColor: "var(--background-secondary)", padding: "6px", borderRadius: "8px", border: "1px solid var(--background-modifier-border)", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" });
 
-        const btnToggleSat = toolsBox.createEl("button", { cls: "clickable-icon" });
-        setIcon(btnToggleSat, this.showSatellites ? "eye" : "eye-off");
-        btnToggleSat.title = this.showSatellites ? "Hide satellite nodes" : "Show satellite nodes";
-        btnToggleSat.setCssStyles({ padding: "4px 8px", backgroundColor: "transparent", boxShadow: "none" });
-        btnToggleSat.onclick = () => {
-            this.showSatellites = !this.showSatellites;
-            this.renderWorkspace(); // 一撳即刻重畫！
-        };
-
-        const btnRefresh = toolsBox.createEl("button", { cls: "clickable-icon" });
-        setIcon(btnRefresh, "refresh-cw");
-        btnRefresh.title = "Refresh canvas";
-        btnRefresh.setCssStyles({ padding: "4px 8px", backgroundColor: "transparent", boxShadow: "none" });
-        btnRefresh.onclick = () => {
-            new Notice("Canvas refreshed");
-            this.renderWorkspace(); // 手動更新最新筆記關係！
-        };
 
         const files = folder.children.filter(f => f instanceof TFile && f.extension === "md") as TFile[];
 
@@ -223,10 +235,11 @@ export class WorldboardView extends ItemView {
                 nodeObj.shape = 'dot';
             }
 
-            if (fm.canvas_x !== undefined && fm.canvas_y !== undefined) {
-                nodeObj.x = fm.canvas_x;
-                nodeObj.y = fm.canvas_y;
-                nodeObj.physics = false; // 📌 本地 Node 絕對釘死！
+            const savedCoords = this.plugin.settings.worldboardCoords?.[file.path];
+            if (savedCoords) {
+                nodeObj.x = savedCoords.x;
+                nodeObj.y = savedCoords.y;
+                nodeObj.physics = false; // 📌 有座標就釘死
             }
 
             nodesData.push(nodeObj);
@@ -301,16 +314,20 @@ export class WorldboardView extends ItemView {
                 const positions = this.network?.getPositions(params.nodes);
                 if (!positions) return;
 
+                if (!this.plugin.settings.worldboardCoords) this.plugin.settings.worldboardCoords = {};
+
                 for (const nodeId of params.nodes) {
                     const pos = positions[nodeId];
                     const file = files.find(f => f.basename === nodeId);
                     if (file) {
-                        await this.app.fileManager.processFrontMatter(file, (fm) => {
-                            fm.canvas_x = Math.round(pos.x);
-                            fm.canvas_y = Math.round(pos.y);
-                        });
+                        // 🌟 靜靜雞寫入 data.json，唔再去污染用家嘅 Markdown！
+                        this.plugin.settings.worldboardCoords[file.path] = {
+                            x: Math.round(pos.x),
+                            y: Math.round(pos.y)
+                        };
                     }
                 }
+                await this.plugin.saveSettings(); // 儲存設定
             }
         });
 
@@ -319,9 +336,17 @@ export class WorldboardView extends ItemView {
             let file = files.find(f => f.basename === nodeId);
             let isSatellite = false;
 
-            if (!file) {
+            if (file) {
+                // 🌟 記錄最後點擊嘅「本地波波」(用來做返回點)
+                this.lastSelectedLocalNode = String(nodeId);
+            } else {
                 file = this.app.metadataCache.getFirstLinkpathDest(String(nodeId), "");
                 if (file) isSatellite = true;
+            }
+
+            // 🌟 如果正常點擊另一個本地波波，清除返回按鈕
+            if (!this.pendingFocusNode && !isSatellite) {
+                this.returnJumpTarget = null;
             }
 
             if (file) {
@@ -346,6 +371,20 @@ export class WorldboardView extends ItemView {
         this.currentEditingFile = file;
         container.empty();
 
+        // --- 1. 原生 Icon Header ---
+        const header = container.createDiv();
+        header.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--background-modifier-border)", paddingBottom: "10px", marginBottom: "15px" });
+
+        const titleContainer = header.createDiv({ attr: { style: "display: flex; align-items: center; gap: 8px;" } });
+        const docIcon = titleContainer.createSpan();
+        setIcon(docIcon, "file-text");
+        docIcon.setCssStyles({ color: "var(--text-muted)" });
+        titleContainer.createEl("h2", { text: file.basename, attr: { style: "margin: 0; color: var(--text-normal); font-size: 1.2em;" } });
+
+        // 🌟 按鈕群組 (跳躍、返回、編輯、關閉 全部位於此)
+        const btnGroup = header.createDiv({ attr: { style: "display: flex; gap: 4px;" } });
+
+        // 🚀 衛星節點專用：跳躍至所屬畫布 (External Link Icon)
         if (isSatellite) {
             const parentPath = file.parent ? file.parent.path : "";
             const cat = this.plugin.settings.wikiCategories.find(c => {
@@ -356,14 +395,14 @@ export class WorldboardView extends ItemView {
 
             if (cat) {
                 const primaryName = cat.name.split(/[,，、]/)[0].trim();
-                const jumpBox = container.createDiv();
-                jumpBox.setCssStyles({ padding: "12px", backgroundColor: "var(--background-modifier-error-hover)", borderRadius: "8px", marginBottom: "15px", border: "1px solid var(--interactive-accent)" });
+                const btnJump = btnGroup.createEl("button", { cls: "clickable-icon" });
+                setIcon(btnJump, "external-link");
+                btnJump.title = `Jump to ${primaryName} canvas`;
+                btnJump.setCssStyles({ padding: "6px", backgroundColor: "transparent", boxShadow: "none", color: "var(--interactive-accent)" });
+                btnJump.onclick = () => {
+                    // 🌟 記低出發點：如果用家跳走，記低當前 Tab 同埋最後點擊嘅人物
+                    this.returnJumpTarget = { tab: this.activeTabName, node: this.lastSelectedLocalNode || file.basename, label: this.activeTabName };
 
-                jumpBox.createDiv({ text: `🚀 This is a satellite node from [${primaryName}].`, attr: { style: "color: var(--text-normal); margin-bottom: 8px; font-weight: bold; font-size: 0.9em;" } });
-
-                const jumpBtn = jumpBox.createEl("button", { text: `Jump to ${primaryName} Canvas`, cls: "mod-cta" });
-                jumpBtn.setCssStyles({ width: "100%", fontWeight: "bold" });
-                jumpBtn.onclick = () => {
                     this.activeTabName = primaryName;
                     this.pendingFocusNode = file.basename;
                     this.onOpen();
@@ -371,58 +410,73 @@ export class WorldboardView extends ItemView {
             }
         }
 
-        const header = container.createDiv();
-        header.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--background-modifier-border)", paddingBottom: "10px", marginBottom: "15px" });
-        header.createEl("h2", { text: file.basename, attr: { style: "margin: 0; color: var(--interactive-accent);" } });
+        // 🔙 返回專用：跳回上一個畫布 (Corner Up Left Icon)
+        if (!isSatellite && this.returnJumpTarget) {
+            const btnReturn = btnGroup.createEl("button", { cls: "clickable-icon" });
+            setIcon(btnReturn, "corner-up-left");
+            btnReturn.title = `Return to ${this.returnJumpTarget.label} canvas`;
+            btnReturn.setCssStyles({ padding: "6px", backgroundColor: "transparent", boxShadow: "none", color: "var(--interactive-accent)" });
+            btnReturn.onclick = () => {
+                const targetTab = this.returnJumpTarget!.tab;
+                const targetNode = this.returnJumpTarget!.node;
+                this.returnJumpTarget = null; // 消耗記憶
 
-        const btnGroup = header.createDiv({ attr: { style: "display: flex; gap: 8px;" } });
+                this.activeTabName = targetTab;
+                this.pendingFocusNode = targetNode; // 🌟 精準對焦返上次嗰個人物！
+                this.onOpen();
+            };
+        }
 
-        const openBtn = btnGroup.createEl("button", { text: "Edit file", cls: "mod-cta" });
-        openBtn.setCssStyles({ padding: "4px 8px", fontSize: "0.8em" });
+        // ✏️ 鉛筆 Icon (Edit file)
+        const openBtn = btnGroup.createEl("button", { cls: "clickable-icon" });
+        setIcon(openBtn, "pencil");
+        openBtn.title = "Edit note";
+        openBtn.setCssStyles({ padding: "6px", backgroundColor: "transparent", boxShadow: "none" });
         openBtn.onclick = () => { this.app.workspace.getLeaf('split', 'vertical').openFile(file); };
 
-        const closeBtn = btnGroup.createEl("button", { text: "X" });
-        closeBtn.setCssStyles({ padding: "4px 8px", fontSize: "0.8em", backgroundColor: "transparent", boxShadow: "none" });
+        // ➡️ 箭嘴 Icon (Close panel)
+        const closeBtn = btnGroup.createEl("button", { cls: "clickable-icon" });
+        setIcon(closeBtn, "arrow-right");
+        closeBtn.title = "Close panel";
+        closeBtn.setCssStyles({ padding: "6px", backgroundColor: "transparent", boxShadow: "none" });
         closeBtn.onclick = () => { container.setCssStyles({ transform: "translateX(100%)" }); };
 
+        // --- 2. 原汁原味 Markdown 筆記渲染 ---
         const content = await this.app.vault.read(file);
         const cache = this.app.metadataCache.getFileCache(file);
-
         this.currentProperties = Object.assign({}, cache?.frontmatter || {});
 
-        let bodyText = content;
-        if (cache?.frontmatterPosition) {
-            bodyText = content.substring(cache.frontmatterPosition.end.offset).trimStart();
+        const keys = Object.keys(this.currentProperties).filter(k => !['position', 'canvas_x', 'canvas_y'].includes(k));
+
+        if (keys.length > 0) {
+            const propsContainer = container.createDiv({ cls: "metadata-container" });
+            propsContainer.setCssStyles({ marginBottom: "20px", borderBottom: "1px solid var(--background-modifier-border)", paddingBottom: "10px" });
+
+            const propsHeader = propsContainer.createDiv({ cls: "metadata-properties-heading" });
+            propsHeader.createDiv({ text: "Properties", attr: { style: "font-size: 0.85em; color: var(--text-muted); font-weight: 600; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em;" } });
+
+            const propsList = propsContainer.createDiv({ cls: "metadata-properties" });
+            propsList.setCssStyles({ display: "flex", flexDirection: "column", gap: "2px" });
+
+            for (const key of keys) {
+                const row = propsList.createDiv({ cls: "metadata-property" });
+                row.setCssStyles({ display: "flex", backgroundColor: "var(--background-secondary-alt)", padding: "4px 8px", borderRadius: "4px", alignItems: "baseline", gap: "10px" });
+
+                row.createSpan({ text: key, attr: { style: "color: var(--text-muted); min-width: 90px; font-size: 0.9em;" } });
+
+                let valStr = this.currentProperties[key];
+                if (Array.isArray(valStr)) valStr = valStr.map(v => typeof v === 'string' && !v.includes('[[') ? `[[${v}]]` : v).join(", ");
+                row.createSpan({ text: String(valStr || "--"), attr: { style: "color: var(--text-normal); font-size: 0.9em; word-break: break-word;" } });
+            }
         }
-        this.currentBodyContent = bodyText;
 
-        container.createEl("strong", { text: "Relations & Attributes" });
-        const propsDiv = container.createDiv({ cls: "ns-panel-props" });
-        propsDiv.setCssStyles({ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "20px", backgroundColor: "var(--background-primary)", padding: "12px", borderRadius: "8px" });
+        const contentWrapper = container.createDiv({ cls: "ns-worldboard-preview markdown-rendered" });
+        contentWrapper.setCssStyles({ padding: "0 5px", userSelect: "text", fontSize: "0.95em" });
 
-        let hasProps = false;
-        for (const key in this.currentProperties) {
-            if (['tags', 'aliases', 'cssclasses', 'canvas_x', 'canvas_y', 'position'].includes(key)) continue;
-            hasProps = true;
-
-            const row = propsDiv.createDiv();
-            row.setCssStyles({ display: "flex", gap: "10px", alignItems: "baseline", borderBottom: "1px solid var(--background-modifier-border)", paddingBottom: "6px" });
-            row.createSpan({ text: key, attr: { style: "font-weight: bold; color: var(--text-muted); min-width: 80px;" } });
-
-            let valStr = this.currentProperties[key];
-            if (Array.isArray(valStr)) valStr = valStr.map(v => typeof v === 'string' && !v.includes('[[') ? `[[${v}]]` : v).join(", ");
-            row.createSpan({ text: String(valStr || "--"), attr: { style: "color: var(--text-normal); word-break: break-word;" } });
-        }
-        if (!hasProps) propsDiv.createDiv({ text: "No custom attributes.", attr: { style: "color: var(--text-muted); font-style: italic;" } });
-
-        container.createEl("strong", { text: "Content preview" });
-        const contentWrapper = container.createDiv({ cls: "ns-worldboard-preview" });
-        contentWrapper.setCssStyles({ padding: "15px", backgroundColor: "var(--background-primary)", borderRadius: "6px", border: "1px solid var(--background-modifier-border)", userSelect: "text" });
-
-        if (!this.currentBodyContent.trim()) {
-            contentWrapper.createDiv({ text: "Empty content. Click 'Edit file' to write something.", attr: { style: "color: var(--text-muted); font-style: italic; text-align: center;" } });
+        if (!content.trim()) {
+            contentWrapper.createDiv({ text: "Empty note. Click the pencil icon to edit.", attr: { style: "color: var(--text-muted); font-style: italic; text-align: center; margin-top: 30px;" } });
         } else {
-            await MarkdownRenderer.render(this.app, this.currentBodyContent, contentWrapper, file.path, this);
+            await MarkdownRenderer.render(this.app, content, contentWrapper, file.path, this);
         }
     }
 
@@ -446,6 +500,7 @@ class AddWikiCategoryModal extends Modal {
     folderPath = "";
     layoutMode: 'network' | 'hierarchy' = 'network';
     parentKey = "";
+    syncToTemplate = true; // 🌟 新增：預設勾選同步至劇情卡
 
     constructor(app: App, plugin: NovelSmithPlugin, onSuccess: (catName: string) => void) {
         super(app);
@@ -460,26 +515,32 @@ class AddWikiCategoryModal extends Modal {
 
         new Setting(contentEl)
             .setName("Category name")
-            .setDesc("e.g., Magic, Factions")
+            .setDesc("E.g., magic, factions")
             .addText(t => t.onChange(v => this.catName = v));
 
         new Setting(contentEl)
             .setName("Storage folder")
-            .setDesc("e.g., MyBook/Magic")
+            .setDesc("E.g., mybook/magic")
             .addText(t => t.onChange(v => this.folderPath = v));
 
         new Setting(contentEl)
             .setName("Layout mode")
-            .addDropdown(d => d.addOption("network", "Network (Free form)").addOption("hierarchy", "Hierarchy (Tree)")
+            .addDropdown(d => d.addOption("network", "Network (free form)").addOption("hierarchy", "Hierarchy (Tree)")
                 .onChange(v => this.layoutMode = v as 'network' | 'hierarchy'));
 
         new Setting(contentEl)
-            .setName("Parent attribute (for Hierarchy)")
+            .setName("Parent attribute (for hierarchy)")
             .addText(t => t.onChange(v => this.parentKey = v));
+
+        // 🌟 新增：Checkbox 畀用家揀加唔加入劇情卡
+        new Setting(contentEl)
+            .setName("Add to scene card template")
+            .setDesc("Automatically add this attribute to your scene card template.")
+            .addToggle(t => t.setValue(this.syncToTemplate).onChange(v => this.syncToTemplate = v));
 
         new Setting(contentEl)
             .addButton(btn => btn
-                .setButtonText("Generate template & Add")
+                .setButtonText("Generate & Add")
                 .setCta()
                 .onClick(async () => {
                     if (!this.catName || !this.folderPath) {
@@ -493,7 +554,13 @@ class AddWikiCategoryModal extends Modal {
                         parentKey: this.parentKey
                     });
                     await this.plugin.saveSettings();
-                    await this.plugin.ensureWikiTemplateExists(this.catName);
+                    await this.plugin.ensureWikiTemplateExists(this.catName, false);
+
+                    // 🌟 邏輯判斷：有剔選先至同步！
+                    if (this.syncToTemplate) {
+                        await this.plugin.syncSceneTemplateWithCategories();
+                    }
+
                     this.onSuccess(this.catName);
                     this.close();
                 }));

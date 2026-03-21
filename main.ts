@@ -93,15 +93,15 @@ export default class NovelSmithPlugin extends Plugin {
         // =================================================================
         // 🌍 Worldboard Entry (With gatekeeper protection!)
         // =================================================================
-        this.addRibbonIcon('globe', 'Open worldboard', () => {
-            const folder = this.settings.bookFolderPath;
-            // 防呆攔截：未 Initialize 唔畀入！
-            if (!folder || folder.trim() === "") {
-                new Notice("Welcome to novelsmith! Please go to the settings page to initialize your workspace before exploring the Worldboard.");
-                return;
-            }
-            void this.activateWorldboardView();
-        });
+        // this.addRibbonIcon('globe', 'Open worldboard', () => {
+        //     const folder = this.settings.bookFolderPath;
+        //     // 防呆攔截：未 Initialize 唔畀入！
+        //     if (!folder || folder.trim() === "") {
+        //         new Notice("Welcome to novelsmith! Please go to the settings page to initialize your workspace before exploring the Worldboard.");
+        //         return;
+        //     }
+        //     void this.activateWorldboardView();
+        // });
 
         // =================================================================
         // 🔥 Thoughtful UX 2: Automatically mount the panel to the right when Obsidian is ready!

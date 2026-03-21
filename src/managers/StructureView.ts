@@ -354,41 +354,49 @@ export class StructureView extends ItemView {
         };
 
         // =========================================================
-        // 🌟 Row 1: 全域模式與存檔 (Sync | Corkboard | Scrivenings/Discard)
+        // 🌟 Row 1: 三大核心視圖 (Draft | Board | World)
         // =========================================================
         const row1 = header.createDiv({ cls: "ns-button-row" });
-        row1.setCssStyles({ marginBottom: "5px" });
+        row1.setCssStyles({ display: "flex", gap: "6px", marginBottom: "6px" });
 
-        // 1. 👈 左邊：同步 (Sync) 掣 
-        const btnSave = createIconButton(row1, "save", "Sync", { backgroundColor: "var(--interactive-accent)", color: "var(--text-on-accent)" });
-        btnSave.onclick = async () => {
-            const currentView = this.getValidMarkdownView(); // 🌟 即時獲取最新視窗
-            if (currentView && this.plugin.checkInBookFolder(currentView.file)) {
-                btnSave.classList.add("ns-btn-flash");
-                const originalText = btnSave.innerText;
-                btnSave.innerText = "Syncing...";
-                btnSave.disabled = true;
-
-                try {
-                    if (isArchivedDraft(currentView.file, currentView.editor.getValue())) {
-                        new Notice("Draft saved.");
-                    } else {
-                        await this.plugin.executeSmartSave(currentView);
-                    }
-                } finally {
-                    setTimeout(() => {
-                        btnSave.innerText = originalText;
-                        btnSave.disabled = false;
-                        btnSave.classList.remove("ns-btn-flash");
-                    }, 400);
+        // 1. 📖 串聯模式 (Draft) OR 捨棄草稿 (Discard)
+        let btnDraft;
+        if (isDraftMode) {
+            btnDraft = createIconButton(row1, "trash-2", "Discard", { flex: "1", padding: "6px 0", backgroundColor: "var(--background-modifier-error)", color: "white" });
+            btnDraft.onclick = () => {
+                const currentView = this.getValidMarkdownView();
+                if (currentView) {
+                    new SimpleConfirmModal(
+                        this.plugin.app,
+                        "Are you sure to discard this darft?\n\nWill close & delete this file, all your word will not be synced",
+                        () => { void this.plugin.scrivenerManager.discardDraft(currentView.file); }
+                    ).open();
                 }
-            }
-        };
+            };
+        } else {
+            btnDraft = createIconButton(row1, "book-open", "Draft", { flex: "1", padding: "6px 0" });
+            btnDraft.onclick = () => {
+                const currentView = this.getValidMarkdownView();
+                if (currentView && this.plugin.checkInBookFolder(currentView.file)) {
+                    const content = currentView.editor.getValue();
+                    if (isArchivedDraft(currentView.file, content)) {
+                        new Notice("Abort: this is a archived draft, scrivenering may cause infinite loop.");
+                    } else {
+                        const folder = currentView.file.parent;
+                        if (folder) {
+                            void this.plugin.sceneManager.assignIDsToAllFiles(folder).then(() => {
+                                void this.plugin.scrivenerManager.toggleScrivenings(currentView.file);
+                            });
+                        }
+                    }
+                }
+            };
+        }
 
-        // 2. 🎯 中間：軟木板 (Corkboard) 掣
-        const btnCorkboard = createIconButton(row1, "layout-dashboard", "Corkboard", { backgroundColor: "var(--interactive-normal)" });
+        // 2. 🎯 軟木板 (Board)
+        const btnCorkboard = createIconButton(row1, "layout-dashboard", "Board", { flex: "1", padding: "6px 0", backgroundColor: "var(--interactive-normal)" });
         btnCorkboard.onclick = async () => {
-            const currentView = this.getValidMarkdownView(); // 🌟 即時獲取最新視窗
+            const currentView = this.getValidMarkdownView();
             if (!currentView || !this.plugin.checkInBookFolder(currentView.file)) return;
 
             const currentFile = currentView.file;
@@ -420,48 +428,51 @@ export class StructureView extends ItemView {
             }
         };
 
-        // 3. 👉 右邊：串聯模式 (Scrivenings) OR 捨棄草稿 (Discard)
-        if (isDraftMode) {
-            const btnDiscard = createIconButton(row1, "trash-2", "Discard", { backgroundColor: "var(--background-modifier-error)", color: "white" });
-            btnDiscard.onclick = () => {
-                const currentView = this.getValidMarkdownView(); // 🌟 即時獲取最新視窗
-                if (currentView) {
-                    new SimpleConfirmModal(
-                        this.plugin.app,
-                        "Are you sure to discard this darft?\n\nWill close & delete this file, all your word will not be synced",
-                        () => { void this.plugin.scrivenerManager.discardDraft(currentView.file); }
-                    ).open();
-                }
-            };
-        } else {
-            const btnScrivenings = createIconButton(row1, "book-open", "Scrivenering");
-            btnScrivenings.onclick = () => {
-                const currentView = this.getValidMarkdownView(); // 🌟 即時獲取最新視窗
-                if (currentView && this.plugin.checkInBookFolder(currentView.file)) {
-                    const content = currentView.editor.getValue();
-                    if (isArchivedDraft(currentView.file, content)) {
-                        new Notice("Abort: this is a archived draft, scrivenering may cause infinite loop.");
-                    } else {
-                        const folder = currentView.file.parent;
-                        if (folder) {
-                            void this.plugin.sceneManager.assignIDsToAllFiles(folder).then(() => {
-                                // 🌟 將 currentView.file 傳入，完美解決 "Please open a file first" Bug！
-                                void this.plugin.scrivenerManager.toggleScrivenings(currentView.file);
-                            });
-                        }
-                    }
-                }
-            };
-        }
+        // 3. 🌍 世界觀畫布 (World)
+        const btnWorldboard = createIconButton(row1, "globe", "World", { flex: "1", padding: "6px 0", backgroundColor: "var(--interactive-accent)", color: "var(--text-on-accent)" });
+        btnWorldboard.onclick = () => {
+            void this.plugin.activateWorldboardView();
+        };
 
         // =========================================================
-        // 🌟 Row 2: 結構編輯與工具 (Micro Actions)
+        // 🌟 Row 2: 工具與操作 (Sync | Scene | Split | Merge | Tools)
+        // 💡 呢行所有掣都特登抽走咗文字，只用 Icon，令排版極度乾淨唔擠迫！
         // =========================================================
         const row2 = header.createDiv({ cls: "ns-button-row" });
+        row2.setCssStyles({ display: "flex", gap: "6px", marginBottom: "12px" });
 
-        const btnInsert = createIconButton(row2, "file-plus", "Scene");
+        // 1. 同步 (Sync) -> 搬落嚟第一格
+        const btnSave = createIconButton(row2, "save", "", { flex: "1", padding: "6px 0", backgroundColor: "var(--interactive-accent)", color: "var(--text-on-accent)" });
+        btnSave.title = "Smart Sync & Save";
+        btnSave.onclick = async () => {
+            const currentView = this.getValidMarkdownView();
+            if (currentView && this.plugin.checkInBookFolder(currentView.file)) {
+                btnSave.classList.add("ns-btn-flash");
+                const originalHTML = btnSave.innerHTML;
+                btnSave.innerHTML = "<span>...</span>";
+                btnSave.disabled = true;
+
+                try {
+                    if (isArchivedDraft(currentView.file, currentView.editor.getValue())) {
+                        new Notice("Draft saved.");
+                    } else {
+                        await this.plugin.executeSmartSave(currentView);
+                    }
+                } finally {
+                    setTimeout(() => {
+                        btnSave.innerHTML = originalHTML;
+                        btnSave.disabled = false;
+                        btnSave.classList.remove("ns-btn-flash");
+                    }, 400);
+                }
+            }
+        };
+
+        // 2. 插入場景 (Insert)
+        const btnInsert = createIconButton(row2, "file-plus", "", { flex: "1", padding: "6px 0" });
+        btnInsert.title = "Insert Scene";
         btnInsert.onclick = () => {
-            const currentView = this.getValidMarkdownView(); // 🌟 即時獲取最新視窗
+            const currentView = this.getValidMarkdownView();
             if (currentView && this.plugin.checkInBookFolder(currentView.file)) {
                 if (isArchivedDraft(currentView.file, currentView.editor.getValue())) {
                     new Notice("This is a archived draft, please return to your working file to insert scene card.");
@@ -471,7 +482,9 @@ export class StructureView extends ItemView {
             }
         };
 
-        const btnSplit = createIconButton(row2, "scissors", "Split");
+        // 3. 拆分 (Split)
+        const btnSplit = createIconButton(row2, "scissors", "", { flex: "1", padding: "6px 0" });
+        btnSplit.title = "Split Scene";
         btnSplit.onclick = () => {
             const currentView = this.getValidMarkdownView();
             if (currentView && this.plugin.checkInBookFolder(currentView.file)) {
@@ -483,7 +496,9 @@ export class StructureView extends ItemView {
             }
         };
 
-        const btnMerge = createIconButton(row2, "combine", "Merge");
+        // 4. 合併 (Merge)
+        const btnMerge = createIconButton(row2, "combine", "", { flex: "1", padding: "6px 0" });
+        btnMerge.title = "Merge Scene";
         btnMerge.onclick = () => {
             const currentView = this.getValidMarkdownView();
             if (currentView && this.plugin.checkInBookFolder(currentView.file)) {
@@ -495,15 +510,15 @@ export class StructureView extends ItemView {
             }
         };
 
-        const btnTools = createIconButton(row2, "wrench", "Tools");
+        // 5. 工具選單 (Tools)
+        const btnTools = createIconButton(row2, "wrench", "", { flex: "1", padding: "6px 0" });
+        btnTools.title = "Tools";
         btnTools.onclick = (e: MouseEvent) => {
-            const currentView = this.getValidMarkdownView(); // 🌟 即時獲取最新視窗
+            const currentView = this.getValidMarkdownView();
             if (!currentView) return;
 
             const isInBookFolder = this.plugin.checkInBookFolderSilent(currentView.file);
             const menu = new Menu();
-
-
 
             menu.addItem((item) => {
                 item.setTitle("Writer's journey").setIcon("trophy").onClick(() => {
@@ -518,7 +533,6 @@ export class StructureView extends ItemView {
                     });
                 });
             });
-
 
             menu.addSeparator();
 
