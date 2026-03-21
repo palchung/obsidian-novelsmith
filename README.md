@@ -73,6 +73,15 @@ Your World Bible is now fully integrated and always just one click away.
 * **Dynamic Info Tab:** The sidebar's "Info Tab" acts as a context-aware World Bible. As you write, it automatically lists the characters, locations, or magic items present in your *current scene* as clickable interactive chips.
 * **Lazy-Load Reading & Instant Editing:** Click a character chip to instantly read their lore note in the side panel without lagging your device. Need to update a character's backstory? Click the ✏️ icon to open their note in an adjacent pane—your side panel will **live-update** the rendered text as you type!
 
+### 🗺️ Worldboard (Visual Relational Canvas) [NEW]
+Transform your raw markdown notes into a stunning, interactive world Bible without filling out static forms.
+* **Data-Driven & Zero Friction:** NovelSmith reads your existing Obsidian YAML properties (e.g., `Wife: [[Alice]]`). It automatically generates interconnected nodes and relationship arrows. No proprietary databases, no lock-in.
+* **Physics & Hierarchy Layouts:** Choose "Network" mode for complex character relationships (bouncing physics engine), or "Hierarchy" mode for strict, top-down trees (perfect for geographical maps, magic systems, or organization charts).
+* **Orbiting Satellite Nodes:** Mention an artifact (e.g., `[[Holy Sword]]`) in a character's note? It appears as a smaller "satellite" node orbiting the character, allowing you to visualize cross-category relationships effortlessly.
+* **Dimension Jump Navigation:** Click a satellite node to instantly teleport to its native category canvas (e.g., jumping from the Characters board to the Items board). A convenient "Return" button snaps you right back to your previous focus.
+* **Drag & Pin (Clean Data):** Drag any node to position it exactly where you want. The physics engine turns off, and its coordinates are saved silently in the plugin's background—keeping your manuscript's markdown files completely clean and untouched.
+* **Interactive Preview Panel:** Click any node to slide out a beautifully rendered, read-only preview of the note and its properties. Need to make a change? Click the ✏️ icon to open the file and watch your canvas update instantly.
+
 ### 📊 Dashboard Builder (No-Code Analytics) (New)
 Transform your writing progress into a data control center, no coding required! Powered by Dataview and Mermaid JS.
 * **Visual BI Generator:** Click "Insert Dashboard" to open a visual, user-friendly UI. Select the attributes you want to analyze (e.g., POV, Status, Rhythm) and the plugin will dynamically generate the complex queries for you.
