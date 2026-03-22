@@ -20,6 +20,7 @@ export interface NovelSmithSettings {
     wikiCategories: WikiCategory[];
     statsData: StatsData;
     worldboardCoords: Record<string, { x: number, y: number }>;
+    relationColors: Record<string, string>;
 }
 
 export const DEFAULT_SETTINGS: NovelSmithSettings = {
@@ -29,7 +30,8 @@ export const DEFAULT_SETTINGS: NovelSmithSettings = {
     wikiFolderPath: '',
     wikiCategories: [],
     statsData: DEFAULT_STATS,
-    worldboardCoords: {}
+    worldboardCoords: {},
+    relationColors: {}
 }
 
 export class NovelSmithSettingTab extends PluginSettingTab {

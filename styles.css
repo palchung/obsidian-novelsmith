@@ -833,3 +833,109 @@ body.ns-mode-dialogue .cm-dialogue-text {
     border-bottom: none !important;
     margin-top: 2em !important;
 }
+
+
+/* ========================================== */
+/* 🗺️ Worldboard View UI Styles              */
+/* ========================================== */
+
+.ns-worldboard-workspace {
+    display: flex;
+    height: calc(100% - 50px);
+    width: 100%;
+    position: relative;
+    overflow: hidden;
+}
+
+.ns-worldboard-canvas {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    background-color: var(--background-primary);
+}
+
+/* 🔍 頂部搜尋框 */
+.ns-wb-search-box {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: var(--background-secondary);
+    padding: 8px 15px;
+    border-radius: 20px;
+    border: 1px solid var(--background-modifier-border);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    width: 220px;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.ns-wb-search-box:focus-within {
+    width: 350px;
+    max-width: 80vw;
+    border-color: var(--interactive-accent);
+}
+
+.ns-wb-search-input {
+    border: none;
+    background: transparent;
+    color: var(--text-normal);
+    outline: none;
+    width: 100%;
+    font-size: 0.95em;
+}
+
+/* 強制清除 Obsidian 預設嘅 Input 邊框同發光外圍 */
+.ns-wb-search-input,
+.ns-wb-search-input:focus,
+.ns-wb-search-input:active,
+.ns-wb-search-input:focus-visible {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    -webkit-appearance: none;
+}
+
+
+/* 🖌️ 左上角群組與印章工具列 */
+.ns-wb-group-box {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: var(--background-secondary);
+    padding: 8px 15px;
+    border-radius: 20px;
+    border: 1px solid var(--background-modifier-border);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* 📝 右側滑出預覽面板 */
+.ns-worldboard-panel {
+    width: 450px;
+    border-left: 1px solid var(--background-modifier-border);
+    background-color: var(--background-primary);
+    padding: 15px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 100%;
+    z-index: 50;
+    box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1);
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}

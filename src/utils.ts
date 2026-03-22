@@ -96,6 +96,42 @@ export const getAnchorSceneIdFromCursor = (editor: Editor): string | null => {
     return null;
 };
 
+// ==========================================
+// 🎨 Worldboard 專用常數與共用函數
+// ==========================================
+
+// 1. 支援嘅圖片 YAML 屬性 (方便日後隨時加新字眼)
+export const IMAGE_PROPERTY_KEYS = ['image', 'avatar', 'cover', '圖片', '立繪'];
+
+// 2. 動態勢力群組顏色庫
+export const GROUP_COLORS = [
+    { bg: "rgba(123, 97, 255, 0.15)", border: "rgba(123, 97, 255, 0.4)", text: "rgba(123, 97, 255, 0.8)" },   // Purple
+    { bg: "rgba(255, 77, 77, 0.15)", border: "rgba(255, 77, 77, 0.4)", text: "rgba(255, 77, 77, 0.8)" },     // Red
+    { bg: "rgba(77, 255, 166, 0.15)", border: "rgba(77, 255, 166, 0.4)", text: "rgba(77, 255, 166, 0.8)" },  // Green
+    { bg: "rgba(77, 166, 255, 0.15)", border: "rgba(77, 166, 255, 0.4)", text: "rgba(77, 166, 255, 0.8)" },  // Blue
+    { bg: "rgba(255, 166, 77, 0.15)", border: "rgba(255, 166, 77, 0.4)", text: "rgba(255, 166, 77, 0.8)" },  // Orange
+    { bg: "rgba(255, 255, 77, 0.15)", border: "rgba(255, 255, 77, 0.4)", text: "rgba(255, 255, 77, 0.8)" },  // Yellow
+];
+
+// 3. 幾何算法：計算凸包 (Convex Hull) (從 View 抽離出嚟)
+export function getConvexHull(points: { x: number, y: number }[]): { x: number, y: number }[] {
+    if (points.length <= 2) return points;
+    const pts = [...points].sort((a, b) => a.x !== b.x ? a.x - b.x : a.y - b.y);
+    const cross = (o: any, a: any, b: any) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    const lower = [];
+    for (let i = 0; i < pts.length; i++) {
+        while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], pts[i]) <= 0) lower.pop();
+        lower.push(pts[i]);
+    }
+    const upper = [];
+    for (let i = pts.length - 1; i >= 0; i--) {
+        while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], pts[i]) <= 0) upper.pop();
+        upper.push(pts[i]);
+    }
+    upper.pop(); lower.pop();
+    return lower.concat(upper);
+}
+
 // ============================================================
 // 🛠️ Shared Utilities
 // ============================================================
