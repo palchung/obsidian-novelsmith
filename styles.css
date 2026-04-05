@@ -843,7 +843,7 @@ body.is-mobile .ns-button-row .ns-btn-discard,
     appearance: none !important;
     opacity: 1 !important;
     /* 強制使用標準實色 Hex Code，唔依賴可能被 iPad 主題溝淡咗嘅 var() */
-    background-color: #762121 !important;
+    background-color: #9a2f2f !important;
     border: none !important;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
 }
@@ -864,6 +864,130 @@ body.is-mobile .ns-button-row .ns-btn-discard span,
 body.is-mobile .ns-button-row .ns-btn-discard:active,
 .ns-button-row .ns-btn-discard:active {
     filter: brightness(0.8) !important;
+}
+
+
+/* ============================================================
+   🔥 6. 劇情卡片無縫過渡與排版瘦身 (Optical Illusion & Callout Slimming)
+   ============================================================ */
+
+/* ----------------------------------------------------
+   A. 瘦身：Callout 原生排版收窄 (極致緊湊版)
+   ---------------------------------------------------- */
+.callout[data-callout^="nsmith"] {
+    padding: 20px 30px !important;
+    /* 整體上下左右收窄 */
+}
+
+/* 消除標題與內容距離，徹底移除橫線 */
+.callout[data-callout^="nsmith"] .callout-title {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+    border-bottom: none !important;
+    /* 🌟 移除橫線 */
+}
+
+/* 消除內容區頂部與底部多餘空白 */
+.callout[data-callout^="nsmith"] .callout-content {
+    margin-top: 4px !important;
+    padding-bottom: 0 !important;
+    /* 🌟 收窄底部最底嘅 Padding */
+}
+
+/* 消除 List (ul/li) 同段落 (p) 自帶嘅超大 Margin */
+.callout[data-callout^="nsmith"] .callout-content ul,
+.callout[data-callout^="nsmith"] .callout-content p {
+    margin-top: 2px !important;
+    margin-bottom: 0 !important;
+    /* 🌟 防止底部被撐大 */
+    padding-bottom: 0 !important;
+}
+
+
+/* ----------------------------------------------------
+   B. 視覺過渡：編輯模式保護色 (解決跳動感)
+   ---------------------------------------------------- */
+.markdown-source-view.mod-cm6 .cm-line.cm-quote {
+    background-color: rgba(var(--color-base-60-rgb), 0.08);
+    /* 統一淺灰保護底色 */
+    border-left: 4px solid var(--background-modifier-border-hover) !important;
+    transition: background-color 0.2s ease;
+    border-radius: 0 6px 6px 0;
+    padding-top: 2px;
+    padding-bottom: 2px;
+    padding-left: 12px !important;
+}
+
+/* 游標所在行稍微加深 */
+.markdown-source-view.mod-cm6 .cm-active.cm-quote {
+    background-color: rgba(var(--interactive-accent-rgb), 0.05);
+    border-left: 4px solid var(--interactive-accent) !important;
+}
+
+
+/* ----------------------------------------------------
+   C. 隱藏噪音：編輯模式符號弱化
+   ---------------------------------------------------- */
+/* > (Quote 符號) 降到最淺：20% */
+.markdown-source-view.mod-cm6 .cm-line.cm-quote .cm-formatting-quote {
+    opacity: 0.2 !important;
+    font-size: 0.9em;
+    transition: opacity 0.2s ease;
+}
+
+/* - (List 符號) 稍微深少少：35% */
+.markdown-source-view.mod-cm6 .cm-line.cm-quote .cm-formatting-list {
+    opacity: 0.35 !important;
+    font-size: 0.9em;
+    transition: opacity 0.2s ease;
+}
+
+/* 當滑鼠懸停喺行上面，符號稍微現形，方便修改 */
+.markdown-source-view.mod-cm6 .cm-line.cm-quote:hover .cm-formatting-quote,
+.markdown-source-view.mod-cm6 .cm-line.cm-quote:hover .cm-formatting-list {
+    opacity: 0.6 !important;
+}
+
+/* 淡化第一行標頭 (e.g. [!NSmith-red]) 嘅文字 */
+.markdown-source-view.mod-cm6 .cm-line.cm-quote:not(.cm-active) .cm-formatting-quote+span {
+    opacity: 0.6;
+}
+
+
+/* ----------------------------------------------------
+   D. 屬性對齊魔法 (CSS Dynamic Grid)
+   ---------------------------------------------------- */
+.ns-property-list {
+    display: grid !important;
+    /* 🌟 終極魔法：第一欄(Key)自動就返最長嗰個字 (max-content)，第二欄(::)固定，第三欄(Value)佔用餘下空間！絕對唔會逼埋一舊！ */
+    grid-template-columns: max-content auto 1fr;
+    gap: 2px 8px;
+    /* 行距 2px，左右距 8px */
+    list-style: none !important;
+    /* 隱藏原本嘅點點 Bullet */
+    padding-left: 0 !important;
+    margin-left: 0 !important;
+}
+
+.ns-property-list li {
+    display: contents;
+    /* 🌟 消除 li 嘅物理限制，等入面嘅 span 直接參與 Grid 排版 */
+}
+
+.ns-prop-key {
+    font-weight: 600;
+    color: var(--text-muted);
+    text-align: right;
+    /* Key 靠右對齊，視覺最齊整 */
+}
+
+.ns-prop-separator {
+    opacity: 0.3;
+    /* :: 符號變淡色 */
+}
+
+.ns-prop-val {
+    color: var(--text-normal);
 }
 
 
@@ -972,6 +1096,15 @@ body.is-mobile .ns-button-row .ns-btn-discard:active,
     transform: translateX(100%);
     transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
+
+
+
+
+
+
+
+
+
 
 
 /* ============================================================

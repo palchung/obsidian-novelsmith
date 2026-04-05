@@ -11,7 +11,7 @@ import { SceneManager } from './src/managers/SceneManager';
 import { DashboardManager } from './src/managers/DashboardManager';
 import { StatsManager } from './src/managers/StatsManager';
 //import { PlotGridView, VIEW_TYPE_PLOTGRID } from './src/managers/PlotGridView';
-import { redundantHighlighter, dialogueHighlighter, structureHighlighter, systemTagsProtector } from './src/decorators';
+import { redundantHighlighter, dialogueHighlighter, structureHighlighter, systemTagsProtector, alignPropertyProcessor } from './src/decorators';
 import { StructureView, VIEW_TYPE_STRUCTURE } from './src/managers/StructureView';
 import { WorldboardView, VIEW_TYPE_WORLDBOARD } from './src/managers/WorldboardView';
 import { ST_WARNING, DRAFT_FILENAME, BACKSTAGE_DIR, TEMPLATES_DIR, ensureFolderExists, isScriveningsDraft } from './src/utils';
@@ -69,7 +69,7 @@ export default class NovelSmithPlugin extends Plugin {
         }));
 
 
-
+        this.registerMarkdownPostProcessor(alignPropertyProcessor);
         this.registerEditorExtension([redundantHighlighter, dialogueHighlighter, structureHighlighter, systemTagsProtector]);
         this.registerView(
             VIEW_TYPE_STRUCTURE,

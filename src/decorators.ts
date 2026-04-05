@@ -1,5 +1,5 @@
 import { ViewUpdate, ViewPlugin, DecorationSet, Decoration, EditorView, MatchDecorator, WidgetType } from '@codemirror/view';
-
+import { MarkdownPostProcessorContext } from 'obsidian';
 
 // ============================================================
 // 1. Global Variables & Redundant Words/Dialogue Mode (Unchanged)
@@ -138,3 +138,34 @@ export const systemTagsProtector = ViewPlugin.fromClass(class {
     constructor(view: EditorView) { this.decorations = systemTagsMatcher.createDeco(view); }
     update(update: ViewUpdate) { this.decorations = systemTagsMatcher.updateDeco(update, this.decorations); }
 }, { decorations: v => v.decorations });
+
+
+
+// ============================================================
+// 🎭 6. Micro Post-Processor (屬性對齊魔法，絕對安全、零干擾)
+// ============================================================
+export function alignPropertyProcessor(el: HTMLElement, ctx: MarkdownPostProcessorContext) {
+    // 只針對 NSmith 卡片，唔影響其他筆記
+    const callouts = Array.from(el.querySelectorAll('.callout')).filter(c => c.getAttribute('data-callout')?.startsWith('nsmith'));
+
+    callouts.forEach(callout => {
+        const lists = callout.querySelectorAll('ul');
+        lists.forEach(ul => {
+            ul.classList.add("ns-property-list"); // 加 Class 畀 CSS 做 Grid 排版
+
+            const items = ul.querySelectorAll('li');
+            items.forEach(li => {
+                const text = li.innerHTML;
+                if (text.includes("::")) {
+                    // 將文字拆開，包裝成 左(Key) 同 右(Value)
+                    const parts = text.split("::");
+                    const key = parts[0];
+                    const val = parts.slice(1).join("::");
+
+                    // 重新包裝，唔加任何 Input，純粹為咗排版
+                    li.innerHTML = `<span class="ns-prop-key">${key}</span><span class="ns-prop-separator">::</span><span class="ns-prop-val">${val}</span>`;
+                }
+            });
+        });
+    });
+}
