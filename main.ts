@@ -10,7 +10,8 @@ import { CompilerManager } from './src/managers/CompilerManager';
 import { SceneManager } from './src/managers/SceneManager';
 import { DashboardManager } from './src/managers/DashboardManager';
 import { StatsManager } from './src/managers/StatsManager';
-import { redundantHighlighter, dialogueHighlighter, structureHighlighter } from './src/decorators';
+//import { PlotGridView, VIEW_TYPE_PLOTGRID } from './src/managers/PlotGridView';
+import { redundantHighlighter, dialogueHighlighter, structureHighlighter, systemTagsProtector } from './src/decorators';
 import { StructureView, VIEW_TYPE_STRUCTURE } from './src/managers/StructureView';
 import { WorldboardView, VIEW_TYPE_WORLDBOARD } from './src/managers/WorldboardView';
 import { ST_WARNING, DRAFT_FILENAME, BACKSTAGE_DIR, TEMPLATES_DIR, ensureFolderExists, isScriveningsDraft } from './src/utils';
@@ -69,9 +70,7 @@ export default class NovelSmithPlugin extends Plugin {
 
 
 
-
-        this.registerEditorExtension([redundantHighlighter, dialogueHighlighter, structureHighlighter]);
-
+        this.registerEditorExtension([redundantHighlighter, dialogueHighlighter, structureHighlighter, systemTagsProtector]);
         this.registerView(
             VIEW_TYPE_STRUCTURE,
             (leaf) => new StructureView(leaf, this)
@@ -82,6 +81,11 @@ export default class NovelSmithPlugin extends Plugin {
             (leaf) => new WorldboardView(leaf, this)
         );
 
+        // this.registerView(
+        //     VIEW_TYPE_PLOTGRID,
+        //     (leaf) => new PlotGridView(leaf, this)
+        // );
+
 
         // =================================================================
         // 🔥 Thoughtful UX 1: Add a physical button to the left Ribbon
@@ -89,6 +93,23 @@ export default class NovelSmithPlugin extends Plugin {
         this.addRibbonIcon('book-open', 'Open novelsmith panel', () => {
             void this.activateView();
         });
+
+        // 🌟 新增 Plot Grid 嘅左側捷徑按鈕 (Ribbon Icon)
+        // this.addRibbonIcon('table', 'Open Plot Grid', async (evt: MouseEvent) => {
+        //     // 1. 檢查用家依家打開緊邊份筆記
+        //     const activeFile = this.app.workspace.getActiveFile();
+
+        //     // 2. 預設目標資料夾係成本書嘅根目錄
+        //     let targetFolder = this.settings.bookFolderPath;
+
+        //     // 3. 如果用家依家打開緊「第一章」嘅筆記，就將目標設定為「第一章」所在嘅資料夾
+        //     if (activeFile && activeFile.parent) {
+        //         targetFolder = activeFile.parent.path;
+        //     }
+
+        //     // 4. 召喚 Plot Grid 面板！
+        //     await this.activatePlotGridView(targetFolder);
+        // });
 
         // =================================================================
         // 🌍 Worldboard Entry (With gatekeeper protection!)
@@ -643,6 +664,25 @@ export default class NovelSmithPlugin extends Plugin {
         }
         workspace.revealLeaf(leaf);
     }
+
+    // async activatePlotGridView(targetFolderPath: string) {
+    //     const { workspace } = this.app;
+    //     let leaf = workspace.getLeavesOfType(VIEW_TYPE_PLOTGRID)[0];
+
+    //     if (!leaf) {
+    //         // 開喺主編輯區 (Tab)
+    //         leaf = workspace.getLeaf('tab');
+    //         await leaf.setViewState({ type: VIEW_TYPE_PLOTGRID, active: true });
+    //     }
+
+    //     // 傳遞目標資料夾，等佢知道 Micro 模式要掃描邊度
+    //     if (leaf.view instanceof PlotGridView) {
+    //         leaf.view.targetFolderPath = targetFolderPath;
+    //         await leaf.view.renderGrid();
+    //     }
+
+    //     workspace.revealLeaf(leaf);
+    // }
 
 
     onunload() {

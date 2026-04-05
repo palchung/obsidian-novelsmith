@@ -108,11 +108,15 @@ export class ScrivenerManager {
 
         for (const file of files) {
             const content = await this.app.vault.read(file);
-
-
             const parsedData = parseContent(content, true, this.app, file);
 
-            contentChunks.push(`\n\n# 📄 ${file.name} <span class="ns-chapter-center"></span>\n`);
+            // 🌟 1. 洗乾淨章節標題！
+            let displayName = file.basename; // 呢個自帶去除 .md 嘅效果
+            // 用正則表達式，自動剷除開頭嘅數字同底線 (例如 "01_第一章" 會變成 "第一章")
+            displayName = displayName.replace(/^[0-9_]+/, "");
+
+            // 🌟 2. 顯示用嘅標題用洗乾淨嘅 displayName，但底層 ID 必須保持 file.name 畀系統認路！
+            contentChunks.push(`\n\n# 📄 ${displayName} <span class="ns-chapter-center"></span>\n`);
             contentChunks.push(`<span class="ns-file-id">++ FILE_ID: ${file.name} ++</span>\n\n`);
 
 

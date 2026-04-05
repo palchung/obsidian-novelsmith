@@ -2,7 +2,7 @@
 import { App, TFolder, Menu, setIcon, Modal, TFile, Notice, MarkdownView, MarkdownRenderer } from 'obsidian';
 import Sortable from 'sortablejs';
 import NovelSmithPlugin from '../../main';
-import { extractSynopsisAndTags, TEMPLATES_DIR, getColorById, generateSceneId, SCENE_COLORS, createIconButton, getManuscriptFiles, parseUniversalScenes, parseContent } from '../utils';
+import { sanitizeFileName, extractSynopsisAndTags, TEMPLATES_DIR, getColorById, generateSceneId, SCENE_COLORS, createIconButton, getManuscriptFiles, parseUniversalScenes, parseContent } from '../utils';
 import { InputModal, SimpleConfirmModal, SceneCreateModal } from '../modals';
 
 // ============================================================
@@ -20,52 +20,27 @@ export class CorkboardDraftActionModal extends Modal {
 
     onOpen() {
         const { contentEl } = this;
-
         contentEl.createEl('h2', { text: "Scrivenings mode active" });
-        contentEl.createEl('p', {
-            text: "To protect your manuscript structure, please handle the current draft before opening the global corkboard:",
-            cls: "setting-item-description"
-        });
+        contentEl.createEl('p', { text: "To protect your manuscript structure, please handle the current draft before opening the global corkboard:", cls: "setting-item-description" });
 
         const btnGroup = contentEl.createDiv({ cls: 'ns-modal-button-group' });
-        btnGroup.setCssStyles({
-            display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px'
-        });
+        btnGroup.setCssStyles({ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' });
 
-        // Option A: Sync & Open
-        const btnSync = btnGroup.createEl('button', {
-            text: "Sync & open corkboard",
-            cls: "mod-cta"
-        });
-        btnSync.onclick = () => {
-            this.close();
-            this.onSyncAndOpen();
-        };
+        const btnSync = btnGroup.createEl('button', { text: "Sync & open corkboard", cls: "mod-cta" });
+        btnSync.onclick = () => { this.close(); this.onSyncAndOpen(); };
 
-        // Option B: Discard & Open
-        const btnDiscard = btnGroup.createEl('button', {
-            text: "Discard draft & open corkboard"
-        });
-        btnDiscard.setCssStyles({
-            backgroundColor: "var(--background-modifier-error)", color: "white"
-        });
-        btnDiscard.onclick = () => {
-            this.close();
-            this.onDiscardAndOpen();
-        };
+        const btnDiscard = btnGroup.createEl('button', { text: "Discard draft & open corkboard" });
+        btnDiscard.setCssStyles({ backgroundColor: "var(--background-modifier-error)", color: "white" });
+        btnDiscard.onclick = () => { this.close(); this.onDiscardAndOpen(); };
 
-        // Option C: Cancel
         const btnCancel = btnGroup.createEl('button', { text: "Cancel" });
         btnCancel.onclick = () => { this.close(); };
     }
-
-    onClose() {
-        this.contentEl.empty();
-    }
+    onClose() { this.contentEl.empty(); }
 }
 
 // ============================================================
-// 📌 Global Corkboard View Modal (Ultimate Edition with CRUD & Colors)
+// 📌 Global Corkboard View Modal (Ultimate Edition with Dirty Flag)
 // ============================================================
 export class CorkboardModal extends Modal {
     plugin: NovelSmithPlugin;
@@ -74,6 +49,9 @@ export class CorkboardModal extends Modal {
     isFromScrivenings: boolean;
     sortables: Sortable[] = [];
     wikiPanel: HTMLElement;
+
+    // 🌟 髒標記 (Dirty Flag)：記錄用家有冇改過嘢
+    isDirty: boolean = false;
 
     // 🌟 終極沙盒記憶體
     liveSceneMap: Map<string, string> = new Map();
@@ -96,55 +74,126 @@ export class CorkboardModal extends Modal {
     async onOpen() {
         const { contentEl } = this;
         contentEl.empty();
+        this.isDirty = false; // 初始化時重置標記
 
         this.modalEl.setCssStyles({ width: "95vw", height: "95vh", maxWidth: "none", maxHeight: "none" });
         contentEl.setCssStyles({ display: "flex", flexDirection: "column", height: "100%" });
         this.modalEl.addClass("ns-corkboard-modal");
 
-        // 🌟 隱藏 Obsidian 原生嘅右上角 X 關閉掣
         const defaultCloseBtn = this.modalEl.querySelector('.modal-close-button');
         if (defaultCloseBtn) defaultCloseBtn.setCssStyles({ display: "none" });
 
-        const folderName = this.workingFolderPath.split('/').pop() || "Global";
-
-        // ==========================================
-        // 🌟 完美重構：三合一頂部 Header
-        // ==========================================
         const headerRow = contentEl.createDiv({ cls: "ns-corkboard-header-row" });
 
-        // 👈 左邊：原生 Icon + 標題 + 資料夾名
         const titleLeft = headerRow.createDiv({ attr: { style: "display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-top: 4px;" } });
         const titleIcon = titleLeft.createSpan();
         setIcon(titleIcon, "layout-dashboard");
         titleIcon.setCssStyles({ color: "var(--interactive-accent)" });
         titleLeft.createEl("h2", { text: "Corkboard", attr: { style: "margin: 0;" } });
 
-        titleLeft.createSpan({ text: `/ ${folderName}`, cls: "ns-corkboard-folder-name" });
+        const rootPath = this.plugin.settings.bookFolderPath;
+        const rootFolder = this.app.vault.getAbstractFileByPath(rootPath);
+        const validFolders: TFolder[] = [];
 
-        // 🎯 中間：雷達追蹤器
+        if (rootFolder instanceof TFolder) {
+            validFolders.push(rootFolder);
+            const scanFolders = (folder: TFolder) => {
+                folder.children.forEach(child => {
+                    if (child instanceof TFolder && !child.name.startsWith('_') && !child.name.includes('Backstage')) {
+                        validFolders.push(child);
+                        scanFolders(child);
+                    }
+                });
+            };
+            scanFolders(rootFolder);
+        }
+
+        const folderSelect = titleLeft.createEl("select", { cls: "ns-corkboard-folder-select" });
+        folderSelect.setCssStyles({
+            marginLeft: "15px", padding: "6px 10px", borderRadius: "8px",
+            backgroundColor: "var(--background-secondary)", border: "1px solid var(--interactive-accent)",
+            color: "var(--text-normal)", cursor: "pointer", maxWidth: "300px", fontSize: "0.95em", fontWeight: "600",
+            outline: "none"
+        });
+
+        validFolders.forEach(f => {
+            let displayName = f.name;
+            if (f.path === rootPath) displayName = "📖 All (Root)";
+            else displayName = `📁 ${f.name}`;
+
+            const option = folderSelect.createEl("option", { value: f.path, text: displayName });
+            if (f.path === this.workingFolderPath) option.selected = true;
+        });
+
         const radarConsole = headerRow.createDiv({ cls: "ns-radar-console" });
 
-        // 👉 右邊：控制按鈕區
         const headerControls = headerRow.createDiv({ attr: { style: "display: flex; gap: 10px; align-items: center; flex-shrink: 0; margin-top: 4px;" } });
         const btnSave = headerControls.createEl("button", { text: "Save & close", cls: "mod-cta ns-save-btn" });
         const btnCancel = headerControls.createEl("button", { text: "Cancel" });
 
+        const gridContainer = contentEl.createDiv({ cls: "ns-corkboard-grid" });
+
         btnSave.onclick = async () => {
             btnSave.disabled = true;
             btnSave.innerText = "Saving...";
-            await this.saveGlobalCorkboard(gridContainer, btnSave);
+            await this.saveGlobalCorkboard(gridContainer, btnSave, true);
         };
         btnCancel.onclick = () => this.cancelCorkboard();
 
-        const gridContainer = contentEl.createDiv({ cls: "ns-corkboard-grid" });
+        // 🌟 智能下拉選單切換 (結合 Dirty Flag)
+        folderSelect.onchange = async () => {
+            const newPath = folderSelect.value;
+            if (newPath === this.workingFolderPath) return;
+
+            const executeSwitch = async (needSave: boolean) => {
+                folderSelect.value = newPath;
+                btnSave.innerText = "Switching...";
+                btnSave.disabled = true;
+                folderSelect.disabled = true;
+
+                if (needSave) {
+                    const success = await this.saveGlobalCorkboard(gridContainer, btnSave, false);
+                    if (!success) return; // 儲存失敗則中止切換
+                }
+
+                this.workingFolderPath = newPath;
+                this.liveSceneMap.clear();
+                this.pendingEdits.clear();
+                this.sortables.forEach(s => s.destroy());
+                this.sortables = [];
+                this.isDirty = false; // 切換後重置標記！
+
+                gridContainer.empty();
+                gridContainer.createEl("h3", { text: "Loading...", attr: { style: "opacity: 0.6; margin: auto;" } });
+                await this.renderGlobalCards(gridContainer);
+
+                radarConsole.empty();
+                this.buildRadarConsole(radarConsole);
+                if (this.activeRadarTokens.length > 0) this.applyRadarMode();
+
+                btnSave.innerText = "Save & close";
+                btnSave.disabled = false;
+                folderSelect.disabled = false;
+            };
+
+            // 如果有改過嘢，先至彈確認視窗！
+            if (this.isDirty) {
+                folderSelect.value = this.workingFolderPath; // 視覺上彈回原位
+                new SimpleConfirmModal(
+                    this.plugin.app,
+                    "Save changes and switch folder?\n\nClick [Confirm] to save current board and switch to the new folder.\nClick [Cancel] to abort and stay here.",
+                    () => { executeSwitch(true); }
+                ).open();
+            } else {
+                // 如果冇改過嘢，直接無縫切換，唔騷擾用家！
+                executeSwitch(false);
+            }
+        };
+
         gridContainer.createEl("h3", { text: "Loading manuscript data...", attr: { style: "opacity: 0.6; margin: auto;" } });
-
         await this.renderGlobalCards(gridContainer);
-
-        // 🌟 喺讀取完所有卡片之後，先至構建雷達
         this.buildRadarConsole(radarConsole);
 
-        // 🌟 構建「側滑資料面板」
         this.wikiPanel = contentEl.createDiv({ cls: "ns-corkboard-wiki-panel" });
     }
 
@@ -225,19 +274,18 @@ export class CorkboardModal extends Modal {
             const deleteBtn = titleRight.createDiv();
             setIcon(deleteBtn, "trash-2");
             deleteBtn.setCssStyles({ cursor: "pointer", opacity: "0.4", display: "flex", alignItems: "center", justifyContent: "center", padding: "2px" });
-            const delSvg = deleteBtn.querySelector("svg");
-            if (delSvg) { delSvg.style.width = "16px"; delSvg.style.height = "16px"; }
-
             deleteBtn.addEventListener("mouseover", () => deleteBtn.setCssStyles({ opacity: "1", color: "var(--text-error)" }));
             deleteBtn.addEventListener("mouseout", () => deleteBtn.setCssStyles({ opacity: "0.4", color: "initial" }));
-            deleteBtn.onclick = (e) => { e.stopPropagation(); card.remove(); };
+            deleteBtn.onclick = (e) => {
+                e.stopPropagation();
+                card.remove();
+                this.isDirty = true; // 🌟 標記：刪除卡片
+            };
         }
 
         const editBtn = titleRight.createDiv();
         setIcon(editBtn, "pencil");
         editBtn.setCssStyles({ cursor: "pointer", opacity: "0.4", display: "flex", alignItems: "center", justifyContent: "center", padding: "2px" });
-        const editSvg = editBtn.querySelector("svg");
-        if (editSvg) { editSvg.style.width = "14px"; editSvg.style.height = "14px"; }
         editBtn.addEventListener("mouseover", () => editBtn.setCssStyles({ opacity: "1", color: "var(--interactive-accent)" }));
         editBtn.addEventListener("mouseout", () => editBtn.setCssStyles({ opacity: "0.4", color: "initial" }));
         editBtn.onclick = (e) => {
@@ -259,6 +307,7 @@ export class CorkboardModal extends Modal {
                         card.dataset.colorId = c.id;
                         card.dataset.colorModified = "true";
                         card.setCssStyles({ borderLeft: `6px solid ${c.color || 'var(--background-modifier-border)'}` });
+                        this.isDirty = true; // 🌟 標記：修改顏色
                     });
                 });
             });
@@ -266,7 +315,6 @@ export class CorkboardModal extends Modal {
         };
 
         const { foundSynopsis, dynamicTags } = extractSynopsisAndTags(scene.meta || []);
-
         const noteText = foundSynopsis || (card.dataset.isNew === "true" ? "(New scene, edit later)" : "(No synopsis)");
         const noteEl = card.createDiv({ text: noteText, cls: "ns-scene-note" });
         noteEl.setCssStyles({ flexGrow: "1", fontSize: "0.9em", opacity: foundSynopsis ? "0.8" : "0.4", whiteSpace: "pre-wrap", maxHeight: "150px", overflow: "hidden", textOverflow: "ellipsis" });
@@ -274,19 +322,12 @@ export class CorkboardModal extends Modal {
         const footer = card.createDiv({ cls: "ns-scene-footer" });
         footer.setCssStyles({ display: "flex", gap: "6px", flexWrap: "wrap", fontSize: "0.8em", marginTop: "auto", paddingTop: "10px", borderTop: "1px solid var(--background-modifier-border)" });
 
-        if (dynamicTags.some(t => t.key.toLowerCase().includes('status') && (t.value.toLowerCase().includes('done') || t.value.includes('完成') || t.value.includes('完稿')))) {
-            const doneBadge = footer.createSpan({ text: "✅" });
-            doneBadge.setCssStyles({ marginRight: "auto" });
-        }
-
         dynamicTags.forEach(tag => {
             const tagSpan = footer.createSpan();
             tagSpan.setCssStyles({ display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap", background: "var(--background-secondary)", padding: "4px 8px", borderRadius: "6px", opacity: "0.9" });
             const iconEl = tagSpan.createSpan();
             setIcon(iconEl, "tag");
             iconEl.setCssStyles({ opacity: "0.5", display: "flex", alignItems: "center" });
-            const svg = iconEl.querySelector("svg");
-            if (svg) { svg.style.width = "12px"; svg.style.height = "12px"; }
 
             tagSpan.createSpan({ text: `${tag.key}: `, attr: { style: "color: var(--text-muted);" } });
 
@@ -344,13 +385,11 @@ export class CorkboardModal extends Modal {
             e.stopPropagation();
             new InputModal(this.app, "Rename Chapter", (newName) => {
                 if (!newName.trim()) return;
-                const safeName = newName.trim();
-                listContainer.dataset.cleanTitle = safeName;
+                listContainer.dataset.cleanTitle = newName.trim();
                 titleTextContainer.empty();
-                if (listContainer.dataset.prefix) {
-                    titleTextContainer.createSpan({ text: listContainer.dataset.prefix, attr: { style: "opacity: 0.3; font-weight: normal;" } });
-                }
-                titleTextContainer.createSpan({ text: safeName });
+                if (listContainer.dataset.prefix) titleTextContainer.createSpan({ text: listContainer.dataset.prefix, attr: { style: "opacity: 0.3; font-weight: normal;" } });
+                titleTextContainer.createSpan({ text: newName.trim() });
+                this.isDirty = true; // 🌟 標記：更改章節名
             }, listContainer.dataset.cleanTitle).open();
         };
 
@@ -362,14 +401,14 @@ export class CorkboardModal extends Modal {
 
         btnDeleteCol.onclick = async (e) => {
             e.stopPropagation();
-            const cardsCount = listContainer.querySelectorAll(".ns-corkboard-card").length;
-            if (cardsCount > 0) {
+            if (listContainer.querySelectorAll(".ns-corkboard-card").length > 0) {
                 new Notice("Cannot delete: this chapter still contains scenes. Please move them first.", 4000);
                 return;
             }
             new SimpleConfirmModal(this.app, "Delete this empty chapter?", () => {
                 col.remove();
-                new Notice("Chapter removed from board (will be trashed on save).");
+                this.isDirty = true; // 🌟 標記：刪除章節
+                new Notice("Chapter removed.");
             }).open();
         };
 
@@ -384,6 +423,7 @@ export class CorkboardModal extends Modal {
             new InputModal(this.app, "Insert New Chapter Here", (result) => {
                 if (!result.trim()) return;
                 this.buildColumnDOM(container, result, null, [], col.nextElementSibling as HTMLElement);
+                this.isDirty = true; // 🌟 標記：新增章節
             }).open();
         };
 
@@ -397,6 +437,7 @@ export class CorkboardModal extends Modal {
                 const newScene = { id: generateSceneId(), title: result, colorId: colorId, meta: [], isNew: true };
                 this.buildCardDOM(listContainer, newScene);
                 listContainer.scrollTop = listContainer.scrollHeight;
+                this.isDirty = true; // 🌟 標記：新增卡片
             }).open();
         };
 
@@ -404,8 +445,10 @@ export class CorkboardModal extends Modal {
         else container.appendChild(col);
 
         this.sortables.push(new Sortable(listContainer, {
-            group: 'global-kanban-board',
-            animation: 150, handle: '.ns-corkboard-card', delay: 100, delayOnTouchOnly: true, ghostClass: 'ns-sortable-ghost'
+            group: 'global-kanban-board', animation: 150, handle: '.ns-corkboard-card', delay: 100, delayOnTouchOnly: true, ghostClass: 'ns-sortable-ghost',
+            onEnd: (evt: any) => {
+                if (evt.oldIndex !== evt.newIndex || evt.from !== evt.to) this.isDirty = true; // 🌟 標記：拖拉卡片
+            }
         }));
     }
 
@@ -462,11 +505,15 @@ export class CorkboardModal extends Modal {
             new InputModal(this.app, "New Chapter Name", (result) => {
                 if (!result.trim()) return;
                 this.buildColumnDOM(container, result, null, [], addColBtn);
+                this.isDirty = true; // 🌟 標記：新增章節
             }).open();
         };
 
         this.sortables.push(new Sortable(container, {
-            animation: 150, handle: '.ns-column-drag-handle', delay: 100, delayOnTouchOnly: true, ghostClass: 'ns-sortable-ghost'
+            animation: 150, handle: '.ns-column-drag-handle', delay: 100, delayOnTouchOnly: true, ghostClass: 'ns-sortable-ghost',
+            onEnd: (evt: any) => {
+                if (evt.oldIndex !== evt.newIndex) this.isDirty = true; // 🌟 標記：拖拉章節列
+            }
         }));
     }
 
@@ -486,9 +533,8 @@ export class CorkboardModal extends Modal {
         btnEdit.onclick = async () => {
             const exactPath = folderPath ? `${folderPath}/${noteName}.md` : `${noteName}.md`;
             let file = this.app.vault.getAbstractFileByPath(exactPath);
-            if (!file || !(file instanceof TFile)) {
-                file = this.app.metadataCache.getFirstLinkpathDest(noteName, folderPath || "");
-            }
+            if (!file || !(file instanceof TFile)) file = this.app.metadataCache.getFirstLinkpathDest(noteName, folderPath || "");
+
             if (file && file instanceof TFile) {
                 const content = await this.app.vault.read(file);
                 this.renderEditMode(noteName, content, async (newText) => {
@@ -506,9 +552,8 @@ export class CorkboardModal extends Modal {
 
         const exactPath = folderPath ? `${folderPath}/${noteName}.md` : `${noteName}.md`;
         let file: TFile | null = this.app.vault.getAbstractFileByPath(exactPath) as TFile | null;
-        if (!file || !(file instanceof TFile)) {
-            file = this.app.metadataCache.getFirstLinkpathDest(noteName, folderPath || "");
-        }
+        if (!file || !(file instanceof TFile)) file = this.app.metadataCache.getFirstLinkpathDest(noteName, folderPath || "");
+
         if (file && file instanceof TFile) {
             const content = await this.app.vault.read(file);
             await MarkdownRenderer.render(this.app, content, contentWrapper, file.path, this);
@@ -518,7 +563,7 @@ export class CorkboardModal extends Modal {
     }
 
     // ==========================================
-    // 🎬 側滑面板：劇情卡片雙模式 (先閱讀，後編輯)
+    // 🎬 側滑面板：劇情卡片雙模式
     // ==========================================
     async openScenePanel(cardEl: HTMLElement, scene: unknown) {
         this.wikiPanel.empty();
@@ -555,15 +600,8 @@ export class CorkboardModal extends Modal {
             const line = lines[i];
             const trimLine = line.trim();
             if (!isBody) {
-                if (trimLine.startsWith('######') || trimLine.startsWith('>')) {
-                    metaLines.push(line);
-                } else if (trimLine === "") {
-                    bodyLines.push(line);
-                    isBody = true;
-                } else {
-                    bodyLines.push(line);
-                    isBody = true;
-                }
+                if (trimLine.startsWith('######') || trimLine.startsWith('>')) metaLines.push(line);
+                else { bodyLines.push(line); isBody = true; }
             } else {
                 bodyLines.push(line);
             }
@@ -603,8 +641,7 @@ export class CorkboardModal extends Modal {
                             let cleanNewTitle = headerMatch[2].replace(/^🎬\s*/, '').trim();
                             if (!cleanNewTitle) cleanNewTitle = "Untitled Scene";
                             editLines[i] = `###### ${cleanNewTitle} ${hiddenSpan}`;
-                            injected = true;
-                            break;
+                            injected = true; break;
                         }
                     }
                     if (!injected) {
@@ -618,14 +655,12 @@ export class CorkboardModal extends Modal {
                 let safeBody = hiddenBodyText.replace(/^\s+/, "");
                 let finalFullText = finalMetaMarkdown.trimEnd();
 
-                if (safeBody) {
-                    finalFullText += "\n\n" + safeBody;
-                } else {
-                    finalFullText += "\n";
-                }
+                if (safeBody) finalFullText += "\n\n" + safeBody;
+                else finalFullText += "\n";
 
                 this.pendingEdits.set(safeKey, finalFullText);
                 this.liveSceneMap.set(safeKey, finalFullText);
+                this.isDirty = true; // 🌟 標記：修改卡片內容
 
                 const parsedScenes = parseUniversalScenes(finalFullText);
                 let updatedScene = scene;
@@ -657,11 +692,8 @@ export class CorkboardModal extends Modal {
         headerRow.createEl("h3", { text: title });
 
         const btnRow = headerRow.createDiv({ attr: { style: "display: flex; gap: 8px;" } });
-
         const btnCancel = btnRow.createEl("button", { text: "Cancel" });
-        btnCancel.onclick = () => {
-            this.wikiPanel.setCssStyles({ transform: "translateX(100%)" });
-        };
+        btnCancel.onclick = () => this.wikiPanel.setCssStyles({ transform: "translateX(100%)" });
 
         const btnSave = btnRow.createEl("button", { text: "Save", cls: "mod-cta" });
 
@@ -672,36 +704,6 @@ export class CorkboardModal extends Modal {
         textArea.value = rawMarkdown;
         textArea.setCssStyles({ width: "100%", flexGrow: "1", resize: "none", padding: "15px", fontFamily: "var(--font-monospace)", fontSize: "14px", border: "1px solid var(--background-modifier-border)", borderRadius: "8px", backgroundColor: "var(--background-primary-alt)" });
 
-        textArea.addEventListener('keydown', (e: KeyboardEvent) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                const cursorPos = textArea.selectionStart;
-                const textBefore = textArea.value.substring(0, cursorPos);
-                const textAfter = textArea.value.substring(textArea.selectionEnd);
-
-                const lines = textBefore.split('\n');
-                const currentLine = lines[lines.length - 1];
-
-                const match = currentLine.match(/^(>\s*-\s*|>\s*|-\s*)/);
-
-                if (match) {
-                    e.preventDefault();
-                    const prefix = match[1];
-
-                    if (currentLine === prefix) {
-                        const newTextBefore = textBefore.substring(0, textBefore.length - prefix.length);
-                        textArea.value = newTextBefore + '\n' + textAfter;
-                        const newPos = newTextBefore.length + 1;
-                        textArea.selectionStart = textArea.selectionEnd = newPos;
-                    } else {
-                        const insertStr = '\n' + prefix;
-                        textArea.value = textBefore + insertStr + textAfter;
-                        const newPos = cursorPos + insertStr.length;
-                        textArea.selectionStart = textArea.selectionEnd = newPos;
-                    }
-                }
-            }
-        });
-
         btnSave.onclick = () => onSave(textArea.value);
     }
 
@@ -709,8 +711,6 @@ export class CorkboardModal extends Modal {
     // 🛡️ 智能取消與賬本結算引擎
     // ==========================================
     async cancelCorkboard() {
-        const hasNewCards = Array.from(this.contentEl.querySelectorAll(".ns-corkboard-card")).some(c => (c as HTMLElement).dataset.isNew === "true");
-
         const doCancel = async () => {
             if (this.pendingEdits.size > 0) {
                 new Notice("Saving text edits to original files...", 2000);
@@ -734,10 +734,13 @@ export class CorkboardModal extends Modal {
             this.close();
         };
 
-        if (hasNewCards) {
-            new SimpleConfirmModal(this.app, "⚠️ 警告：您有全新建立的劇情卡片！\n取消將放棄排版並永久遺失新卡片（現有舊卡片的文字修改則會被安全保留）。確定放棄嗎？", () => {
-                doCancel();
-            }).open();
+        // 🌟 結合 Dirty Flag：如果用家改過排版，彈出警告！
+        if (this.isDirty) {
+            new SimpleConfirmModal(
+                this.app,
+                "You have unsaved layout changes!\n\nAre you sure you want to discard your layout changes and close? (Text edits will still be saved).",
+                () => { doCancel(); }
+            ).open();
         } else {
             doCancel();
         }
@@ -754,16 +757,15 @@ export class CorkboardModal extends Modal {
         catSelect.createEl("option", { text: "Select to track..." });
 
         const btnControls = topRow.createDiv({ attr: { style: "display: flex; gap: 4px;" } });
-
         const btnConfirm = btnControls.createDiv();
         setIcon(btnConfirm, "check");
-        btnConfirm.setCssStyles({ cursor: "pointer", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center", opacity: "0.7", borderRadius: "4px", transition: "all 0.2s" });
+        btnConfirm.setCssStyles({ cursor: "pointer", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center", opacity: "0.7", borderRadius: "4px" });
         btnConfirm.addEventListener("mouseover", () => btnConfirm.setCssStyles({ opacity: "1", backgroundColor: "var(--background-modifier-hover)", color: "var(--interactive-accent)" }));
         btnConfirm.addEventListener("mouseout", () => btnConfirm.setCssStyles({ opacity: "0.7", backgroundColor: "transparent", color: "initial" }));
 
         const btnClear = btnControls.createDiv();
         setIcon(btnClear, "x");
-        btnClear.setCssStyles({ cursor: "pointer", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center", opacity: "0.5", borderRadius: "4px", transition: "all 0.2s" });
+        btnClear.setCssStyles({ cursor: "pointer", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center", opacity: "0.5", borderRadius: "4px" });
         btnClear.addEventListener("mouseover", () => btnClear.setCssStyles({ opacity: "1", backgroundColor: "var(--background-modifier-hover)", color: "var(--text-error)" }));
         btnClear.addEventListener("mouseout", () => btnClear.setCssStyles({ opacity: "0.5", backgroundColor: "transparent", color: "initial" }));
 
@@ -787,7 +789,6 @@ export class CorkboardModal extends Modal {
             const values = valueMap.get(selectedCat) || [];
             values.forEach(val => {
                 const chip = this.radarDrawer.createEl("button", { text: val, cls: "ns-chip" });
-
                 chip.onclick = () => {
                     if (!this.activeRadarTokens.some(t => t.key === selectedCat && t.value === val)) {
                         this.activeRadarTokens.push({ key: selectedCat, value: val });
@@ -798,11 +799,7 @@ export class CorkboardModal extends Modal {
             });
         };
 
-        btnConfirm.onclick = () => {
-            this.radarDrawer.setCssStyles({ display: "none" });
-            catSelect.selectedIndex = 0;
-        };
-
+        btnConfirm.onclick = () => { this.radarDrawer.setCssStyles({ display: "none" }); catSelect.selectedIndex = 0; };
         btnClear.onclick = () => {
             this.activeRadarTokens = [];
             this.renderTokens();
@@ -811,6 +808,19 @@ export class CorkboardModal extends Modal {
             this.radarDrawer.setCssStyles({ display: "none" });
             catSelect.selectedIndex = 0;
         };
+
+        // 🌟 點擊空白處自動隱藏 Drawer (Click Outside to Close)
+        this.contentEl.addEventListener("click", (e: MouseEvent) => {
+            const target = e.target as Node;
+            // 確保個 Drawer 係打開緊嘅狀態
+            if (this.radarDrawer && this.radarDrawer.style.display === "flex") {
+                // 如果用家點擊嘅地方：唔係 Drawer 入面，亦都唔係下拉選單入面
+                if (!this.radarDrawer.contains(target) && !catSelect.contains(target)) {
+                    this.radarDrawer.setCssStyles({ display: "none" });
+                    catSelect.selectedIndex = 0; // 重置下拉選單
+                }
+            }
+        });
     }
 
     scanAllAttributes() {
@@ -885,39 +895,29 @@ export class CorkboardModal extends Modal {
                         if (match) {
                             const cardKey = match[1].trim();
                             const cardItems = match[2].trim().replace(/[\[\]]/g, '').split(/(?=#)|[,，、;；]+/).map(i => i.trim()).filter(i => i);
-
                             this.activeRadarTokens.forEach(token => {
-                                if (token.key === cardKey && cardItems.includes(token.value)) {
-                                    hasMatch = true;
-                                }
+                                if (token.key === cardKey && cardItems.includes(token.value)) hasMatch = true;
                             });
                         }
                     }
                 });
             }
-            if (hasMatch) {
-                cardEl.removeClass("is-dimmed");
-                cardEl.addClass("is-highlighted");
-            } else {
-                cardEl.removeClass("is-highlighted");
-                cardEl.addClass("is-dimmed");
-            }
+            if (hasMatch) { cardEl.removeClass("is-dimmed"); cardEl.addClass("is-highlighted"); }
+            else { cardEl.removeClass("is-highlighted"); cardEl.addClass("is-dimmed"); }
         });
     }
 
     // ==========================================
     // 💾 🌟 Ultimate Settlement Engine
     // ==========================================
-    async saveGlobalCorkboard(container: HTMLElement, btnSaveEl?: HTMLButtonElement) {
+    async saveGlobalCorkboard(container: HTMLElement, btnSaveEl?: HTMLButtonElement, shouldClose: boolean = true): Promise<boolean> {
         try {
             new Notice("Saving manuscript structure...", 2000);
 
             let cachedTemplateText: string | null = null;
             if (TEMPLATES_DIR) {
                 const tplFile = this.app.vault.getAbstractFileByPath(`${this.plugin.settings.bookFolderPath}/${TEMPLATES_DIR}/NovelSmith_Template.md`);
-                if (tplFile && tplFile instanceof TFile) {
-                    cachedTemplateText = await this.app.vault.read(tplFile);
-                }
+                if (tplFile && tplFile instanceof TFile) cachedTemplateText = await this.app.vault.read(tplFile);
             }
 
             const allFiles = getManuscriptFiles(this.app, this.workingFolderPath, this.plugin.settings.exportFolderPath);
@@ -946,7 +946,6 @@ export class CorkboardModal extends Modal {
             }
 
             const columns = container.querySelectorAll(".ns-corkboard-list");
-
             const keptFilePaths = new Set<string>();
             columns.forEach(listEl => {
                 const path = (listEl as HTMLElement).dataset.filePath;
@@ -954,7 +953,6 @@ export class CorkboardModal extends Modal {
             });
 
             const filesToTrash: TFile[] = [];
-
             for (const file of allFiles) {
                 if (!keptFilePaths.has(file.path)) {
                     filesToTrash.push(file);
@@ -1008,9 +1006,8 @@ export class CorkboardModal extends Modal {
                 }
 
                 const newContent = chunks.join("").trim() + "\n";
-
                 const rawTitle = el.dataset.cleanTitle || "Untitled_Chapter";
-                const cleanTitle = rawTitle.replace(/[\\/:*?"<>|]/g, "_");
+                const cleanTitle = sanitizeFileName(rawTitle);
                 const prefix = chapterIndex < 10 ? `0${chapterIndex}_` : `${chapterIndex}_`;
                 const newName = `${prefix}${cleanTitle}.md`;
 
@@ -1024,7 +1021,6 @@ export class CorkboardModal extends Modal {
                     if (newContent !== oldContent.trim() + "\n") {
                         await this.app.vault.modify(file, newContent);
                     }
-
                     const newPath = safeParentPath ? `${safeParentPath}/${newName}` : newName;
                     if (file.path !== newPath) {
                         try { await this.app.fileManager.renameFile(file, newPath); } catch (e) { /* ignore */ }
@@ -1044,8 +1040,16 @@ export class CorkboardModal extends Modal {
 
             await this.plugin.statsManager.recordActivity(0);
 
-            new Notice("Corkboard saved successfully!");
-            this.close();
+            // 儲存成功，重置髒標記
+            this.isDirty = false;
+
+            if (shouldClose) {
+                new Notice("Corkboard saved successfully!");
+                this.close();
+            } else {
+                new Notice("Auto-saved current folder.");
+            }
+            return true;
 
         } catch (error) {
             console.error("Corkboard save error:", error);
@@ -1054,6 +1058,7 @@ export class CorkboardModal extends Modal {
                 btnSaveEl.innerText = "Save & close";
                 btnSaveEl.disabled = false;
             }
+            return false;
         }
     }
 

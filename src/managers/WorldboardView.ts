@@ -227,21 +227,82 @@ export class WorldboardView extends ItemView {
         }
 
         // ==========================================
-        // 🔍 2. 懸浮搜尋列 (Search Box)
+        // 🔍 2. 搜尋列 (Search Box) - 終極大遷移！
         // ==========================================
-        const searchBox = workspaceEl.createDiv({ cls: "ns-wb-search-box" });
+        // 🌟 我哋將個搜尋框由「畫布上面 (absolute)」搬去「頂部導航列 (flex)」！
+        // 咁樣可以 100% 避開 iOS Safari 所有絕對座標 Bug 同鍵盤衝突！
+        const headerEl = this.contentEl.querySelector(".ns-worldboard-header") as HTMLElement;
+        let searchBox = headerEl?.querySelector(".ns-wb-search-box") as HTMLElement;
+        if (searchBox) searchBox.remove();
 
-        const searchIcon = searchBox.createSpan();
-        setIcon(searchIcon, "search");
-        searchIcon.setCssStyles({ color: "var(--text-muted)", display: "flex" });
+        if (headerEl) {
+            searchBox = headerEl.createDiv({ cls: "ns-wb-search-box" });
+            searchBox.setCssStyles({
+                position: "relative", top: "auto", left: "auto", transform: "none", // 🌟 強制覆蓋舊 CSS，解除懸浮狀態
+                display: "flex", alignItems: "center", gap: "8px", backgroundColor: "var(--background-secondary)",
+                padding: "6px 12px", borderRadius: "15px", border: "1px solid var(--background-modifier-border)",
+                width: "160px", transition: "width 0.3s", marginLeft: "auto", zIndex: "40" // 🌟 marginLeft: auto 將佢推去畫面最右邊！
+            });
 
-        const searchInput = searchBox.createEl("input", { type: "search", cls: "ns-wb-search-input" });
-        searchInput.placeholder = "Search node...";
+            const searchIcon = searchBox.createSpan();
+            setIcon(searchIcon, "search");
+            searchIcon.setCssStyles({ color: "var(--text-muted)", display: "flex" });
 
-        searchInput.addEventListener("focus", () => searchBox.setCssProps({ width: "350px", maxWidth: "80vw", borderColor: "var(--interactive-accent)" }));
-        searchInput.addEventListener("blur", () => { if (!searchInput.value) searchBox.setCssProps({ width: "220px", borderColor: "var(--background-modifier-border)" }); });
-        searchInput.addEventListener("input", (e) => this.handleSearch((e.target as HTMLInputElement).value));
-        searchInput.addEventListener("keydown", (e) => { if (e.key === "Enter") this.focusSearchMatches(); });
+            const searchInput = searchBox.createEl("input", { type: "search", cls: "ns-wb-search-input" });
+            searchInput.placeholder = "Search...";
+            // 🌟 保持字體 16px，防止 Apple 強制放大畫面
+            searchInput.setCssStyles({ border: "none", background: "transparent", color: "var(--text-normal)", outline: "none", width: "100%", fontSize: "16px" });
+
+            // 🌟 新增兩個變數，用嚟死守鏡頭嘅「記憶點」
+            let savedScale = 1;
+            let savedPosition = { x: 0, y: 0 };
+
+            searchInput.addEventListener("focus", () => {
+                searchBox.setCssStyles({ width: "250px", borderColor: "var(--interactive-accent)" });
+
+                if (this.network) {
+                    // 1. 鍵盤彈出前嘅 0.001 秒，光速記低目前嘅鏡頭縮放比例同中心點座標！
+                    savedScale = this.network.getScale();
+                    savedPosition = this.network.getViewPosition();
+
+                    // 2. 等鍵盤彈出穩定後 (約 300ms)，強制將鏡頭「啪」返去記憶點，防止波波消失！
+                    setTimeout(() => {
+                        if (this.network) {
+                            this.network.moveTo({
+                                position: savedPosition,
+                                scale: savedScale,
+                                animation: false // 絕對唔准有動畫，強制瞬間歸位
+                            });
+                        }
+                    }, 300);
+                }
+            });
+
+            searchInput.addEventListener("blur", () => {
+                if (!searchInput.value) searchBox.setCssStyles({ width: "160px", borderColor: "var(--background-modifier-border)" });
+
+                // 3. 鍵盤收起後，再一次強制將鏡頭鎖定喺原本嘅大細，徹底打破「越縮越細」嘅惡性循環！
+                setTimeout(() => {
+                    if (this.network) {
+                        this.network.setSize('100%', '100%');
+                        this.network.moveTo({
+                            position: savedPosition,
+                            scale: savedScale,
+                            animation: false
+                        });
+                    }
+                }, 300);
+            });
+
+            // 下面保持不變
+            searchInput.addEventListener("input", (e) => this.handleSearch((e.target as HTMLInputElement).value));
+            searchInput.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") {
+                    searchInput.blur();
+                    this.focusSearchMatches();
+                }
+            });
+        }
 
         // ==========================================
         // 🖌️ 3. 智能勢力群組與印章工具列 (Group & Stamp UI)
@@ -580,7 +641,8 @@ export class WorldboardView extends ItemView {
             this.pendingFocusNode = null;
             this.network.once("afterDrawing", () => {
                 this.network?.selectNodes([targetId]);
-                this.network?.focus(targetId, { scale: 1.5, animation: { duration: 800, easingFunction: "easeInOutQuad" } });
+                // 🌟 關鍵修正：加入 locked: false，防止畫布被鎖死
+                this.network?.focus(targetId, { scale: 1.5, locked: false, animation: { duration: 800, easingFunction: "easeInOutQuad" } });
                 const targetFile = files.find(f => f.basename === targetId);
                 if (targetFile) {
                     panelContainer.setCssStyles({ transform: "translateX(0)" });
@@ -759,7 +821,6 @@ export class WorldboardView extends ItemView {
         let lastMatchId = null;
 
         if (q === "") {
-            // 🌟 關鍵字清空，全部波波同連線恢復原狀
             nodesData.forEach((node: any) => {
                 nodeUpdates.push({ id: node.id, color: node._origColor, font: node._origFont });
             });
@@ -767,7 +828,6 @@ export class WorldboardView extends ItemView {
                 edgeUpdates.push({ id: edge.id, color: edge._origColor, font: edge._origFont });
             });
         } else {
-            // 🌟 執行 Level 2 深度搜尋過濾
             nodesData.forEach((node: any) => {
                 const isMatch = node._searchString && node._searchString.includes(q);
                 if (isMatch) {
@@ -775,7 +835,6 @@ export class WorldboardView extends ItemView {
                     matchCount++;
                     lastMatchId = node.id;
                 } else {
-                    // 唔符合嘅波波，變成 10% 透明度嘅暗灰色
                     nodeUpdates.push({
                         id: node.id,
                         color: { background: 'rgba(128,128,128,0.1)', border: 'rgba(128,128,128,0.2)' },
@@ -790,7 +849,6 @@ export class WorldboardView extends ItemView {
                 const isFromMatch = fromNode && fromNode._searchString && fromNode._searchString.includes(q);
                 const isToMatch = toNode && toNode._searchString && toNode._searchString.includes(q);
 
-                // 只有首尾兩端嘅波波都符合，條線先會發光
                 if (isFromMatch && isToMatch) {
                     edgeUpdates.push({ id: edge.id, color: edge._origColor, font: edge._origFont });
                 } else {
@@ -806,10 +864,7 @@ export class WorldboardView extends ItemView {
         nodesData.update(nodeUpdates);
         edgesData.update(edgeUpdates);
 
-        // 🌟 鏡頭魔法：如果打字過程中只剩返 1 個目標，即刻飛過去放大！
-        if (q !== "" && matchCount === 1 && lastMatchId) {
-            this.network.focus(lastMatchId, { scale: 1.2, animation: { duration: 500, easingFunction: "easeInOutQuad" } });
-        }
+
     }
 
     // ==========================================
@@ -820,23 +875,32 @@ export class WorldboardView extends ItemView {
         const searchInput = this.contentEl.querySelector(".ns-wb-search-input") as HTMLInputElement;
         if (!searchInput) return;
         const q = searchInput.value.toLowerCase().trim();
-        if (!q) return;
 
-        const nodesData = (this.network as any).body.data.nodes;
-        const matchIds: string[] = [];
-        nodesData.forEach((node: any) => {
-            if (node._searchString && node._searchString.includes(q)) {
-                matchIds.push(node.id);
+        // 🌟 神級時間差：等待 350ms，確保鍵盤收起、畫布解凍完畢，先至發動動畫！
+        setTimeout(() => {
+            if (!this.network) return;
+
+            if (!q) {
+                this.network.fit({ animation: { duration: 800, easingFunction: "easeInOutQuad" } });
+                return;
             }
-        });
 
-        // 將鏡頭拉到可以睇晒所有發光波波嘅最佳距離
-        if (matchIds.length > 0) {
-            this.network.fit({
-                nodes: matchIds,
-                animation: { duration: 800, easingFunction: "easeInOutQuad" }
+            const nodesData = (this.network as any).body.data.nodes;
+            const matchIds: string[] = [];
+            nodesData.forEach((node: any) => {
+                if (node._searchString && node._searchString.includes(q)) {
+                    matchIds.push(node.id);
+                }
             });
-        }
+
+            if (matchIds.length > 0) {
+                // 🌟 華麗運鏡復活！因為畫布已經穩定，動畫絕對唔會引發對角線 Bug！
+                this.network.fit({
+                    nodes: matchIds,
+                    animation: { duration: 800, easingFunction: "easeInOutQuad" }
+                });
+            }
+        }, 350);
     }
 
 
@@ -892,8 +956,13 @@ export class WorldboardView extends ItemView {
         colorInput.value = currentColor;
         colorInput.className = "ns-color-picker-temp";
         colorInput.style.position = "absolute";
+
+        // ⚠️ iOS 修復：唔可以 pointer-events: none，必須有實體大細
         colorInput.style.opacity = "0";
-        colorInput.style.pointerEvents = "none";
+        colorInput.style.width = "1px";
+        colorInput.style.height = "1px";
+        colorInput.style.border = "none";
+        colorInput.style.padding = "0";
 
         colorInput.style.left = `${pointerDOM.x}px`;
         colorInput.style.top = `${pointerDOM.y}px`;
@@ -909,7 +978,17 @@ export class WorldboardView extends ItemView {
             colorInput.remove();
         };
 
-        setTimeout(() => colorInput.click(), 10);
+        // 🌟 終極解法：環境偵測 (Platform Sniffing)
+        // 偵測是否為 iOS / iPadOS
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+        if (isIOS) {
+            // iPad/iOS 嚴格安全機制：必須同步執行
+            colorInput.click();
+        } else {
+            // PC/Mac 渲染機制：需要 10ms 延遲等座標畫好，防止飛去左上角
+            setTimeout(() => colorInput.click(), 10);
+        }
     }
 
     // ==========================================

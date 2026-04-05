@@ -21,6 +21,7 @@ export interface NovelSmithSettings {
     statsData: StatsData;
     worldboardCoords: Record<string, { x: number, y: number }>;
     relationColors: Record<string, string>;
+    plotGridColumns: { name: string, type: "tracking" | "scene" }[];
 }
 
 export const DEFAULT_SETTINGS: NovelSmithSettings = {
@@ -31,7 +32,8 @@ export const DEFAULT_SETTINGS: NovelSmithSettings = {
     wikiCategories: [],
     statsData: DEFAULT_STATS,
     worldboardCoords: {},
-    relationColors: {}
+    relationColors: {},
+    plotGridColumns: [],
 }
 
 export class NovelSmithSettingTab extends PluginSettingTab {

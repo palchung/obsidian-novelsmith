@@ -221,6 +221,24 @@ export class StructureView extends ItemView {
 
             const view = this.getValidMarkdownView();
 
+
+            // 🌟 加入呢段：檢查檔案係咪屬於小說資料夾！
+            if (view && view.file && !this.plugin.checkInBookFolderSilent(view.file)) {
+                container.empty();
+                container.createDiv({
+                    text: "Current file is not in your novel folder.",
+                    attr: { style: "text-align: center; margin-top: 40px; opacity: 0.5; font-style: italic;" }
+                });
+                // 重置狀態，確保下次返嚟小說筆記時會重新畫 Header
+                this.lastTab = "";
+                this.lastOutlineHash = "";
+                return;
+            }
+            // 🌟 加入完畢
+
+
+
+
             if (view && this.activeTab === 'outline') {
                 const editor = view.editor;
 
@@ -363,6 +381,8 @@ export class StructureView extends ItemView {
         let btnDraft;
         if (isDraftMode) {
             btnDraft = createIconButton(row1, "trash-2", "Discard", { flex: "1", padding: "6px 0", backgroundColor: "var(--background-modifier-error)", color: "white" });
+            btnDraft.addClass("ns-btn-discard"); // 🌟 加入呢句：賦予專屬 Class 畀 iPad 識別！
+
             btnDraft.onclick = () => {
                 const currentView = this.getValidMarkdownView();
                 if (currentView) {

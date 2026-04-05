@@ -1,4 +1,5 @@
-import { ViewUpdate, ViewPlugin, DecorationSet, Decoration, EditorView, MatchDecorator } from '@codemirror/view';
+import { ViewUpdate, ViewPlugin, DecorationSet, Decoration, EditorView, MatchDecorator, WidgetType } from '@codemirror/view';
+
 
 // ============================================================
 // 1. Global Variables & Redundant Words/Dialogue Mode (Unchanged)
@@ -92,4 +93,48 @@ export const structureHighlighter = ViewPlugin.fromClass(class {
     update(update: ViewUpdate) {
         this.decorations = structureMatcher.updateDeco(update, this.decorations);
     }
+}, { decorations: v => v.decorations });
+
+// ============================================================
+// 🔥 5. System Tags Protector (一網打盡：隱藏所有系統標記)
+// ============================================================
+
+class HiddenIdWidget extends WidgetType {
+    toDOM() {
+        const span = document.createElement("span");
+        span.style.display = "none";
+        return span;
+    }
+    ignoreEvent() { return true; }
+}
+
+class FileBoundaryWidget extends WidgetType {
+    toDOM() {
+        const span = document.createElement("span");
+        //span.className = "ns-file-id";
+        span.style.display = "none";
+        return span;
+    }
+    ignoreEvent() { return true; }
+}
+
+const systemTagsMatcher = new MatchDecorator({
+    // 🌟 更新 Regex：同時捕捉 ns-id, ns-file-id 同埋 ns-chapter-center
+    regexp: /<span class="ns-id"[^>]*>.*?<\/span>|<span class="ns-file-id"[^>]*>.*?<\/span>|<span class="ns-chapter-center"[^>]*>.*?<\/span>/g,
+    decoration: (match) => {
+        const text = match[0];
+        // 判斷係邊種標記
+        if (text.includes("ns-file-id")) {
+            return Decoration.replace({ widget: new FileBoundaryWidget(), inclusive: false });
+        } else {
+            // ns-id 同 ns-chapter-center 都一律套用隱形 Widget
+            return Decoration.replace({ widget: new HiddenIdWidget(), inclusive: false });
+        }
+    }
+});
+
+export const systemTagsProtector = ViewPlugin.fromClass(class {
+    decorations: DecorationSet;
+    constructor(view: EditorView) { this.decorations = systemTagsMatcher.createDeco(view); }
+    update(update: ViewUpdate) { this.decorations = systemTagsMatcher.updateDeco(update, this.decorations); }
 }, { decorations: v => v.decorations });

@@ -834,6 +834,38 @@ body.ns-mode-dialogue .cm-dialogue-text {
     margin-top: 2em !important;
 }
 
+/* 🌟 終極核彈：強制覆蓋 iPad (Mobile) 預設樣式，確保 Discard 掣係深紅色實色！ */
+
+/* 1. 針對按鈕本體，加入 body.is-mobile 提高最高權重 */
+body.is-mobile .ns-button-row .ns-btn-discard,
+.ns-button-row .ns-btn-discard {
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    opacity: 1 !important;
+    /* 強制使用標準實色 Hex Code，唔依賴可能被 iPad 主題溝淡咗嘅 var() */
+    background-color: #762121 !important;
+    border: none !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* 2. 🌟 真兇落網：強制殺死 iPad 施加喺圖示 (SVG) 同文字上嘅半透明濾鏡！ */
+body.is-mobile .ns-button-row .ns-btn-discard svg,
+body.is-mobile .ns-button-row .ns-btn-discard span,
+.ns-button-row .ns-btn-discard svg,
+.ns-button-row .ns-btn-discard span {
+    opacity: 1 !important;
+    color: #ffffff !important;
+    stroke: #ffffff !important;
+    /* 確保 SVG 圖示嘅線條係純白實色 */
+    fill: none !important;
+}
+
+/* Hover / Active 狀態微調 */
+body.is-mobile .ns-button-row .ns-btn-discard:active,
+.ns-button-row .ns-btn-discard:active {
+    filter: brightness(0.8) !important;
+}
+
 
 /* ========================================== */
 /* 🗺️ Worldboard View UI Styles              */
@@ -854,6 +886,7 @@ body.ns-mode-dialogue .cm-dialogue-text {
     top: 0;
     left: 0;
     background-color: var(--background-primary);
+
 }
 
 /* 🔍 頂部搜尋框 */
@@ -887,7 +920,7 @@ body.ns-mode-dialogue .cm-dialogue-text {
     color: var(--text-normal);
     outline: none;
     width: 100%;
-    font-size: 0.95em;
+    font-size: 16px !important;
 }
 
 /* 強制清除 Obsidian 預設嘅 Input 邊框同發光外圍 */
@@ -938,4 +971,110 @@ body.ns-mode-dialogue .cm-dialogue-text {
     box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1);
     transform: translateX(100%);
     transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+
+/* ============================================================
+   5. Plot Grid View (Excel-like Matrix - Vertical Timeline)
+   ============================================================ */
+.ns-plotgrid-container {
+    background-color: var(--background-primary);
+    padding-bottom: 50px;
+}
+
+.ns-grid-base-cell {
+    border-right: 1px solid var(--background-modifier-border);
+    border-bottom: 1px solid var(--background-modifier-border);
+    padding: 12px;
+    display: flex;
+    align-items: flex-start;
+    /* 確保字體靠上 */
+    font-size: 0.9em;
+    word-break: break-word;
+}
+
+/* 🌟 X 軸：頂部屬性表頭 (POV, 地點...) */
+.ns-grid-header-top {
+    background-color: var(--background-secondary-alt);
+    font-weight: bold;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+/* 🌟 左上角霸王位 (同時鎖死 Top 同 Left) */
+.ns-grid-header-corner {
+    background-color: var(--background-secondary-alt);
+    font-weight: bold;
+    position: sticky;
+    top: 0;
+    left: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-right: 2px solid var(--background-modifier-border-hover);
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+/* 🌟 Y 軸分隔線：大資料夾 (Book 1, Book 2...) */
+.ns-grid-folder-divider {
+    background-color: var(--background-secondary);
+    font-weight: bold;
+    color: var(--text-accent);
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    left: 0;
+    /* 向右碌嗰陣保持可見 */
+    z-index: 5;
+    border-bottom: 2px solid var(--background-modifier-border-hover);
+}
+
+/* 🌟 Y 軸標籤：章節名稱 */
+.ns-grid-header-left {
+    background-color: var(--background-primary);
+    font-weight: bold;
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-right: 2px solid var(--background-modifier-border-hover);
+}
+
+/* 🌟 可編輯嘅內容格仔 (自動撐高設定) */
+.ns-grid-cell {
+    cursor: text;
+    background-color: var(--background-primary);
+    min-height: 80px;
+    transition: background-color 0.2s;
+    white-space: pre-wrap;
+    /* 確保換行顯示正確 */
+}
+
+.ns-grid-cell:hover {
+    background-color: var(--background-secondary);
+}
+
+/* 🌟 動態撐高嘅 Textarea */
+.ns-grid-auto-textarea {
+    width: 100%;
+    min-height: 60px;
+    resize: none;
+    /* 禁止手動拉大，由 JS 自動撐高 */
+    overflow: hidden;
+    /* 隱藏 Scrollbar */
+    border: 1px solid var(--interactive-accent);
+    outline: none;
+    background: var(--background-primary-alt);
+    padding: 8px;
+    font-family: var(--font-interface);
+    border-radius: 4px;
+    line-height: 1.5;
 }
