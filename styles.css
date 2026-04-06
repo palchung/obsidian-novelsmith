@@ -507,6 +507,143 @@ body.ns-mode-dialogue .cm-dialogue-text {
 }
 
 /* ============================================================
+   🗂️ 軟木板 (Corkboard) 視覺完美化修復 (針對最新架構)
+   ============================================================ */
+
+/* 1. 修復：章節標題過長導致「推低卡片」 (強制單行與省略號) */
+.ns-corkboard-column h3 {
+    flex-wrap: nowrap !important;
+    min-width: 0 !important;
+    /* 破解 Flexbox 不能截斷文字嘅限制 */
+}
+
+.ns-column-drag-handle {
+    min-width: 0 !important;
+    overflow: hidden !important;
+}
+
+/* 精準鎖定標題文字容器，超出字數自動變成 ... */
+.ns-column-drag-handle>span:last-child {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    display: inline-block;
+    max-width: 100%;
+}
+
+/* 2. 修復：雷達模式(搜尋)過濾後，卡片內容擠壓重疊 */
+/* 當進入雷達模式，強制隱藏卡片入面嘅「備註大綱」同「標籤屬性」，只保留最清爽嘅標題！ */
+.ns-corkboard-grid.is-radar-mode .ns-corkboard-card .ns-scene-note,
+.ns-corkboard-grid.is-radar-mode .ns-corkboard-card .ns-scene-footer {
+    display: none !important;
+}
+
+/* ============================================================
+   🗂️ 軟木板 (Corkboard) 終極視覺完美化修復 (基於真實結構)
+   ============================================================ */
+
+/* ----------------------------------------------------
+   1. 修復：章節標題過長導致 Column 跌落去
+   (目標：.ns-corkboard-column 嘅 h3 同 .ns-column-drag-handle)
+   ---------------------------------------------------- */
+.ns-corkboard-column h3 {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    margin-top: 0;
+}
+
+.ns-column-drag-handle {
+    flex: 1;
+    min-width: 0;
+    /* 🌟 救星：防止文字撐爆外框 */
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.ns-column-drag-handle span:last-child {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    /* 超出顯示 ... */
+    vertical-align: bottom;
+}
+
+/* ----------------------------------------------------
+   2. 修復：劇情卡片標題極長，推走右上角齒輪/顏色按鈕
+   (目標：.ns-corkboard-card 嘅頂部 Flex 容器)
+   ---------------------------------------------------- */
+.ns-corkboard-card>div:first-child {
+    width: 100%;
+}
+
+.ns-corkboard-card>div:first-child>div:first-child {
+    min-width: 0;
+    /* 🌟 救星：限制標題區塊最大寬度 */
+}
+
+.ns-corkboard-card h4 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    /* 容許最長顯示 2 行 */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-width: 0;
+    margin: 0;
+}
+
+.ns-scene-actions {
+    flex-shrink: 0;
+    /* 🛡️ 絕對防禦：保證按鈕區寧死不屈，絕對不被壓縮或推走 */
+}
+
+/* ----------------------------------------------------
+   3. 修復：側滑面板 (Wiki Panel) 編輯時標題推走 Save 按鈕
+   (目標：.ns-wiki-panel-header)
+   ---------------------------------------------------- */
+.ns-wiki-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 12px;
+}
+
+.ns-wiki-panel-header h3 {
+    flex: 1;
+    min-width: 0;
+    /* 🌟 救星：限制標題無限伸長 */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    /* 標題太長會變成 ... */
+    margin: 0;
+}
+
+.ns-wiki-panel-header>div {
+    flex-shrink: 0;
+    /* 🛡️ 絕對防禦：保證 Save / Cancel / 箭嘴 按鈕永遠可見 */
+}
+
+/* ----------------------------------------------------
+   4. 修復：雷達追蹤 (Radar Mode) 縮小卡片時文字重疊
+   (目標：.is-dimmed 狀態隱藏標籤)
+   ---------------------------------------------------- */
+.ns-corkboard-card.is-dimmed .ns-scene-note,
+.ns-corkboard-card.is-dimmed .ns-scene-footer {
+    display: none !important;
+    /* 隱藏簡介同埋標籤區 */
+}
+
+.ns-corkboard-card.is-dimmed {
+    min-height: auto !important;
+    height: auto !important;
+    padding-bottom: 12px !important;
+    /* 縮小後保留優雅嘅底距 */
+}
+
+/* ============================================================
    5. UTILITIES & OTHERS (作家旅程, 衝刺, 懸浮卷軸等)
    ============================================================ */
 
