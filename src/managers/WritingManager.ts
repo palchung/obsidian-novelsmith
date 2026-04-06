@@ -21,7 +21,7 @@ export class WritingManager {
         this.app.workspace.iterateAllLeaves((leaf) => {
             if (leaf.view instanceof MarkdownView) {
 
-                const cm = leaf.view.editor.cm;
+                const cm = (leaf.view.editor as any).cm;
 
                 if (cm) cm.dispatch({ effects: [] });
             }

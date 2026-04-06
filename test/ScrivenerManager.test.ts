@@ -86,8 +86,8 @@ describe('ScrivenerManager - 核心串聯與同步測試', () => {
 
     test('compileDraft - 應該正確組合多個檔案，隱藏 YAML 並保留引言', async () => {
         const fakeFolder = { name: '第一章', path: 'MyBook/第一章' };
-        const file1 = { name: 'Scene1.md' };
-        const file2 = { name: 'Scene2.md' };
+        const file1 = { name: 'Scene1.md', basename: 'Scene1' };
+        const file2 = { name: 'Scene2.md', basename: 'Scene2' };
 
         // 告訴系統：當你讀取 Scene1 嗰陣俾呢段字佢，讀 Scene2 俾另一段
         app.vault.read.mockImplementation(async (file: any) => {

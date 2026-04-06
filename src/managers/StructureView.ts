@@ -212,7 +212,7 @@ export class StructureView extends ItemView {
                 return;
             }
 
-            const container = this.contentEl.querySelector(".ns-structure-container");
+            const container = this.contentEl.querySelector(".ns-structure-container") as HTMLElement | null;;
             if (!container) return;
 
             // 🌟 變身魔法：如果衝刺緊，清空大綱，畫出巨大時鐘，直接 return！
@@ -295,7 +295,7 @@ export class StructureView extends ItemView {
             // 🚀 神級優化：防止頻繁清空整個側邊欄 (DOM Reuse)
             // ==========================================
             let header = container.querySelector(":scope > .ns-control-header");
-            let contentDiv = container.querySelector(":scope > .ns-tab-content");
+            let contentDiv = container.querySelector(":scope > .ns-tab-content") as HTMLElement | null;
 
             const isDraftMode = view && view.file && view.file.name === DRAFT_FILENAME;
             const draftModeChanged = this.lastDraftMode !== !!isDraftMode;
@@ -356,7 +356,7 @@ export class StructureView extends ItemView {
         const header = container.createDiv({ cls: "ns-control-header" });
         const isDraftMode = view && view.file && view.file.name === DRAFT_FILENAME;
 
-        const isArchivedDraft = (file: unknown, content: string) => {
+        const isArchivedDraft = (file: any, content: string) => {
             return file.name !== DRAFT_FILENAME && (isScriveningsDraft(content));
         };
 
@@ -647,7 +647,7 @@ export class StructureView extends ItemView {
         // ==========================================
         // 🌟 DOM Diffing 魔法開始：只更新有變動嘅卡片！
         // ==========================================
-        const existingChapters = Array.from(bodyContainer.querySelectorAll(":scope > .ns-chapter-box"));
+        const existingChapters = Array.from(bodyContainer.querySelectorAll(":scope > .ns-chapter-box")) as HTMLElement[];
         const chapterMap = new Map<string, HTMLElement>();
         existingChapters.forEach(ch => chapterMap.set(ch.dataset.name || "", ch));
 
@@ -671,7 +671,7 @@ export class StructureView extends ItemView {
                 this.sortables.push(new Sortable(sceneList, {
                     group: 'scenes', animation: 150, ghostClass: 'ns-sortable-ghost', dragClass: 'ns-sortable-drag',
                     delay: 100, delayOnTouchOnly: true,
-                    onEnd: (evt: unknown) => {
+                    onEnd: (evt: any) => {
                         if (evt.newIndex !== evt.oldIndex || evt.from !== evt.to) this.saveChanges(container, view);
                     }
                 }));
@@ -684,15 +684,15 @@ export class StructureView extends ItemView {
             this.chapterPreambleMap.set(chapterBox, chapter.preamble);
 
             if (chapter.name !== "root") {
-                const chCard = chapterBox.querySelector(".ns-chapter-card");
+                const chCard = chapterBox.querySelector(".ns-chapter-card") as HTMLElement;
                 chCard.onclick = (e) => { e.stopPropagation(); e.preventDefault(); this.jumpToLine(chapter.lineNumber); };
             }
 
-            const sceneList = chapterBox.querySelector(".ns-scene-list");
+            const sceneList = chapterBox.querySelector(".ns-scene-list") as HTMLElement;
             sceneList.dataset.chapterIndex = chIndex.toString();
 
             // --- 處理 Scene Card (卡片層級比對) ---
-            const existingScenes = Array.from(sceneList.querySelectorAll(":scope > .ns-scene-card"));
+            const existingScenes = Array.from(sceneList.querySelectorAll(":scope > .ns-scene-card")) as HTMLElement[];
             const sceneMap = new Map<string, HTMLElement>();
             existingScenes.forEach(sc => sceneMap.set(sc.dataset.safeKey || "", sc));
 
@@ -747,7 +747,7 @@ export class StructureView extends ItemView {
                 }
 
                 // 處理標題更新 (唔好盲目覆寫，避免浪費效能)
-                const titleText = scCard.querySelector(".ns-scene-title-text");
+                const titleText = scCard.querySelector(".ns-scene-title-text") as HTMLElement;
                 if (titleText.innerText !== scene.name) titleText.innerText = scene.name;
 
                 // 重新綁定事件
@@ -1143,7 +1143,7 @@ export class StructureView extends ItemView {
 
         const folder = this.app.vault.getAbstractFileByPath(folderPath);
         if (folder && folder instanceof TFolder) {
-            const files = folder.children.filter(f => f instanceof TFile && f.extension === "md");
+            const files = folder.children.filter(f => f instanceof TFile && f.extension === "md") as TFile[];
 
             if (files.length === 0) {
                 layer2.createDiv({ text: "Empty folder" });

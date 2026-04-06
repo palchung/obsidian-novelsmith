@@ -80,7 +80,7 @@ export class CorkboardModal extends Modal {
         contentEl.setCssStyles({ display: "flex", flexDirection: "column", height: "100%" });
         this.modalEl.addClass("ns-corkboard-modal");
 
-        const defaultCloseBtn = this.modalEl.querySelector('.modal-close-button');
+        const defaultCloseBtn = this.modalEl.querySelector('.modal-close-button') as HTMLElement;
         if (defaultCloseBtn) defaultCloseBtn.setCssStyles({ display: "none" });
 
         const headerRow = contentEl.createDiv({ cls: "ns-corkboard-header-row" });
@@ -200,7 +200,7 @@ export class CorkboardModal extends Modal {
     // ==========================================
     // 🎨 UI Builders
     // ==========================================
-    buildCardDOM(listContainer: HTMLElement, scene: unknown) {
+    buildCardDOM(listContainer: HTMLElement, scene: any) {
         const card = listContainer.createDiv({ cls: "ns-corkboard-card" });
         card.setCssStyles({
             backgroundColor: "var(--background-primary)", border: "1px solid var(--background-modifier-border)",
@@ -228,7 +228,7 @@ export class CorkboardModal extends Modal {
         });
     }
 
-    populateCardInnerDOM(card: HTMLElement, scene: unknown) {
+    populateCardInnerDOM(card: HTMLElement, scene: any) {
         // 🌟 換成動態注入 CSS 變數：
         const colorObj = getColorById(card.dataset.colorId);
         card.style.setProperty('--scene-bg', colorObj.bg);
@@ -261,9 +261,9 @@ export class CorkboardModal extends Modal {
             e.stopPropagation();
             new SimpleConfirmModal(this.app, "Save corkboard and jump to this scene?", async () => {
                 this.anchorSceneId = card.dataset.sceneId || card.dataset.sceneTitle || null;
-                const saveBtn = this.contentEl.querySelector(".ns-save-btn");
+                const saveBtn = this.contentEl.querySelector(".ns-save-btn") as HTMLButtonElement;
                 if (saveBtn) { saveBtn.disabled = true; saveBtn.innerText = "Saving & jumping..."; }
-                const gridContainer = this.contentEl.querySelector(".ns-corkboard-grid");
+                const gridContainer = this.contentEl.querySelector(".ns-corkboard-grid") as HTMLElement;
                 await this.saveGlobalCorkboard(gridContainer, saveBtn);
             }).open();
         };
@@ -352,7 +352,7 @@ export class CorkboardModal extends Modal {
         });
     }
 
-    buildColumnDOM(container: HTMLElement | DocumentFragment, colTitle: string, filePath: string | null, scenes: unknown[], insertBeforeEl?: HTMLElement) {
+    buildColumnDOM(container: HTMLElement | DocumentFragment, colTitle: string, filePath: string | null, scenes: any[], insertBeforeEl?: HTMLElement) {
         const col = container.createDiv({ cls: "ns-corkboard-column" });
         const headerEl = col.createEl("h3");
         const listContainer = col.createDiv({ cls: "ns-corkboard-list" });
@@ -438,7 +438,7 @@ export class CorkboardModal extends Modal {
 
         btnAddScene.onclick = () => {
             new SceneCreateModal(this.app, "Create New Scene", "", (result, colorId) => {
-                const newScene = { id: generateSceneId(), title: result, colorId: colorId, meta: [], isNew: true };
+                const newScene = { id: generateSceneId(), title: result, colorId: colorId, meta: [] as string[], isNew: true };
                 this.buildCardDOM(listContainer, newScene);
                 listContainer.scrollTop = listContainer.scrollHeight;
                 this.isDirty = true; // 🌟 標記：新增卡片
@@ -476,9 +476,9 @@ export class CorkboardModal extends Modal {
 
                 let safeKey = card.id || card.key;
                 if (!safeKey) {
-                    const count = titleCollisionCount.get(card.title) || 0;
-                    safeKey = count === 0 ? card.title : `${card.title}_${count}`;
-                    titleCollisionCount.set(card.title, count + 1);
+                    const count = titleCollisionCount.get(card.key) || 0;
+                    safeKey = count === 0 ? card.key : `${card.key}_${count}`;
+                    titleCollisionCount.set(card.key, count + 1);
                 }
                 this.liveSceneMap.set(safeKey, sceneFullText.trimEnd());
             }
@@ -566,7 +566,7 @@ export class CorkboardModal extends Modal {
 
         if (file && file instanceof TFile) {
             const content = await this.app.vault.read(file);
-            await MarkdownRenderer.render(this.app, content, contentWrapper, file.path, this);
+            await MarkdownRenderer.render(this.app, content, contentWrapper, file.path, this as any);
         } else {
             contentWrapper.createDiv({ text: `Cannot find note: ${noteName}` });
         }
@@ -575,7 +575,7 @@ export class CorkboardModal extends Modal {
     // ==========================================
     // 🎬 側滑面板：劇情卡片雙模式
     // ==========================================
-    async openScenePanel(cardEl: HTMLElement, scene: unknown) {
+    async openScenePanel(cardEl: HTMLElement, scene: any) {
         this.wikiPanel.empty();
         this.wikiPanel.setCssStyles({ width: "450px", transform: "translateX(0)" });
 
@@ -691,7 +691,7 @@ export class CorkboardModal extends Modal {
         btnClose.onclick = () => this.wikiPanel.setCssStyles({ transform: "translateX(100%)" });
 
         const contentWrapper = this.wikiPanel.createDiv({ cls: "ns-wiki-panel-content markdown-rendered" });
-        await MarkdownRenderer.render(this.app, displayMetaText, contentWrapper, "", this);
+        await MarkdownRenderer.render(this.app, displayMetaText, contentWrapper, "", this as any);
     }
 
     renderEditMode(title: string, rawMarkdown: string, onSave: (newText: string) => void) {

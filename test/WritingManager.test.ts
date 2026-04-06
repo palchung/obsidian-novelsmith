@@ -39,14 +39,21 @@ describe('WritingManager - 編輯器大掃除 (Clean Draft)', () => {
     let fakeView: any;
 
     beforeEach(() => {
-        app = { workspace: { iterateAllLeaves: jest.fn() } };
+        app = {
+            workspace: { iterateAllLeaves: jest.fn() },
+            vault: { modify: jest.fn().mockResolvedValue(undefined) } // 🌟 補返假嘅寫入檔案功能
+        };
         settings = { bookFolderPath: 'MyBook' };
         manager = new WritingManager(app, settings);
 
-        // 準備一個假嘅編輯器 View
+        // 🌟 更新呢個假編輯器，補返 getScrollInfo 同 scrollTo 畀佢！
         fakeView = {
+            file: { name: 'test.md' },
             editor: {
-                getValue: jest.fn()
+                getValue: jest.fn(),
+                getScrollInfo: jest.fn().mockReturnValue({ left: 0, top: 0 }),
+                scrollTo: jest.fn(),
+                cm: { dispatch: jest.fn() } // 順便加埋 cm 防呆
             }
         };
     });
@@ -73,14 +80,11 @@ describe('WritingManager - 編輯器大掃除 (Clean Draft)', () => {
         // 2. 執行一鍵大掃除
         manager.cleanDraft(fakeView);
 
-        // 3. 引入 mock 咗嘅 replaceEntireDocument 嚟檢查替換結果
-        const { replaceEntireDocument } = require('../src/utils');
+        // 3. 檢查系統有冇觸發底層寫入 (modify)
+        expect(app.vault.modify).toHaveBeenCalled();
 
-        // 檢查系統有冇觸發全文替換
-        expect(replaceEntireDocument).toHaveBeenCalled();
-
-        // 抽出準備寫入編輯器嘅最終內容
-        const finalContent = replaceEntireDocument.mock.calls[0][1];
+        // 抽出準備寫入檔案嘅最終內容 (modify 嘅第二個參數)
+        const finalContent = app.vault.modify.mock.calls[0][1];
 
         // ==========================================
         // 🕵️‍♂️ 斷言：驗證 Regex 魔法！
