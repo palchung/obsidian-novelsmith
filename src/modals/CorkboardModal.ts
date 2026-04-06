@@ -348,7 +348,7 @@ export class CorkboardModal extends Modal {
         });
     }
 
-    buildColumnDOM(container: HTMLElement, colTitle: string, filePath: string | null, scenes: unknown[], insertBeforeEl?: HTMLElement) {
+    buildColumnDOM(container: HTMLElement | DocumentFragment, colTitle: string, filePath: string | null, scenes: unknown[], insertBeforeEl?: HTMLElement) {
         const col = container.createDiv({ cls: "ns-corkboard-column" });
         const headerEl = col.createEl("h3");
         const listContainer = col.createDiv({ cls: "ns-corkboard-list" });
@@ -456,6 +456,8 @@ export class CorkboardModal extends Modal {
         const files = getManuscriptFiles(this.app, this.workingFolderPath, this.plugin.settings.exportFolderPath);
         container.empty();
 
+        // 🌟 效能大絕：建立一個「虛擬記憶體碎片」，所有卡片先砌入呢度！
+        const fragment = document.createDocumentFragment();
         const titleCollisionCount = new Map<string, number>();
 
         for (let i = 0; i < files.length; i++) {
@@ -488,7 +490,7 @@ export class CorkboardModal extends Modal {
                 return { ...s, safeKey: sKey };
             });
 
-            this.buildColumnDOM(container, file.basename, file.path, scenesWithSafeKey);
+            this.buildColumnDOM(fragment, file.basename, file.path, scenesWithSafeKey);
         }
 
         const addColBtn = container.createDiv({ cls: "ns-corkboard-column" });
@@ -508,6 +510,10 @@ export class CorkboardModal extends Modal {
                 this.isDirty = true; // 🌟 標記：新增章節
             }).open();
         };
+
+        fragment.appendChild(addColBtn);
+        // 🌟 終極一步：將幾十個章節、幾百張卡片，1次過掟上螢幕！(極度慳電)
+        container.appendChild(fragment);
 
         this.sortables.push(new Sortable(container, {
             animation: 150, handle: '.ns-column-drag-handle', delay: 100, delayOnTouchOnly: true, ghostClass: 'ns-sortable-ghost',

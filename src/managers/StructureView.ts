@@ -26,6 +26,7 @@ interface ChapterNode {
     lineNumber: number;
     scenes: SceneNode[];
     type: 'chapter';
+    fileIdTag?: string;
 }
 
 export class StructureView extends ItemView {
@@ -781,11 +782,19 @@ export class StructureView extends ItemView {
                 scCard.onclick = (e) => {
                     if (this.isMenuClicking) { e.stopPropagation(); e.preventDefault(); return; }
                     e.stopPropagation(); e.preventDefault();
+
                     this.selectedSceneId = scene.id || null;
                     this.selectedSceneTitle = scene.name;
+
+                    // 1. 瞬間跳轉去編輯器目標行數
                     this.jumpToLine(scene.lineNumber);
-                    this.lastOutlineHash = "";
-                    void this.parseAndRender();
+
+                    // 2. 🌟 極速高亮魔法 (取代原本嘅拆屋重建)
+                    // 只係用 Javascript 搵返所有卡片熄滅佢哋，然後點亮自己！
+                    // 咁樣做係 0 毫秒延遲，而且絕對唔會令到面板飛返上頂！
+                    const allCards = container.querySelectorAll(".ns-scene-card");
+                    allCards.forEach(card => (card as HTMLElement).setCssProps({ borderLeftWidth: "", filter: "" }));
+                    scCard.setCssProps({ borderLeftWidth: "4px", filter: "brightness(0.9)" });
                 };
 
                 this.sceneContentMap.set(scCard, scene.content); // 更新 WeakMap 內容
@@ -1203,15 +1212,12 @@ export class StructureView extends ItemView {
         }
     }
 
-    saveChanges(container: HTMLElement, view: MarkdownView) {
+    async saveChanges(container: HTMLElement, view: MarkdownView) {
         if (!view) return;
 
         const liveText = view.editor.getValue();
         const liveTree = this.parseDocument(liveText);
 
-        // =========================================================
-        // 🚨 Prevention 2A：word disappear prevention 
-        // =========================================================
         let liveSceneCount = 0;
         liveTree.forEach(ch => liveSceneCount += ch.scenes.length);
         const domScenes = container.querySelectorAll(".ns-scene-card");
@@ -1224,11 +1230,9 @@ export class StructureView extends ItemView {
 
         new Notice("Re-organizing...");
 
-        // =========================================================
-        // 🛡️ Prevention 2B：Safe Key Map
-        // =========================================================
         const liveSceneMap = new Map<string, string>();
         const liveChapterPreambleMap = new Map<string, string>();
+        const liveChapterFileIdMap = new Map<string, string>(); // 🌟 裝鎖匙嘅袋
         let rootPreamble = "";
 
         const liveNameCount = new Map<string, number>();
@@ -1238,10 +1242,10 @@ export class StructureView extends ItemView {
                 rootPreamble = ch.preamble;
             } else {
                 liveChapterPreambleMap.set(ch.name, ch.preamble);
+                if (ch.fileIdTag) liveChapterFileIdMap.set(ch.name, ch.fileIdTag); // 🌟 將鎖匙入袋
             }
 
             ch.scenes.forEach(sc => {
-
                 let key = sc.id;
                 if (!key) {
                     const count = liveNameCount.get(sc.name) || 0;
@@ -1252,9 +1256,6 @@ export class StructureView extends ItemView {
             });
         });
 
-        // =========================================================
-        // 🧱 Re-organize draft base on new DOM order
-        // =========================================================
         const chunks: string[] = [];
         if (this.docYaml.trim()) chunks.push(this.docYaml.trim());
 
@@ -1264,59 +1265,52 @@ export class StructureView extends ItemView {
             const el = box as HTMLElement;
             const chName = el.dataset.name;
 
-
             if (chName === "root") {
                 if (rootPreamble.trim()) chunks.push(rootPreamble.trim());
             } else if (chName && chName !== "root") {
-                chunks.push(`# 📄 ${chName} <span class="ns-chapter-center"></span>\n<span class="ns-file-id">++ FILE_ID: ${chName} ++</span>`);
+
+                // 🌟 完美修復：攞返原裝鎖匙，然後用 \n 緊緊黐住個標題！(徹底消滅雙重線與 Sync Error)
+                const fileIdTag = liveChapterFileIdMap.get(chName) || `<span class="ns-file-id">++ FILE_ID: ${chName} ++</span>`;
+                chunks.push(`# 📄 ${chName} <span class="ns-chapter-center"></span>\n${fileIdTag}`);
+
                 const chPreamble = liveChapterPreambleMap.get(chName) || "";
                 if (chPreamble.trim()) chunks.push(chPreamble.trim());
             }
 
-
             const scenes = el.querySelectorAll(".ns-scene-card");
-            let hasConflict = false; // 🛑 衝突標記
+            let hasConflict = false;
 
             for (const sc of Array.from(scenes)) {
                 const scEl = sc as HTMLElement;
                 const safeKey = scEl.dataset.safeKey;
-
                 const content = safeKey ? liveSceneMap.get(safeKey) : null;
 
                 if (content && content.trim()) {
                     chunks.push(content.trimEnd());
                 } else {
-                    // 🚨 致命危險：畫面同編輯器內容脫節！
-                    // 絕對唔可以盲目用 fallbackContent 覆寫，會導致用家最新打嘅字遺失！
                     console.error("Sync conflict! Missing live content for key:", safeKey);
                     hasConflict = true;
-                    break; // 停止處理呢個章節
+                    break;
                 }
             }
 
-            // 🛑 如果發現任何一張卡片對唔上，即刻中斷成個 Drag & Drop 儲存過程！
             if (hasConflict) {
                 new Notice("Outline sync conflict! Drag cancelled to protect your latest typing.", 4000);
-                this.parseAndRender(); // 強制重新讀取最新文字
-                return; // 直接中止，唔好替換文稿！
+                void this.parseAndRender();
+                return;
             }
         });
 
-        // =========================================================
-        // ✍️ refresh editor
-        // =========================================================
         const finalText = chunks.join("\n\n") + "\n";
 
-        replaceEntireDocument(view.editor, finalText);
-
-        this.lastOutlineHash = "";
-        void this.parseAndRender();
-
-        // 🌟 1. 自動觸發 Smart Save，確保新卡片即時獲得 ID
-        void this.plugin.executeSmartSave(view);
-
-        // 🌟 2. 給予大綱整理獎勵 (傳入 0 滴字數，但系統會自動 +10 分 Action Point)
-        void this.plugin.statsManager.recordActivity(0);
+        // 🌟 終極防 Crash 魔法：延遲 50 毫秒執行 replaceEntireDocument！
+        // 咁樣可以避開 Sortable 拖拉引起嘅 CodeMirror 崩潰，同時令編輯器瞬間獲得最新內容，保證一撳 Sync 就成功！
+        setTimeout(() => {
+            replaceEntireDocument(view.editor, finalText);
+            this.lastOutlineHash = "";
+            void this.parseAndRender();
+            void this.plugin.statsManager.recordActivity(0);
+        }, 50);
     }
 
 
@@ -1394,14 +1388,12 @@ export class StructureView extends ItemView {
                 flushChapter();
                 // 🌟 清除置中標籤，還原乾淨檔名
                 const cleanName = trimLine.replace("# 📄", "").replace('<span class="ns-chapter-center"></span>', "").trim();
-                currentChapter = { id: trimLine, name: cleanName, preamble: '', lineNumber: i, scenes: [], type: 'chapter' };
+                currentChapter = { id: trimLine, name: cleanName, preamble: '', lineNumber: i, scenes: [], type: 'chapter', fileIdTag: '' };
                 currentScene = null; buffer = []; continue;
             }
 
             if (trimLine.startsWith("######")) {
                 flushScene();
-
-
                 const uuid = extractSceneId(trimLine) || "";
                 const cleanName = cleanSceneTitle(trimLine);
                 const colorId = extractSceneColor(trimLine);
@@ -1409,7 +1401,11 @@ export class StructureView extends ItemView {
                 currentScene = { id: uuid, rawHeader: trimLine, name: cleanName.trim(), content: line + "\n", lineNumber: i, type: 'scene', colorId: colorId };
                 buffer = []; continue;
             }
-            if (trimLine.includes('<span class="ns-file-id">++ FILE_ID')) continue;
+
+            if (trimLine.includes('<span class="ns-file-id">++ FILE_ID')) {
+                currentChapter.fileIdTag = line.trim(); // 記低原汁原味嘅鎖匙
+                continue;
+            }
             buffer.push(line);
         }
         flushChapter();

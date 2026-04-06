@@ -1,11 +1,3 @@
-// import { App, TFolder, Menu, setIcon, FuzzySuggestModal, Modal, Setting, TFile, Notice, MarkdownView, MarkdownRenderer } from 'obsidian';
-// import { extractSynopsisAndTags, TEMPLATES_DIR, getColorById, generateSceneId, SCENE_COLORS, createIconButton, replaceEntireDocument, cleanSceneTitle, extractSceneId, getManuscriptFiles, parseUniversalScenes, parseContent } from './utils';
-
-// import { StructureView } from './managers/StructureView';
-// import { HEATMAP_LEVELS, TROPHIES_CONFIG } from './managers/StatsManager';
-// import Sortable from 'sortablejs';
-// import NovelSmithPlugin from '../main';
-
 import { App, FuzzySuggestModal, Modal, Setting, TFile, Notice } from 'obsidian';
 import { SCENE_COLORS, createIconButton } from './utils';
 
@@ -415,6 +407,7 @@ export interface CleanDraftOptions {
     removeStrikethrough: boolean;
     removeHighlights: boolean;
     removeInternalLinks: boolean;
+    removeBold: boolean;
 }
 
 export class CleanDraftModal extends Modal {
@@ -422,7 +415,8 @@ export class CleanDraftModal extends Modal {
         removeComments: true,
         removeStrikethrough: true,
         removeHighlights: true,
-        removeInternalLinks: true
+        removeInternalLinks: true,
+        removeBold: true
     };
     onSubmit: (options: CleanDraftOptions) => void;
 
@@ -439,6 +433,8 @@ export class CleanDraftModal extends Modal {
 
         new Setting(contentEl).setName("Remove comments (%%...%%)").addToggle(t => t.setValue(this.options.removeComments).onChange(v => this.options.removeComments = v));
         new Setting(contentEl).setName("Remove strikethrough (~~...~~)").addToggle(t => t.setValue(this.options.removeStrikethrough).onChange(v => this.options.removeStrikethrough = v));
+        new Setting(contentEl).setName("Remove Bold ( ** )").setDesc("Remove the ** symbols but keep the text inside.").addToggle(toggle => toggle.setValue(this.options.removeBold).onChange(v => { this.options.removeBold = v; }));
+
         new Setting(contentEl).setName("Remove highlights (==...==)").addToggle(t => t.setValue(this.options.removeHighlights).onChange(v => this.options.removeHighlights = v));
         new Setting(contentEl).setName("Remove internal links ([...])").setDesc("Keep display text, remove only the double brackets.").addToggle(t => t.setValue(this.options.removeInternalLinks).onChange(v => this.options.removeInternalLinks = v));
 

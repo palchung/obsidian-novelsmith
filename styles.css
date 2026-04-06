@@ -990,6 +990,323 @@ body.is-mobile .ns-button-row .ns-btn-discard:active,
     color: var(--text-normal);
 }
 
+/* ----------------------------------------------------
+   E. 文學質感注入：手稿壓印風 (Letterpress Index Card)
+   ---------------------------------------------------- */
+
+.callout[data-callout^="nsmith"] {
+    /* 1. 壓印立體感 (內陰影模擬凹陷，外陰影模擬浮起) */
+    box-shadow:
+        inset 1px 1px 5px rgba(0, 0, 0, 0.06),
+        /* 左上暗角 (凹陷感) */
+        inset -1px -1px 4px rgba(255, 255, 255, 0.5),
+        /* 右下高光 (紙張厚度) */
+        1px 1px 3px rgba(0, 0, 0, 0.04) !important;
+    /* 微微投射喺底紙上 */
+
+    /* 2. 微漸變底色 (模擬紙張受光面，取代死板嘅單色) */
+    background-image: linear-gradient(135deg,
+            rgba(var(--callout-color), 0.15) 0%,
+            rgba(var(--callout-color), 0.04) 100%) !important;
+    background-color: transparent !important;
+    /* 讓路畀漸變色 */
+
+    /* 3. 卡片邊界與書脊 (雙實線帶出經典復古感) */
+    border: 1px solid rgba(var(--callout-color), 0.2) !important;
+    border-left: 4px double rgba(var(--callout-color), 0.8) !important;
+    border-radius: 6px !important;
+}
+
+/* 🌙 針對 Dark Mode (黑夜模式) 嘅光影微調 */
+/* 防止白色高光喺黑夜模式太刺眼，改用暗黑系陰影 */
+.theme-dark .callout[data-callout^="nsmith"] {
+    box-shadow:
+        inset 1px 1px 6px rgba(0, 0, 0, 0.4),
+        inset -1px -1px 4px rgba(255, 255, 255, 0.03),
+        1px 1px 4px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* ============================================================
+   💎 7. NovelSmith 終極 UI 昇華包 (Modern Writer's Studio)
+   包含：懸浮卷軸、藥丸標籤、畫廊軌道、發光導航
+   ============================================================ */
+
+/* ----------------------------------------------------
+   1. 徹底消滅「核突卷軸」 (macOS-style Hover Scrollbars)
+   ---------------------------------------------------- */
+/* 針對軟木板同側邊欄，將卷軸變成半透明懸浮圓角 */
+.ns-corkboard-modal ::-webkit-scrollbar,
+.workspace-leaf-content[data-type="novelsmith-structure-view"] ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.ns-corkboard-modal ::-webkit-scrollbar-track,
+.workspace-leaf-content[data-type="novelsmith-structure-view"] ::-webkit-scrollbar-track {
+    background: transparent;
+    /* 軌道全透明 */
+}
+
+.ns-corkboard-modal ::-webkit-scrollbar-thumb,
+.workspace-leaf-content[data-type="novelsmith-structure-view"] ::-webkit-scrollbar-thumb {
+    background-color: rgba(var(--color-base-60-rgb), 0.2);
+    border-radius: 999px;
+    /* 極致圓潤 */
+    border: 2px solid transparent;
+    /* 留白邊緣，營造懸浮感 */
+    background-clip: padding-box;
+}
+
+.ns-corkboard-modal ::-webkit-scrollbar-thumb:hover,
+.workspace-leaf-content[data-type="novelsmith-structure-view"] ::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(var(--color-base-60-rgb), 0.5);
+    /* 滑鼠移上去變深色 */
+}
+
+/* ----------------------------------------------------
+   2. 現代化藥丸設計 (Pill-shaped Tokens & Micro-interactions)
+   ---------------------------------------------------- */
+/* 軟木板頂部雷達 Token 同埋卡片底部嘅 Tags */
+.ns-radar-token,
+.ns-chip,
+.ns-scene-footer span {
+    border-radius: 999px !important;
+    /* 完美藥丸形 */
+    padding: 4px 10px !important;
+    transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+    /* 絲滑彈性動畫 */
+    border: 1px solid rgba(var(--interactive-accent-rgb), 0.15) !important;
+    background-color: rgba(var(--interactive-accent-rgb), 0.03) !important;
+}
+
+/* Hover 浮起發光效果 */
+.ns-radar-token:hover,
+.ns-chip:hover,
+.ns-scene-footer span:has(span):hover {
+    /* 確保只係有互動嘅 Tag 先會浮起 */
+    transform: translateY(-2px) scale(1.02);
+    /* 微微向上浮起並放大 */
+    box-shadow: 0 4px 8px rgba(var(--interactive-accent-rgb), 0.15);
+    background-color: rgba(var(--interactive-accent-rgb), 0.1) !important;
+    border-color: rgba(var(--interactive-accent-rgb), 0.5) !important;
+}
+
+/* ----------------------------------------------------
+   3. 畫廊級軌道 (Gallery Tracks for Corkboard)
+   ---------------------------------------------------- */
+/* 將每一章嘅 Column 變成磨砂玻璃展板 */
+.ns-corkboard-column {
+    background-color: rgba(var(--background-secondary-rgb), 0.4) !important;
+    border-radius: 14px !important;
+    /* 大圓角包裹 */
+    padding: 10px !important;
+    border: 1px solid rgba(var(--background-modifier-border-rgb), 0.4);
+    box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.02);
+}
+
+/* ----------------------------------------------------
+   4. 發光導航 (Illuminated Active States for Structure View)
+   ---------------------------------------------------- */
+/* 針對大綱側邊欄嘅每一行 */
+.workspace-leaf-content[data-type="novelsmith-structure-view"] .tree-item-self,
+.workspace-leaf-content[data-type="novelsmith-structure-view"] .nav-file-title {
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    margin: 2px 4px;
+    border-left: 3px solid transparent;
+    /* 預留發光線位置 */
+}
+
+/* Hover 狀態：優雅嘅淡底色 */
+.workspace-leaf-content[data-type="novelsmith-structure-view"] .tree-item-self:hover,
+.workspace-leaf-content[data-type="novelsmith-structure-view"] .nav-file-title:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+/* 🌟 Active 狀態 (你正在編輯緊嗰一張卡片)：發光主題色 */
+.workspace-leaf-content[data-type="novelsmith-structure-view"] .is-active {
+    background-color: rgba(var(--interactive-accent-rgb), 0.08) !important;
+    /* 微弱漸變底色 */
+    border-left: 3px solid var(--interactive-accent) !important;
+    /* 標誌性左側發光線 */
+    color: var(--text-accent) !important;
+    box-shadow: -2px 0 8px rgba(var(--interactive-accent-rgb), 0.2);
+    /* 線條發光感 */
+}
+
+/* ============================================================
+   ✨ 8. 史詩奇幻寫作氛圍包 (Epic Fantasy Vibe)
+   包含：實體書標題、載入動畫、點陣背景、專屬反白
+   ============================================================ */
+
+/* ----------------------------------------------------
+   1. 實體書級別排版 (Print-Ready Typography)
+   針對串聯模式嘅章節標題
+   ---------------------------------------------------- */
+.markdown-source-view .HyperMD-header-1:has(.ns-chapter-center) {
+    text-align: center;
+    letter-spacing: 0.15em;
+    /* 拉闊字距，增加史詩感 */
+    font-weight: 400;
+    /* 收斂粗體，顯得更古典 */
+    margin-top: 2.5em !important;
+    margin-bottom: 2em !important;
+    color: var(--text-normal);
+}
+
+/* 🌟 加入上下方嘅古典 ✧ 分隔線 */
+.markdown-source-view .HyperMD-header-1:has(.ns-chapter-center)::before,
+.markdown-source-view .HyperMD-header-1:has(.ns-chapter-center)::after {
+    content: "────── ✧ ──────";
+    display: block;
+    font-size: 0.45em;
+    font-weight: normal;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+    margin: 15px auto;
+    opacity: 0.3;
+    /* 若隱若現嘅排版細節 */
+}
+
+/* ----------------------------------------------------
+   2. 卡片呼吸感載入動畫 (Cinematic Fade-In)
+   ---------------------------------------------------- */
+/* 定義一段極度絲滑嘅「浮現」關鍵影格 */
+@keyframes nsCardFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 賦予每張劇情卡片柔和嘅出場動畫 */
+.ns-corkboard-card {
+    animation: nsCardFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+/* ----------------------------------------------------
+   3. 沉浸式禪模式背景 (Immersive Canvas - Dot Grid)
+   ---------------------------------------------------- */
+/* 為軟木板底部加上極淡嘅幾何點陣，營造無限工作枱感覺 */
+.ns-corkboard-modal .modal-content {
+    background-color: var(--background-primary-alt) !important;
+    /* 🌟 純數學畫出嚟嘅幾何網點，零圖片，不耗記憶體 */
+    background-image: radial-gradient(rgba(var(--text-muted-rgb), 0.12) 1px, transparent 1px) !important;
+    background-size: 24px 24px !important;
+    background-position: center center !important;
+}
+
+/* ----------------------------------------------------
+   4. 品牌專屬反白選取色 (Custom Selection Highlight)
+   ---------------------------------------------------- */
+/* 將預設嘅死板藍色反白，改成帶有透明度嘅主題色 */
+.ns-corkboard-modal ::selection,
+.workspace-leaf-content[data-type="novelsmith-structure-view"] ::selection {
+    background-color: rgba(var(--interactive-accent-rgb), 0.25) !important;
+    color: var(--text-normal) !important;
+    text-shadow: none !important;
+}
+
+
+/* ============================================================
+   🛠️ 9. 軟木板版面爆格與雙重卷軸修復 (Flexbox Scrollbar Fix)
+   ============================================================ */
+
+/* 1. 鎖死 Modal 本身：嚴禁預設嘅外圍卷軸出現 */
+.ns-corkboard-modal .modal-content {
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 0 !important;
+    /* 移除預設邊距，用盡全螢幕 */
+}
+
+/* 2. 確保頂部 Header 唔會被下面嘅內容擠壓變形 */
+.ns-corkboard-header-row {
+    flex-shrink: 0 !important;
+    padding: 15px 20px !important;
+    border-bottom: 1px solid var(--background-modifier-border) !important;
+}
+
+/* 3. 軟木板 Grid：唯一合法嘅「全域滾動區」 */
+.ns-corkboard-grid {
+    flex-grow: 1 !important;
+    overflow: auto !important;
+    /* 🌟 只允許呢度出卷軸 */
+    display: flex !important;
+    gap: 20px !important;
+    align-items: flex-start !important;
+    padding: 20px !important;
+    flex-wrap: nowrap !important;
+    /* 🌟 確保章節橫向排開，絕對唔換行 */
+}
+
+/* 4. 獨立章節 Column：鎖死闊度，防止被擠壓 */
+.ns-corkboard-column {
+    flex-shrink: 0 !important;
+    /* 🌟 寧願撐爆阿爸(出橫卷軸)，都絕對唔准縮窄自己 */
+    width: 340px !important;
+    /* 固定闊度 */
+    max-height: 100% !important;
+    /* 唔准高過個螢幕 */
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+/* 5. 卡片列表區：Column 內部嘅垂直滾動區 */
+.ns-corkboard-list {
+    overflow-y: auto !important;
+    /* 如果一張 Column 太多卡片，就自己內部直向滾動 */
+    overflow-x: hidden !important;
+    flex-grow: 1 !important;
+    padding-right: 5px;
+    /* 預留卷軸位置，防止卡片黐實條邊 */
+    padding-bottom: 20px;
+    /* 底部留白，方便拖拉卡片去最尾 */
+}
+
+
+/* ============================================================
+   🛠️ 10. 側滑面板懸浮修復 (Drawer Absolute Position Fix)
+   ============================================================ */
+
+/* 1. 確保 Modal 內容區成為「定位錨點」 */
+.ns-corkboard-modal .modal-content {
+    position: relative !important;
+}
+
+/* 2. 將 Wiki 面板變成「幽靈」，強行浮喺最面層，絕對唔佔用底層空間 */
+.ns-corkboard-wiki-panel {
+    position: absolute !important;
+    top: 0 !important;
+    right: 0 !important;
+    height: 100% !important;
+    /* 高度同 Modal 齊平 */
+    z-index: 100 !important;
+    /* 確保蓋過軟木板卡片 */
+
+    background-color: var(--background-primary) !important;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.2) !important;
+    /* 加深左邊陰影，加強懸浮立體感 */
+    border-left: 1px solid var(--background-modifier-border) !important;
+
+    /* 確保面板內部排版正常 */
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+/* 3. 面板內部嘅內容區，允許獨立上下滾動，唔影響外面 */
+.ns-wiki-panel-content {
+    flex-grow: 1 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+}
+
 
 /* ========================================== */
 /* 🗺️ Worldboard View UI Styles              */

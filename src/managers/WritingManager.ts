@@ -291,8 +291,16 @@ export class WritingManager {
         if (totalCount > 0) {
             const finalContent = processedLines.join("\n");
             if (finalContent !== content) {
+                // 🌟 1. 記低目前嘅游標同捲動位置
+                const cursorInfo = view.editor.getCursor();
+                const scrollInfo = view.editor.getScrollInfo();
+
                 // 🔥 P2 Optimization: Call global silent replacement
                 replaceEntireDocument(view.editor, finalContent);
+
+                // 🌟 2. 瞬間還原位置，完美防止畫面飛上頂！
+                view.editor.setCursor(cursorInfo);
+                view.editor.scrollTo(scrollInfo.left, scrollInfo.top);
 
                 new Notice(`✅ Corrected ${totalCount} typos.\n` + changesLog.slice(0, 3).join("\n") + (changesLog.length > 3 ? "\n..." : ""), 5000);
             }
@@ -305,7 +313,8 @@ export class WritingManager {
     // 🧹 Clean Draft (Upgraded: Supports options and internal links)
     // =================================================================
     cleanDraft(view: MarkdownView) {
-        new CleanDraftModal(this.app, (options) => {
+        // 🚨 留意：呢度 options 加咗 any，方便接收新增嘅 removeBold
+        new CleanDraftModal(this.app, (options: any) => {
             let content = view.editor.getValue();
             const originalContent = content;
 
@@ -314,12 +323,23 @@ export class WritingManager {
             if (options.removeStrikethrough) content = content.replace(/~~[\s\S]*?~~/g, "");
             if (options.removeHighlights) content = content.replace(/==/g, "");
 
-            // 🔥 New: Remove internal links (keep display text, e.g., [[Alias|Display]] becomes Display)
-            // 🔥 P2 Tweak: Use Negative Lookbehind (?<!\!), perfectly avoid images ![[...]], remove only plain text links!
+            // Remove internal links
             if (options.removeInternalLinks) content = content.replace(/(?<!!)\[\[(?:[^\]]*\|)?([^\]]+)\]\]/g, "$1");
+
+            // 🌟 新增功能：清除粗體 **符號**，但保留中間嘅文字 ($1)
+            if (options.removeBold) content = content.replace(/\*\*([\s\S]*?)\*\*/g, "$1");
+
             if (content !== originalContent) {
+                // 🌟 1. 記低目前嘅游標同捲動位置
+                const cursorInfo = view.editor.getCursor();
+                const scrollInfo = view.editor.getScrollInfo();
+
                 // 🔥 P2 Optimization: Call global silent replacement
                 replaceEntireDocument(view.editor, content);
+
+                // 🌟 2. 瞬間還原位置，防止畫面飛上頂
+                view.editor.setCursor(cursorInfo);
+                view.editor.scrollTo(scrollInfo.left, scrollInfo.top);
 
                 new Notice("Clean draft complete! Selected markers have been removed.");
             } else {
