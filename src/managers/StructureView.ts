@@ -735,7 +735,9 @@ export class StructureView extends ItemView {
                 // 處理顏色更新
                 const colorObj = getColorById(scene.colorId);
                 scCard.className = "ns-scene-card"; // Reset
-                if (colorObj.cssClass) scCard.addClass(colorObj.cssClass);
+                // 🌟 換成注入變數：
+                scCard.style.setProperty('--scene-bg', colorObj.bg);
+                scCard.style.setProperty('--scene-border', colorObj.border);
 
                 // 處理高亮狀態
                 if (this.selectedSceneId === scene.id) {

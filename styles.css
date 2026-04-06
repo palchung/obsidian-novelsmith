@@ -1399,3 +1399,37 @@ body.is-mobile .ns-button-row .ns-btn-discard:active,
     border-radius: 4px;
     line-height: 1.5;
 }
+
+/* ============================================================
+   🎨 劇情卡片顏色系統 (全卡片底色 + 修復按鈕層級)
+   ============================================================ */
+
+/* 1. 修復按鈕點擊 (防止被標題的透明區遮擋) */
+.ns-scene-card .ns-scene-actions,
+.ns-scene-card .ns-card-buttons,
+.ns-scene-card .ns-color-picker-btn {
+    position: relative;
+    z-index: 10 !important;
+    /* 🌟 強制浮喺最面，破除隱形玻璃，保證撳得到！ */
+    pointer-events: auto;
+}
+
+/* ============================================================
+   🎨 終極全域卡片顏色接收器 (聽命於 utils.ts)
+   ============================================================ */
+.ns-scene-card,
+.ns-corkboard-card {
+    /* 盲目讀取 TS 派發過嚟嘅變數，如果冇，就用預設底色 */
+    background-color: var(--scene-bg, var(--background-primary)) !important;
+    border-color: var(--scene-border, var(--background-modifier-border)) !important;
+
+    border-left: none !important;
+    /* 剷除舊版左邊粗線 */
+    transition: background-color 0.3s ease, border-color 0.3s ease !important;
+}
+
+/* 確保有顏色時，文字唔會俾背景食咗 */
+.ns-scene-card[style*="--scene-bg"],
+.ns-corkboard-card[style*="--scene-bg"] {
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15) !important;
+}

@@ -229,9 +229,10 @@ export class CorkboardModal extends Modal {
     }
 
     populateCardInnerDOM(card: HTMLElement, scene: unknown) {
+        // 🌟 換成動態注入 CSS 變數：
         const colorObj = getColorById(card.dataset.colorId);
-        const hexColor = colorObj?.color || "var(--background-modifier-border)";
-        card.setCssStyles({ borderLeft: `6px solid ${hexColor}` });
+        card.style.setProperty('--scene-bg', colorObj.bg);
+        card.style.setProperty('--scene-border', colorObj.border);
 
         const titleRow = card.createDiv();
         titleRow.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "flex-start" });
@@ -306,7 +307,10 @@ export class CorkboardModal extends Modal {
                     item.setTitle(c.name).setIcon("palette").onClick(() => {
                         card.dataset.colorId = c.id;
                         card.dataset.colorModified = "true";
-                        card.setCssStyles({ borderLeft: `6px solid ${c.color || 'var(--background-modifier-border)'}` });
+
+                        // 🌟 舊版係 set borderLeft，依家換成實時切換變數！
+                        card.style.setProperty('--scene-bg', c.bg);
+                        card.style.setProperty('--scene-border', c.border);
                         this.isDirty = true; // 🌟 標記：修改顏色
                     });
                 });

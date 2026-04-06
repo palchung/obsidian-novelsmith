@@ -96,41 +96,7 @@ export const getAnchorSceneIdFromCursor = (editor: Editor): string | null => {
     return null;
 };
 
-// ==========================================
-// 🎨 Worldboard 專用常數與共用函數
-// ==========================================
 
-// 1. 支援嘅圖片 YAML 屬性 (方便日後隨時加新字眼)
-export const IMAGE_PROPERTY_KEYS = ['image', 'avatar', 'cover', '圖片', '立繪'];
-
-// 2. 動態勢力群組顏色庫
-export const GROUP_COLORS = [
-    { bg: "rgba(123, 97, 255, 0.15)", border: "rgba(123, 97, 255, 0.4)", text: "rgba(123, 97, 255, 0.8)" },   // Purple
-    { bg: "rgba(255, 77, 77, 0.15)", border: "rgba(255, 77, 77, 0.4)", text: "rgba(255, 77, 77, 0.8)" },     // Red
-    { bg: "rgba(77, 255, 166, 0.15)", border: "rgba(77, 255, 166, 0.4)", text: "rgba(77, 255, 166, 0.8)" },  // Green
-    { bg: "rgba(77, 166, 255, 0.15)", border: "rgba(77, 166, 255, 0.4)", text: "rgba(77, 166, 255, 0.8)" },  // Blue
-    { bg: "rgba(255, 166, 77, 0.15)", border: "rgba(255, 166, 77, 0.4)", text: "rgba(255, 166, 77, 0.8)" },  // Orange
-    { bg: "rgba(255, 255, 77, 0.15)", border: "rgba(255, 255, 77, 0.4)", text: "rgba(255, 255, 77, 0.8)" },  // Yellow
-];
-
-// 3. 幾何算法：計算凸包 (Convex Hull) (從 View 抽離出嚟)
-export function getConvexHull(points: { x: number, y: number }[]): { x: number, y: number }[] {
-    if (points.length <= 2) return points;
-    const pts = [...points].sort((a, b) => a.x !== b.x ? a.x - b.x : a.y - b.y);
-    const cross = (o: any, a: any, b: any) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
-    const lower = [];
-    for (let i = 0; i < pts.length; i++) {
-        while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], pts[i]) <= 0) lower.pop();
-        lower.push(pts[i]);
-    }
-    const upper = [];
-    for (let i = pts.length - 1; i >= 0; i--) {
-        while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], pts[i]) <= 0) upper.pop();
-        upper.push(pts[i]);
-    }
-    upper.pop(); lower.pop();
-    return lower.concat(upper);
-}
 
 // ============================================================
 // 🛠️ Shared Utilities
@@ -301,14 +267,14 @@ export function cleanSceneTitle(header: string): string {
 
 export const RE_EXTRACT_COLOR = /data-color="([a-zA-Z0-9-]+)"/;
 
+// 🌟 將所有顏色設定集中喺度！要加新色，只需喺度加一行！
 export const SCENE_COLORS = [
-    //{ id: "default", icon: "⚪️", name: "Default (Colorless)", cssClass: "ns-color-grey", color: "var(--background-modifier-border)" },
-    { id: "default", icon: "⚪️", name: "Default (Colorless)", cssClass: "ns-color-grey", color: "#e5e8dc" },
-    { id: "red", icon: "🔴", name: "Red (Conflict/Villain)", cssClass: "ns-color-red", color: "#e5534b" },
-    { id: "orange", icon: "🟠", name: "Orange (Slice of Life/Suspense)", cssClass: "ns-color-orange", color: "#d9813b" },
-    { id: "green", icon: "🟢", name: "Green (Growth/Supporting)", cssClass: "ns-color-green", color: "#4bbf6b" },
-    { id: "blue", icon: "🔵", name: "Blue (Calm/Protagonist)", cssClass: "ns-color-blue", color: "#4b8be5" },
-    { id: "purple", icon: "🟣", name: "Purple (Mystery/Magic)", cssClass: "ns-color-purple", color: "#9c4be5" },
+    { id: "default", icon: "⚪️", name: "Default (Colorless)", color: "var(--background-primary)", bg: "var(--background-primary)", border: "var(--background-modifier-border)" },
+    { id: "red", icon: "🔴", name: "Red (Conflict/Villain)", color: "#e5534b", bg: "rgba(229, 83, 75, 0.15)", border: "rgba(229, 83, 75, 0.4)" },
+    { id: "orange", icon: "🟠", name: "Orange (Slice of Life/Suspense)", color: "#d9813b", bg: "rgba(217, 129, 59, 0.15)", border: "rgba(217, 129, 59, 0.4)" },
+    { id: "green", icon: "🟢", name: "Green (Growth/Supporting)", color: "#4bbf6b", bg: "rgba(75, 191, 107, 0.15)", border: "rgba(75, 191, 107, 0.4)" },
+    { id: "blue", icon: "🔵", name: "Blue (Calm/Protagonist)", color: "#4b8be5", bg: "rgba(75, 139, 229, 0.15)", border: "rgba(75, 139, 229, 0.4)" },
+    { id: "purple", icon: "🟣", name: "Purple (Mystery/Magic)", color: "#9c4be5", bg: "rgba(156, 75, 229, 0.15)", border: "rgba(156, 75, 229, 0.4)" },
 ];
 
 export const getColorById = (colorId: string | null | undefined) => {
@@ -443,3 +409,37 @@ export const getManuscriptFiles = (app: App, targetFolderPath: string, exportFol
         })
         .sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true }));
 };
+
+// ==========================================
+// 🎨 Worldboard 專用常數與共用函數
+// ==========================================
+
+// 1. 支援嘅圖片 YAML 屬性 (方便日後隨時加新字眼)
+export const IMAGE_PROPERTY_KEYS = ['image', 'avatar', 'cover', '圖片', '立繪'];
+
+// 2. 動態勢力群組顏色庫
+// 🌟 讓 Worldboard 嘅 GROUP_COLORS 直接讀取 SCENE_COLORS，完美消除重複代碼！
+export const GROUP_COLORS = SCENE_COLORS.filter(c => c.id !== "default").map(c => ({
+    bg: c.bg,
+    border: c.border,
+    text: c.color
+}));
+
+// 3. 幾何算法：計算凸包 (Convex Hull) (從 View 抽離出嚟)
+export function getConvexHull(points: { x: number, y: number }[]): { x: number, y: number }[] {
+    if (points.length <= 2) return points;
+    const pts = [...points].sort((a, b) => a.x !== b.x ? a.x - b.x : a.y - b.y);
+    const cross = (o: any, a: any, b: any) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    const lower = [];
+    for (let i = 0; i < pts.length; i++) {
+        while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], pts[i]) <= 0) lower.pop();
+        lower.push(pts[i]);
+    }
+    const upper = [];
+    for (let i = pts.length - 1; i >= 0; i--) {
+        while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], pts[i]) <= 0) upper.pop();
+        upper.push(pts[i]);
+    }
+    upper.pop(); lower.pop();
+    return lower.concat(upper);
+}
