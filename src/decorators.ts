@@ -1,6 +1,7 @@
 import { ViewUpdate, ViewPlugin, DecorationSet, Decoration, EditorView, MatchDecorator, WidgetType } from '@codemirror/view';
 import { MarkdownPostProcessorContext } from 'obsidian';
 
+
 // ============================================================
 // 1. Global Variables & Redundant Words/Dialogue Mode (Unchanged)
 // ============================================================
@@ -169,3 +170,4 @@ export function alignPropertyProcessor(el: HTMLElement, ctx: MarkdownPostProcess
         });
     });
 }
+

@@ -190,18 +190,23 @@ export class StructureView extends ItemView {
 
     async parseAndRender() {
         if (this.isRefreshing) {
-
             this.pendingRefresh = true;
             return;
         }
         this.isRefreshing = true;
 
-
+        // ==========================================
+        // 🌟 1. 記低大綱面板目前嘅捲動位置 (防跳頂魔法)
+        // ==========================================
+        let previousScrollTop = 0;
+        const scrollContainer = this.contentEl.querySelector(".ns-structure-container");
+        if (scrollContainer) {
+            previousScrollTop = scrollContainer.scrollTop;
+        }
 
         // 🔥 Include try...finally
         try {
             const activeFile = this.app.workspace.getActiveFile();
-
 
             if (this.activeTab === 'info' && this.currentWikiFile && activeFile && activeFile.path === this.currentWikiFile.path) {
                 return;
@@ -210,7 +215,6 @@ export class StructureView extends ItemView {
             const container = this.contentEl.querySelector(".ns-structure-container");
             if (!container) return;
 
-
             // 🌟 變身魔法：如果衝刺緊，清空大綱，畫出巨大時鐘，直接 return！
             if (this.isSprinting) {
                 container.empty();
@@ -218,12 +222,9 @@ export class StructureView extends ItemView {
                 return;
             }
 
-
-
             const view = this.getValidMarkdownView();
 
-
-            // 🌟 加入呢段：檢查檔案係咪屬於小說資料夾！
+            // 🌟 檢查檔案係咪屬於小說資料夾
             if (view && view.file && !this.plugin.checkInBookFolderSilent(view.file)) {
                 container.empty();
                 container.createDiv({
@@ -235,29 +236,16 @@ export class StructureView extends ItemView {
                 this.lastOutlineHash = "";
                 return;
             }
-            // 🌟 加入完畢
-
-
-
 
             if (view && this.activeTab === 'outline') {
                 const editor = view.editor;
-
-
                 const text = editor.getValue();
-
-
                 const matches = text.match(/^(?:# 📄|######|> \[!NSmith|> -).*$/gm);
-
-
                 const hashBuilder = matches ? matches.join("|") : "";
-
 
                 if (hashBuilder === this.lastOutlineHash) return;
                 this.lastOutlineHash = hashBuilder;
             }
-
-
 
             if (view && this.activeTab === 'info') {
                 const editor = view.editor;
@@ -291,7 +279,6 @@ export class StructureView extends ItemView {
                     }
                     const currentInfoHash = metaLines.join("|");
 
-
                     if (this.lastInfoTitle === foundTitle && this.lastInfoHash === currentInfoHash) {
                         return;
                     }
@@ -303,12 +290,6 @@ export class StructureView extends ItemView {
                     this.lastInfoHash = "";
                 }
             }
-
-
-
-
-
-
 
             // ==========================================
             // 🚀 神級優化：防止頻繁清空整個側邊欄 (DOM Reuse)
@@ -332,8 +313,6 @@ export class StructureView extends ItemView {
                 this.sortables = [];
             }
 
-
-
             if (!view) {
                 contentDiv.empty();
                 contentDiv.setText("Please open a draft");
@@ -354,6 +333,16 @@ export class StructureView extends ItemView {
             }
 
         } finally {
+            // ==========================================
+            // 🌟 2. 瞬間還原捲動位置，完美防止「飛返上頂」！
+            // ==========================================
+            const containerToRestore = this.contentEl.querySelector(".ns-structure-container");
+            if (containerToRestore && previousScrollTop > 0) {
+                // 使用 requestAnimationFrame 確保瀏覽器畫完 DOM 之後，即刻撥返個捲軸落去
+                requestAnimationFrame(() => {
+                    containerToRestore.scrollTop = previousScrollTop;
+                });
+            }
 
             this.isRefreshing = false;
             if (this.pendingRefresh) {
@@ -361,7 +350,6 @@ export class StructureView extends ItemView {
                 void this.parseAndRender();
             }
         }
-
     }
 
     renderHeader(container: HTMLElement, view: MarkdownView | null) {
@@ -1212,7 +1200,10 @@ export class StructureView extends ItemView {
         }
     }
 
-    async saveChanges(container: HTMLElement, view: MarkdownView) {
+    async saveChanges(container: HTMLElement, staleView?: MarkdownView) {
+        // 🌟 核心修復：永遠即時獲取「最 update」嘅視窗！
+        // 避開舊版 UI 重用時，拖拉工具鎖死咗上一篇筆記嘅「記憶體殘留 (Stale Closure)」Bug！
+        const view = this.getValidMarkdownView();
         if (!view) return;
 
         const liveText = view.editor.getValue();
@@ -1232,7 +1223,7 @@ export class StructureView extends ItemView {
 
         const liveSceneMap = new Map<string, string>();
         const liveChapterPreambleMap = new Map<string, string>();
-        const liveChapterFileIdMap = new Map<string, string>(); // 🌟 裝鎖匙嘅袋
+        const liveChapterFileIdMap = new Map<string, string>();
         let rootPreamble = "";
 
         const liveNameCount = new Map<string, number>();
@@ -1242,7 +1233,7 @@ export class StructureView extends ItemView {
                 rootPreamble = ch.preamble;
             } else {
                 liveChapterPreambleMap.set(ch.name, ch.preamble);
-                if (ch.fileIdTag) liveChapterFileIdMap.set(ch.name, ch.fileIdTag); // 🌟 將鎖匙入袋
+                if (ch.fileIdTag) liveChapterFileIdMap.set(ch.name, ch.fileIdTag);
             }
 
             ch.scenes.forEach(sc => {
@@ -1268,8 +1259,6 @@ export class StructureView extends ItemView {
             if (chName === "root") {
                 if (rootPreamble.trim()) chunks.push(rootPreamble.trim());
             } else if (chName && chName !== "root") {
-
-                // 🌟 完美修復：攞返原裝鎖匙，然後用 \n 緊緊黐住個標題！(徹底消滅雙重線與 Sync Error)
                 const fileIdTag = liveChapterFileIdMap.get(chName) || `<span class="ns-file-id">++ FILE_ID: ${chName} ++</span>`;
                 chunks.push(`# 📄 ${chName} <span class="ns-chapter-center"></span>\n${fileIdTag}`);
 
@@ -1303,14 +1292,20 @@ export class StructureView extends ItemView {
 
         const finalText = chunks.join("\n\n") + "\n";
 
-        // 🌟 終極防 Crash 魔法：延遲 50 毫秒執行 replaceEntireDocument！
-        // 咁樣可以避開 Sortable 拖拉引起嘅 CodeMirror 崩潰，同時令編輯器瞬間獲得最新內容，保證一撳 Sync 就成功！
+        // 🌟 記低「捲動位置 (Scrollbar 坐標)」(完美防飛頂)
+        const scrollInfo = view.editor.getScrollInfo();
+
+        // 🌟 寫入底層檔案，Obsidian 會做 Smart Diff 局部更新
+        await this.app.vault.modify(view.file, finalText);
+
+        this.lastOutlineHash = "";
+
+        // 🌟 延遲 150 毫秒，等系統畫完之後，強行將捲軸撥返去原本位置！
         setTimeout(() => {
-            replaceEntireDocument(view.editor, finalText);
-            this.lastOutlineHash = "";
+            view.editor.scrollTo(scrollInfo.left, scrollInfo.top);
             void this.parseAndRender();
             void this.plugin.statsManager.recordActivity(0);
-        }, 50);
+        }, 150);
     }
 
 

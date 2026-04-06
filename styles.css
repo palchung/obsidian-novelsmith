@@ -1,14 +1,11 @@
 /* ============================================================
-   NovelSmith Stylesheet
+   NovelSmith Stylesheet (Cleaned & Unified Version)
    結構：1. Overrides | 2. Layouts | 3. Components | 4. Utilities
    ============================================================ */
-
 
 /* ============================================================
    1. OVERRIDES (精準擴充 Obsidian 原生樣式，零全域污染)
    ============================================================ */
-
-/* 🛠️ 劇情卡片 H6 大細楷修正 (使用 :has() 確保只影響 NovelSmith 卡片) */
 .markdown-source-view .HyperMD-header-6:has(.ns-id),
 .markdown-source-view .HyperMD-header-6:has(.ns-id) * {
     text-transform: none !important;
@@ -20,7 +17,6 @@
     font-variant: normal !important;
 }
 
-/* 🏷️ 專屬場景卡片 Callout: [!NSmith] */
 .callout[data-callout^="nsmith"] {
     --callout-icon: lucide-clapperboard;
     transition: all 0.2s ease;
@@ -52,7 +48,6 @@
     --callout-color: var(--color-purple-rgb);
 }
 
-/* 🎭 對白模式 (Dialogue Mode) 與 冗詞標示 (Redundant Words) */
 .cm-redundant-text {
     background-color: rgba(var(--color-red-rgb), 0.25);
     border-bottom: 2px solid rgba(var(--color-red-rgb), 0.6);
@@ -73,42 +68,15 @@ body.ns-mode-dialogue .cm-dialogue-text {
     opacity: 1 !important;
 }
 
-
 /* ============================================================
-   2. LAYOUTS (軟木板、側邊欄大結構)
+   2. LAYOUTS (側邊欄大結構)
    ============================================================ */
-
-/* 📱 側邊欄大綱主體 */
 .ns-structure-container {
     padding: 15px 10px;
     height: 100%;
     overflow-y: auto;
     overflow-x: hidden !important;
-    /* 禁止橫向捲動 */
 }
-
-/* 📌 軟木板主畫布 */
-.ns-corkboard-grid {
-    display: flex;
-    flex-direction: row;
-    gap: 20px;
-    padding: 10px;
-    align-items: stretch;
-    overflow-x: auto;
-    overflow-y: hidden;
-    height: 100%;
-}
-
-/* 軟木板頂部控制台 */
-.ns-corkboard-header-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 15px;
-    padding-bottom: 10px;
-    border-bottom: 2px solid var(--background-modifier-border);
-}
-
 
 /* ============================================================
    3. COMPONENTS (UI 獨立元件)
@@ -140,12 +108,8 @@ body.ns-mode-dialogue .cm-dialogue-text {
     font-size: 0.85em;
     cursor: pointer;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-
-    /* 🌟 解除 iPad/iOS 的強制原生藥丸外觀 */
     -webkit-appearance: none;
     appearance: none;
-
-    /* 🌟 強制使用 Obsidian 標準微圓角 (確保 Mac/Windows/iPad 視覺完全統一) */
     border-radius: var(--radius-s);
 }
 
@@ -232,7 +196,6 @@ body.ns-mode-dialogue .cm-dialogue-text {
     filter: brightness(1.15);
 }
 
-/* 卡片顏色系統 */
 .ns-scene-card.ns-color-red {
     background-color: rgba(var(--color-red-rgb), 0.15) !important;
     border-left-color: var(--color-red) !important;
@@ -274,17 +237,66 @@ body.ns-mode-dialogue .cm-dialogue-text {
     line-height: 1.3 !important;
 }
 
-/* --- 📌 軟木板欄目與卡片 --- */
-.ns-corkboard-column {
+/* ============================================================
+   📌 4. 軟木板 (Corkboard) 終極 UI 整合版
+   包含：版面鎖定、畫廊軌道、懸浮面板、標籤雲微縮排版
+   ============================================================ */
+
+/* 1. 基礎版面與無限白板背景 */
+.ns-corkboard-modal .modal-content {
+    overflow: hidden !important;
+    /* 嚴禁外圍出卷軸 */
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 0 !important;
+    position: relative !important;
+    /* 確保右側面板懸浮定位準確 */
+    background-color: var(--background-primary-alt) !important;
+
+    /* 幾何點陣背景 */
+    background-image: radial-gradient(rgba(var(--text-muted-rgb), 0.12) 1px, transparent 1px) !important;
+    background-size: 24px 24px !important;
+    background-position: center center !important;
+}
+
+/* 頂部控制列 */
+.ns-corkboard-header-row {
+    flex-shrink: 0 !important;
+    padding: 15px 20px !important;
+    border-bottom: 1px solid var(--background-modifier-border) !important;
+    background-color: var(--background-primary) !important;
     display: flex;
-    flex-direction: column;
-    min-width: 320px;
-    max-width: 320px;
-    background-color: var(--background-secondary-alt);
-    border-radius: 10px;
-    padding: 12px;
-    max-height: 100%;
-    border: 1px solid var(--background-modifier-border);
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+/* 2. 畫廊軌道區 (網格與直欄) */
+.ns-corkboard-grid {
+    flex-grow: 1 !important;
+    overflow: auto !important;
+    /* 唯一允許出卷軸嘅地方 */
+    display: flex !important;
+    gap: 20px !important;
+    align-items: flex-start !important;
+    padding: 20px !important;
+    flex-wrap: nowrap !important;
+    /* 確保章節橫向排開 */
+}
+
+.ns-corkboard-column {
+    flex-shrink: 0 !important;
+    /* 寧願出橫卷軸都唔准縮水 */
+    width: 320px !important;
+    /* 收窄少少 Column 闊度，畫面更見使 */
+    max-height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+
+    /* 磨砂玻璃展板效果 */
+    background-color: rgba(var(--background-secondary-rgb), 0.5) !important;
+    border-radius: 12px !important;
+    padding: 10px !important;
+    border: 1px solid rgba(var(--background-modifier-border-rgb), 0.4);
 }
 
 .ns-corkboard-column h3 {
@@ -299,27 +311,122 @@ body.ns-mode-dialogue .cm-dialogue-text {
 }
 
 .ns-corkboard-list {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    flex-grow: 1 !important;
+    padding-right: 5px;
+    padding-bottom: 20px;
     display: flex;
     flex-direction: column;
     gap: 15px;
-    overflow-y: auto;
-    flex-grow: 1;
-    padding-right: 5px;
 }
 
-.ns-corkboard-folder-name {
-    font-size: 1.1em;
-    opacity: 0.6;
-    font-weight: bold;
-    margin-left: 5px;
-    max-width: 15vw;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: inline-block;
+/* 3. 劇情卡片高密度排版 (縮短高度) */
+@keyframes nsCardFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-/* --- 🔍 雷達系統 (Radar Semantic Zoom) --- */
+.ns-corkboard-list .ns-scene-card,
+.ns-corkboard-card {
+    animation: nsCardFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    padding: 12px 14px !important;
+    /* 收窄卡片內部留白 */
+    background-color: var(--background-primary) !important;
+    border-radius: 8px !important;
+    border: 1px solid var(--background-modifier-border) !important;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* 屬性標籤雲 (將直排變成打橫排嘅小藥丸) */
+.ns-corkboard-list .ns-scene-card>div:has(.lucide-tag) {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px 8px !important;
+    margin-top: 8px !important;
+    padding-top: 8px !important;
+    border-top: 1px dashed rgba(var(--background-modifier-border-rgb), 0.3) !important;
+}
+
+/* 小藥丸外觀 (淡灰底 + 深色字，收斂色彩) */
+.ns-corkboard-list .ns-scene-card>div:has(.lucide-tag)>div {
+    display: inline-flex !important;
+    align-items: center !important;
+    width: auto !important;
+    /* 解除霸佔全行 */
+    margin: 0 !important;
+    padding: 2px 8px !important;
+    background-color: var(--background-secondary-alt) !important;
+    border: 1px solid var(--background-modifier-border) !important;
+    border-radius: 6px !important;
+    font-size: 0.8em !important;
+    color: var(--text-normal) !important;
+}
+
+/* 隱藏重複嘅 Tag Icon */
+.ns-corkboard-list .ns-scene-card .lucide-tag {
+    display: none !important;
+}
+
+/* 淡化屬性標題 (如 POV: ) */
+.ns-corkboard-list .ns-scene-card>div:has(.lucide-tag)>div>span:first-child {
+    color: var(--text-muted) !important;
+    margin-right: 4px !important;
+    opacity: 0.8 !important;
+}
+
+/* 4. 右側編輯面板 (懸浮防爆格) */
+.ns-corkboard-wiki-panel {
+    position: absolute !important;
+    /* 幽靈懸浮魔法 */
+    top: 0 !important;
+    right: 0 !important;
+    height: 100% !important;
+    z-index: 2000 !important;
+    width: 450px;
+    max-width: 90%;
+    background-color: var(--background-primary) !important;
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.15) !important;
+    border-left: 1px solid var(--background-modifier-border) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.ns-wiki-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 25px 20px 15px 20px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.ns-wiki-panel-header h3 {
+    margin: 0;
+    color: var(--interactive-accent);
+}
+
+.ns-wiki-panel-content {
+    flex-grow: 1 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 20px;
+    font-size: 0.95em;
+}
+
+/* ----------------------------------------------------
+   🔍 雷達系統 (Radar Semantic Zoom) 
+   ---------------------------------------------------- */
 .ns-radar-console {
     flex-grow: 1;
     min-width: 0;
@@ -355,9 +462,15 @@ body.ns-mode-dialogue .cm-dialogue-text {
     background: var(--interactive-accent);
     color: var(--text-on-accent);
     padding: 4px 10px;
-    border-radius: 12px;
+    border-radius: 999px !important;
     font-size: 0.85em;
     font-weight: bold;
+    transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+}
+
+.ns-radar-token:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 4px 8px rgba(var(--interactive-accent-rgb), 0.15);
 }
 
 .ns-radar-token-close {
@@ -380,22 +493,6 @@ body.ns-mode-dialogue .cm-dialogue-text {
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
-.ns-corkboard-grid.is-radar-mode .ns-corkboard-card h4 {
-    display: -webkit-box !important;
-    -webkit-line-clamp: 2 !important;
-    -webkit-box-orient: vertical !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    font-size: 0.95em !important;
-    line-height: 1.3 !important;
-}
-
-.ns-corkboard-grid.is-radar-mode .ns-scene-note,
-.ns-corkboard-grid.is-radar-mode .ns-scene-footer,
-.ns-corkboard-grid.is-radar-mode .ns-scene-actions {
-    display: none !important;
-}
-
 .ns-corkboard-grid.is-radar-mode .ns-corkboard-card.is-dimmed {
     opacity: 0.15 !important;
     filter: grayscale(100%);
@@ -409,45 +506,110 @@ body.ns-mode-dialogue .cm-dialogue-text {
     z-index: 10;
 }
 
-/* --- 📖 側滑 Wiki 面板 (Slide-over Panel) --- */
-.ns-corkboard-wiki-panel {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 450px;
-    max-width: 90%;
-    height: 100%;
-    background-color: var(--background-primary);
-    border-left: 1px solid var(--background-modifier-border);
-    box-shadow: -5px 0 20px rgba(0, 0, 0, 0.15);
-    transform: translateX(100%);
-    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), width 0.3s ease;
-    z-index: 2000;
-    display: flex;
-    flex-direction: column;
+/* ============================================================
+   5. UTILITIES & OTHERS (作家旅程, 衝刺, 懸浮卷軸等)
+   ============================================================ */
+
+/* 懸浮卷軸 (macOS-style) */
+.ns-corkboard-modal ::-webkit-scrollbar,
+.workspace-leaf-content[data-type="novelsmith-structure-view"] ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
 }
 
-.ns-wiki-panel-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 25px 20px 15px 20px;
-    border-bottom: 1px solid var(--background-modifier-border);
+.ns-corkboard-modal ::-webkit-scrollbar-track,
+.workspace-leaf-content[data-type="novelsmith-structure-view"] ::-webkit-scrollbar-track {
+    background: transparent;
 }
 
-.ns-wiki-panel-header h3 {
-    margin: 0;
-    color: var(--interactive-accent);
+.ns-corkboard-modal ::-webkit-scrollbar-thumb,
+.workspace-leaf-content[data-type="novelsmith-structure-view"] ::-webkit-scrollbar-thumb {
+    background-color: rgba(var(--color-base-60-rgb), 0.2);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
 }
 
-.ns-wiki-panel-content {
-    padding: 20px;
-    overflow-y: auto;
-    flex-grow: 1;
-    font-size: 0.95em;
+.ns-corkboard-modal ::-webkit-scrollbar-thumb:hover,
+.workspace-leaf-content[data-type="novelsmith-structure-view"] ::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(var(--color-base-60-rgb), 0.5);
 }
 
-/* --- 🏆 作家旅程 (Writer's Journey Dashboard) --- */
+/* 發光導航 (Structure View) */
+.workspace-leaf-content[data-type="novelsmith-structure-view"] .tree-item-self,
+.workspace-leaf-content[data-type="novelsmith-structure-view"] .nav-file-title {
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    margin: 2px 4px;
+    border-left: 3px solid transparent;
+}
+
+.workspace-leaf-content[data-type="novelsmith-structure-view"] .tree-item-self:hover,
+.workspace-leaf-content[data-type="novelsmith-structure-view"] .nav-file-title:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.workspace-leaf-content[data-type="novelsmith-structure-view"] .is-active {
+    background-color: rgba(var(--interactive-accent-rgb), 0.08) !important;
+    border-left: 3px solid var(--interactive-accent) !important;
+    color: var(--text-accent) !important;
+    box-shadow: -2px 0 8px rgba(var(--interactive-accent-rgb), 0.2);
+}
+
+/* 實體書標題 (串聯模式) */
+.markdown-source-view .HyperMD-header-1:has(.ns-chapter-center) {
+    text-align: center;
+    letter-spacing: 0.15em;
+    font-weight: 400;
+    margin-top: 2.5em !important;
+    margin-bottom: 2em !important;
+    color: var(--text-normal);
+}
+
+.markdown-source-view .HyperMD-header-1:has(.ns-chapter-center)::before,
+.markdown-source-view .HyperMD-header-1:has(.ns-chapter-center)::after {
+    content: "────── ✧ ──────";
+    display: block;
+    font-size: 0.45em;
+    font-weight: normal;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+    margin: 15px auto;
+    opacity: 0.3;
+}
+
+.ns-corkboard-modal ::selection,
+.workspace-leaf-content[data-type="novelsmith-structure-view"] ::selection {
+    background-color: rgba(var(--interactive-accent-rgb), 0.25) !important;
+    color: var(--text-normal) !important;
+    text-shadow: none !important;
+}
+
+/* 藥丸標籤 (Chips) */
+.ns-chip {
+    border-radius: 999px !important;
+    padding: 4px 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background-color: var(--background-secondary);
+    color: var(--text-normal);
+    border: 1px solid var(--background-modifier-border);
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+.ns-chip:hover {
+    filter: brightness(1.2);
+    transform: translateY(-2px);
+}
+
+.ns-chip.is-active {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-color: var(--interactive-accent);
+}
+
+/* --- 🏆 作家旅程, 歷史, 衝刺, 工具類 (保留原狀) --- */
 .ns-dashboard-container {
     display: flex;
     gap: 40px;
@@ -613,7 +775,6 @@ body.ns-mode-dialogue .cm-dialogue-text {
     margin: 0;
 }
 
-/* --- 🕰️ 備份歷史面板 (History Tab) --- */
 .ns-history-list {
     display: flex;
     flex-direction: column;
@@ -668,7 +829,6 @@ body.ns-mode-dialogue .cm-dialogue-text {
     color: var(--text-error) !important;
 }
 
-/* --- ⏱️ 寫作衝刺 (Word Sprint Zen Mode) --- */
 .ns-sprint-container {
     display: flex;
     flex-direction: column;
@@ -722,12 +882,6 @@ body.ns-mode-dialogue .cm-dialogue-text {
     margin-bottom: 30px;
 }
 
-
-/* ============================================================
-   4. UTILITIES (工具類、共用微調、隱藏標記)
-   ============================================================ */
-
-/* Modal 通用區域 */
 .ns-modal-scroll-area {
     max-height: 55vh;
     overflow-y: auto;
@@ -743,30 +897,6 @@ body.ns-mode-dialogue .cm-dialogue-text {
     gap: 10px;
 }
 
-/* 藥丸標籤 (Chips) */
-.ns-chip {
-    border-radius: 16px;
-    padding: 4px 12px;
-    cursor: pointer;
-    transition: all 0.2s;
-    background-color: var(--background-secondary);
-    color: var(--text-normal);
-    border: 1px solid var(--background-modifier-border);
-    font-size: 0.85em;
-    font-weight: bold;
-}
-
-.ns-chip:hover {
-    filter: brightness(1.2);
-}
-
-.ns-chip.is-active {
-    background-color: var(--interactive-accent);
-    color: var(--text-on-accent);
-    border-color: var(--interactive-accent);
-}
-
-/* 拖拽視覺特效 */
 .ns-sortable-ghost {
     opacity: 0.4;
     background-color: var(--interactive-accent);
@@ -778,7 +908,6 @@ body.ns-mode-dialogue .cm-dialogue-text {
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
 }
 
-/* 按鈕點擊閃爍特效 */
 @keyframes ns-button-click-pulse {
     0% {
         transform: scale(1);
@@ -801,12 +930,10 @@ body.ns-mode-dialogue .cm-dialogue-text {
     transition: all 0.2s ease;
 }
 
-/* 🥷 系統隱藏標記 */
 .ns-id {
     display: none !important;
 }
 
-/* 虛擬合併檔分隔線 (++ FILE_ID ++) */
 .ns-file-id {
     display: inline-block;
     width: 100%;
@@ -826,29 +953,16 @@ body.ns-mode-dialogue .cm-dialogue-text {
     opacity: 0.6;
 }
 
-/* 📝 串聯草稿模式：專屬章節標題置中 */
-.markdown-source-view .HyperMD-header-1:has(.ns-chapter-center),
-.markdown-rendered h1:has(.ns-chapter-center) {
-    text-align: center !important;
-    border-bottom: none !important;
-    margin-top: 2em !important;
-}
-
-/* 🌟 終極核彈：強制覆蓋 iPad (Mobile) 預設樣式，確保 Discard 掣係深紅色實色！ */
-
-/* 1. 針對按鈕本體，加入 body.is-mobile 提高最高權重 */
 body.is-mobile .ns-button-row .ns-btn-discard,
 .ns-button-row .ns-btn-discard {
     -webkit-appearance: none !important;
     appearance: none !important;
     opacity: 1 !important;
-    /* 強制使用標準實色 Hex Code，唔依賴可能被 iPad 主題溝淡咗嘅 var() */
     background-color: #9a2f2f !important;
     border: none !important;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
 }
 
-/* 2. 🌟 真兇落網：強制殺死 iPad 施加喺圖示 (SVG) 同文字上嘅半透明濾鏡！ */
 body.is-mobile .ns-button-row .ns-btn-discard svg,
 body.is-mobile .ns-button-row .ns-btn-discard span,
 .ns-button-row .ns-btn-discard svg,
@@ -856,60 +970,17 @@ body.is-mobile .ns-button-row .ns-btn-discard span,
     opacity: 1 !important;
     color: #ffffff !important;
     stroke: #ffffff !important;
-    /* 確保 SVG 圖示嘅線條係純白實色 */
     fill: none !important;
 }
 
-/* Hover / Active 狀態微調 */
 body.is-mobile .ns-button-row .ns-btn-discard:active,
 .ns-button-row .ns-btn-discard:active {
     filter: brightness(0.8) !important;
 }
 
-
-/* ============================================================
-   🔥 6. 劇情卡片無縫過渡與排版瘦身 (Optical Illusion & Callout Slimming)
-   ============================================================ */
-
-/* ----------------------------------------------------
-   A. 瘦身：Callout 原生排版收窄 (極致緊湊版)
-   ---------------------------------------------------- */
-.callout[data-callout^="nsmith"] {
-    padding: 20px 30px !important;
-    /* 整體上下左右收窄 */
-}
-
-/* 消除標題與內容距離，徹底移除橫線 */
-.callout[data-callout^="nsmith"] .callout-title {
-    margin-bottom: 0 !important;
-    padding-bottom: 0 !important;
-    border-bottom: none !important;
-    /* 🌟 移除橫線 */
-}
-
-/* 消除內容區頂部與底部多餘空白 */
-.callout[data-callout^="nsmith"] .callout-content {
-    margin-top: 4px !important;
-    padding-bottom: 0 !important;
-    /* 🌟 收窄底部最底嘅 Padding */
-}
-
-/* 消除 List (ul/li) 同段落 (p) 自帶嘅超大 Margin */
-.callout[data-callout^="nsmith"] .callout-content ul,
-.callout[data-callout^="nsmith"] .callout-content p {
-    margin-top: 2px !important;
-    margin-bottom: 0 !important;
-    /* 🌟 防止底部被撐大 */
-    padding-bottom: 0 !important;
-}
-
-
-/* ----------------------------------------------------
-   B. 視覺過渡：編輯模式保護色 (解決跳動感)
-   ---------------------------------------------------- */
+/* 編輯模式保護色與對齊魔法 */
 .markdown-source-view.mod-cm6 .cm-line.cm-quote {
     background-color: rgba(var(--color-base-60-rgb), 0.08);
-    /* 統一淺灰保護底色 */
     border-left: 4px solid var(--background-modifier-border-hover) !important;
     transition: background-color 0.2s ease;
     border-radius: 0 6px 6px 0;
@@ -918,400 +989,92 @@ body.is-mobile .ns-button-row .ns-btn-discard:active,
     padding-left: 12px !important;
 }
 
-/* 游標所在行稍微加深 */
 .markdown-source-view.mod-cm6 .cm-active.cm-quote {
     background-color: rgba(var(--interactive-accent-rgb), 0.05);
     border-left: 4px solid var(--interactive-accent) !important;
 }
 
-
-/* ----------------------------------------------------
-   C. 隱藏噪音：編輯模式符號弱化
-   ---------------------------------------------------- */
-/* > (Quote 符號) 降到最淺：20% */
 .markdown-source-view.mod-cm6 .cm-line.cm-quote .cm-formatting-quote {
     opacity: 0.2 !important;
     font-size: 0.9em;
     transition: opacity 0.2s ease;
 }
 
-/* - (List 符號) 稍微深少少：35% */
 .markdown-source-view.mod-cm6 .cm-line.cm-quote .cm-formatting-list {
     opacity: 0.35 !important;
     font-size: 0.9em;
     transition: opacity 0.2s ease;
 }
 
-/* 當滑鼠懸停喺行上面，符號稍微現形，方便修改 */
 .markdown-source-view.mod-cm6 .cm-line.cm-quote:hover .cm-formatting-quote,
 .markdown-source-view.mod-cm6 .cm-line.cm-quote:hover .cm-formatting-list {
     opacity: 0.6 !important;
 }
 
-/* 淡化第一行標頭 (e.g. [!NSmith-red]) 嘅文字 */
 .markdown-source-view.mod-cm6 .cm-line.cm-quote:not(.cm-active) .cm-formatting-quote+span {
     opacity: 0.6;
 }
 
-
-/* ----------------------------------------------------
-   D. 屬性對齊魔法 (CSS Dynamic Grid)
-   ---------------------------------------------------- */
 .ns-property-list {
     display: grid !important;
-    /* 🌟 終極魔法：第一欄(Key)自動就返最長嗰個字 (max-content)，第二欄(::)固定，第三欄(Value)佔用餘下空間！絕對唔會逼埋一舊！ */
     grid-template-columns: max-content auto 1fr;
     gap: 2px 8px;
-    /* 行距 2px，左右距 8px */
     list-style: none !important;
-    /* 隱藏原本嘅點點 Bullet */
     padding-left: 0 !important;
     margin-left: 0 !important;
 }
 
 .ns-property-list li {
     display: contents;
-    /* 🌟 消除 li 嘅物理限制，等入面嘅 span 直接參與 Grid 排版 */
 }
 
 .ns-prop-key {
     font-weight: 600;
     color: var(--text-muted);
     text-align: right;
-    /* Key 靠右對齊，視覺最齊整 */
 }
 
 .ns-prop-separator {
     opacity: 0.3;
-    /* :: 符號變淡色 */
 }
 
 .ns-prop-val {
     color: var(--text-normal);
 }
 
-/* ----------------------------------------------------
-   E. 文學質感注入：手稿壓印風 (Letterpress Index Card)
-   ---------------------------------------------------- */
-
 .callout[data-callout^="nsmith"] {
-    /* 1. 壓印立體感 (內陰影模擬凹陷，外陰影模擬浮起) */
-    box-shadow:
-        inset 1px 1px 5px rgba(0, 0, 0, 0.06),
-        /* 左上暗角 (凹陷感) */
-        inset -1px -1px 4px rgba(255, 255, 255, 0.5),
-        /* 右下高光 (紙張厚度) */
-        1px 1px 3px rgba(0, 0, 0, 0.04) !important;
-    /* 微微投射喺底紙上 */
-
-    /* 2. 微漸變底色 (模擬紙張受光面，取代死板嘅單色) */
-    background-image: linear-gradient(135deg,
-            rgba(var(--callout-color), 0.15) 0%,
-            rgba(var(--callout-color), 0.04) 100%) !important;
+    box-shadow: inset 1px 1px 5px rgba(0, 0, 0, 0.06), inset -1px -1px 4px rgba(255, 255, 255, 0.5), 1px 1px 3px rgba(0, 0, 0, 0.04) !important;
+    background-image: linear-gradient(135deg, rgba(var(--callout-color), 0.15) 0%, rgba(var(--callout-color), 0.04) 100%) !important;
     background-color: transparent !important;
-    /* 讓路畀漸變色 */
-
-    /* 3. 卡片邊界與書脊 (雙實線帶出經典復古感) */
     border: 1px solid rgba(var(--callout-color), 0.2) !important;
     border-left: 4px double rgba(var(--callout-color), 0.8) !important;
     border-radius: 6px !important;
+    padding: 20px 30px !important;
 }
 
-/* 🌙 針對 Dark Mode (黑夜模式) 嘅光影微調 */
-/* 防止白色高光喺黑夜模式太刺眼，改用暗黑系陰影 */
 .theme-dark .callout[data-callout^="nsmith"] {
-    box-shadow:
-        inset 1px 1px 6px rgba(0, 0, 0, 0.4),
-        inset -1px -1px 4px rgba(255, 255, 255, 0.03),
-        1px 1px 4px rgba(0, 0, 0, 0.3) !important;
+    box-shadow: inset 1px 1px 6px rgba(0, 0, 0, 0.4), inset -1px -1px 4px rgba(255, 255, 255, 0.03), 1px 1px 4px rgba(0, 0, 0, 0.3) !important;
 }
 
-/* ============================================================
-   💎 7. NovelSmith 終極 UI 昇華包 (Modern Writer's Studio)
-   包含：懸浮卷軸、藥丸標籤、畫廊軌道、發光導航
-   ============================================================ */
-
-/* ----------------------------------------------------
-   1. 徹底消滅「核突卷軸」 (macOS-style Hover Scrollbars)
-   ---------------------------------------------------- */
-/* 針對軟木板同側邊欄，將卷軸變成半透明懸浮圓角 */
-.ns-corkboard-modal ::-webkit-scrollbar,
-.workspace-leaf-content[data-type="novelsmith-structure-view"] ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+.callout[data-callout^="nsmith"] .callout-title {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+    border-bottom: none !important;
 }
 
-.ns-corkboard-modal ::-webkit-scrollbar-track,
-.workspace-leaf-content[data-type="novelsmith-structure-view"] ::-webkit-scrollbar-track {
-    background: transparent;
-    /* 軌道全透明 */
+.callout[data-callout^="nsmith"] .callout-content {
+    margin-top: 4px !important;
+    padding-bottom: 0 !important;
 }
 
-.ns-corkboard-modal ::-webkit-scrollbar-thumb,
-.workspace-leaf-content[data-type="novelsmith-structure-view"] ::-webkit-scrollbar-thumb {
-    background-color: rgba(var(--color-base-60-rgb), 0.2);
-    border-radius: 999px;
-    /* 極致圓潤 */
-    border: 2px solid transparent;
-    /* 留白邊緣，營造懸浮感 */
-    background-clip: padding-box;
+.callout[data-callout^="nsmith"] .callout-content ul,
+.callout[data-callout^="nsmith"] .callout-content p {
+    margin-top: 2px !important;
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
 }
 
-.ns-corkboard-modal ::-webkit-scrollbar-thumb:hover,
-.workspace-leaf-content[data-type="novelsmith-structure-view"] ::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(var(--color-base-60-rgb), 0.5);
-    /* 滑鼠移上去變深色 */
-}
-
-/* ----------------------------------------------------
-   2. 現代化藥丸設計 (Pill-shaped Tokens & Micro-interactions)
-   ---------------------------------------------------- */
-/* 軟木板頂部雷達 Token 同埋卡片底部嘅 Tags */
-.ns-radar-token,
-.ns-chip,
-.ns-scene-footer span {
-    border-radius: 999px !important;
-    /* 完美藥丸形 */
-    padding: 4px 10px !important;
-    transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
-    /* 絲滑彈性動畫 */
-    border: 1px solid rgba(var(--interactive-accent-rgb), 0.15) !important;
-    background-color: rgba(var(--interactive-accent-rgb), 0.03) !important;
-}
-
-/* Hover 浮起發光效果 */
-.ns-radar-token:hover,
-.ns-chip:hover,
-.ns-scene-footer span:has(span):hover {
-    /* 確保只係有互動嘅 Tag 先會浮起 */
-    transform: translateY(-2px) scale(1.02);
-    /* 微微向上浮起並放大 */
-    box-shadow: 0 4px 8px rgba(var(--interactive-accent-rgb), 0.15);
-    background-color: rgba(var(--interactive-accent-rgb), 0.1) !important;
-    border-color: rgba(var(--interactive-accent-rgb), 0.5) !important;
-}
-
-/* ----------------------------------------------------
-   3. 畫廊級軌道 (Gallery Tracks for Corkboard)
-   ---------------------------------------------------- */
-/* 將每一章嘅 Column 變成磨砂玻璃展板 */
-.ns-corkboard-column {
-    background-color: rgba(var(--background-secondary-rgb), 0.4) !important;
-    border-radius: 14px !important;
-    /* 大圓角包裹 */
-    padding: 10px !important;
-    border: 1px solid rgba(var(--background-modifier-border-rgb), 0.4);
-    box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.02);
-}
-
-/* ----------------------------------------------------
-   4. 發光導航 (Illuminated Active States for Structure View)
-   ---------------------------------------------------- */
-/* 針對大綱側邊欄嘅每一行 */
-.workspace-leaf-content[data-type="novelsmith-structure-view"] .tree-item-self,
-.workspace-leaf-content[data-type="novelsmith-structure-view"] .nav-file-title {
-    border-radius: 6px;
-    transition: all 0.2s ease;
-    margin: 2px 4px;
-    border-left: 3px solid transparent;
-    /* 預留發光線位置 */
-}
-
-/* Hover 狀態：優雅嘅淡底色 */
-.workspace-leaf-content[data-type="novelsmith-structure-view"] .tree-item-self:hover,
-.workspace-leaf-content[data-type="novelsmith-structure-view"] .nav-file-title:hover {
-    background-color: var(--background-modifier-hover);
-}
-
-/* 🌟 Active 狀態 (你正在編輯緊嗰一張卡片)：發光主題色 */
-.workspace-leaf-content[data-type="novelsmith-structure-view"] .is-active {
-    background-color: rgba(var(--interactive-accent-rgb), 0.08) !important;
-    /* 微弱漸變底色 */
-    border-left: 3px solid var(--interactive-accent) !important;
-    /* 標誌性左側發光線 */
-    color: var(--text-accent) !important;
-    box-shadow: -2px 0 8px rgba(var(--interactive-accent-rgb), 0.2);
-    /* 線條發光感 */
-}
-
-/* ============================================================
-   ✨ 8. 史詩奇幻寫作氛圍包 (Epic Fantasy Vibe)
-   包含：實體書標題、載入動畫、點陣背景、專屬反白
-   ============================================================ */
-
-/* ----------------------------------------------------
-   1. 實體書級別排版 (Print-Ready Typography)
-   針對串聯模式嘅章節標題
-   ---------------------------------------------------- */
-.markdown-source-view .HyperMD-header-1:has(.ns-chapter-center) {
-    text-align: center;
-    letter-spacing: 0.15em;
-    /* 拉闊字距，增加史詩感 */
-    font-weight: 400;
-    /* 收斂粗體，顯得更古典 */
-    margin-top: 2.5em !important;
-    margin-bottom: 2em !important;
-    color: var(--text-normal);
-}
-
-/* 🌟 加入上下方嘅古典 ✧ 分隔線 */
-.markdown-source-view .HyperMD-header-1:has(.ns-chapter-center)::before,
-.markdown-source-view .HyperMD-header-1:has(.ns-chapter-center)::after {
-    content: "────── ✧ ──────";
-    display: block;
-    font-size: 0.45em;
-    font-weight: normal;
-    color: var(--text-muted);
-    letter-spacing: 2px;
-    margin: 15px auto;
-    opacity: 0.3;
-    /* 若隱若現嘅排版細節 */
-}
-
-/* ----------------------------------------------------
-   2. 卡片呼吸感載入動畫 (Cinematic Fade-In)
-   ---------------------------------------------------- */
-/* 定義一段極度絲滑嘅「浮現」關鍵影格 */
-@keyframes nsCardFadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* 賦予每張劇情卡片柔和嘅出場動畫 */
-.ns-corkboard-card {
-    animation: nsCardFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
-}
-
-/* ----------------------------------------------------
-   3. 沉浸式禪模式背景 (Immersive Canvas - Dot Grid)
-   ---------------------------------------------------- */
-/* 為軟木板底部加上極淡嘅幾何點陣，營造無限工作枱感覺 */
-.ns-corkboard-modal .modal-content {
-    background-color: var(--background-primary-alt) !important;
-    /* 🌟 純數學畫出嚟嘅幾何網點，零圖片，不耗記憶體 */
-    background-image: radial-gradient(rgba(var(--text-muted-rgb), 0.12) 1px, transparent 1px) !important;
-    background-size: 24px 24px !important;
-    background-position: center center !important;
-}
-
-/* ----------------------------------------------------
-   4. 品牌專屬反白選取色 (Custom Selection Highlight)
-   ---------------------------------------------------- */
-/* 將預設嘅死板藍色反白，改成帶有透明度嘅主題色 */
-.ns-corkboard-modal ::selection,
-.workspace-leaf-content[data-type="novelsmith-structure-view"] ::selection {
-    background-color: rgba(var(--interactive-accent-rgb), 0.25) !important;
-    color: var(--text-normal) !important;
-    text-shadow: none !important;
-}
-
-
-/* ============================================================
-   🛠️ 9. 軟木板版面爆格與雙重卷軸修復 (Flexbox Scrollbar Fix)
-   ============================================================ */
-
-/* 1. 鎖死 Modal 本身：嚴禁預設嘅外圍卷軸出現 */
-.ns-corkboard-modal .modal-content {
-    overflow: hidden !important;
-    display: flex !important;
-    flex-direction: column !important;
-    padding: 0 !important;
-    /* 移除預設邊距，用盡全螢幕 */
-}
-
-/* 2. 確保頂部 Header 唔會被下面嘅內容擠壓變形 */
-.ns-corkboard-header-row {
-    flex-shrink: 0 !important;
-    padding: 15px 20px !important;
-    border-bottom: 1px solid var(--background-modifier-border) !important;
-}
-
-/* 3. 軟木板 Grid：唯一合法嘅「全域滾動區」 */
-.ns-corkboard-grid {
-    flex-grow: 1 !important;
-    overflow: auto !important;
-    /* 🌟 只允許呢度出卷軸 */
-    display: flex !important;
-    gap: 20px !important;
-    align-items: flex-start !important;
-    padding: 20px !important;
-    flex-wrap: nowrap !important;
-    /* 🌟 確保章節橫向排開，絕對唔換行 */
-}
-
-/* 4. 獨立章節 Column：鎖死闊度，防止被擠壓 */
-.ns-corkboard-column {
-    flex-shrink: 0 !important;
-    /* 🌟 寧願撐爆阿爸(出橫卷軸)，都絕對唔准縮窄自己 */
-    width: 340px !important;
-    /* 固定闊度 */
-    max-height: 100% !important;
-    /* 唔准高過個螢幕 */
-    display: flex !important;
-    flex-direction: column !important;
-}
-
-/* 5. 卡片列表區：Column 內部嘅垂直滾動區 */
-.ns-corkboard-list {
-    overflow-y: auto !important;
-    /* 如果一張 Column 太多卡片，就自己內部直向滾動 */
-    overflow-x: hidden !important;
-    flex-grow: 1 !important;
-    padding-right: 5px;
-    /* 預留卷軸位置，防止卡片黐實條邊 */
-    padding-bottom: 20px;
-    /* 底部留白，方便拖拉卡片去最尾 */
-}
-
-
-/* ============================================================
-   🛠️ 10. 側滑面板懸浮修復 (Drawer Absolute Position Fix)
-   ============================================================ */
-
-/* 1. 確保 Modal 內容區成為「定位錨點」 */
-.ns-corkboard-modal .modal-content {
-    position: relative !important;
-}
-
-/* 2. 將 Wiki 面板變成「幽靈」，強行浮喺最面層，絕對唔佔用底層空間 */
-.ns-corkboard-wiki-panel {
-    position: absolute !important;
-    top: 0 !important;
-    right: 0 !important;
-    height: 100% !important;
-    /* 高度同 Modal 齊平 */
-    z-index: 100 !important;
-    /* 確保蓋過軟木板卡片 */
-
-    background-color: var(--background-primary) !important;
-    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.2) !important;
-    /* 加深左邊陰影，加強懸浮立體感 */
-    border-left: 1px solid var(--background-modifier-border) !important;
-
-    /* 確保面板內部排版正常 */
-    display: flex !important;
-    flex-direction: column !important;
-}
-
-/* 3. 面板內部嘅內容區，允許獨立上下滾動，唔影響外面 */
-.ns-wiki-panel-content {
-    flex-grow: 1 !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-}
-
-
-/* ========================================== */
-/* 🗺️ Worldboard View UI Styles              */
-/* ========================================== */
-
+/* 🗺️ Worldboard View UI Styles */
 .ns-worldboard-workspace {
     display: flex;
     height: calc(100% - 50px);
@@ -1327,10 +1090,8 @@ body.is-mobile .ns-button-row .ns-btn-discard:active,
     top: 0;
     left: 0;
     background-color: var(--background-primary);
-
 }
 
-/* 🔍 頂部搜尋框 */
 .ns-wb-search-box {
     position: absolute;
     top: 20px;
@@ -1364,7 +1125,6 @@ body.is-mobile .ns-button-row .ns-btn-discard:active,
     font-size: 16px !important;
 }
 
-/* 強制清除 Obsidian 預設嘅 Input 邊框同發光外圍 */
 .ns-wb-search-input,
 .ns-wb-search-input:focus,
 .ns-wb-search-input:active,
@@ -1376,8 +1136,6 @@ body.is-mobile .ns-button-row .ns-btn-discard:active,
     -webkit-appearance: none;
 }
 
-
-/* 🖌️ 左上角群組與印章工具列 */
 .ns-wb-group-box {
     position: absolute;
     top: 20px;
@@ -1394,7 +1152,6 @@ body.is-mobile .ns-button-row .ns-btn-discard:active,
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
-/* 📝 右側滑出預覽面板 */
 .ns-worldboard-panel {
     width: 450px;
     border-left: 1px solid var(--background-modifier-border);
@@ -1414,19 +1171,7 @@ body.is-mobile .ns-button-row .ns-btn-discard:active,
     transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
-
-
-
-
-
-
-
-
-
-
-/* ============================================================
-   5. Plot Grid View (Excel-like Matrix - Vertical Timeline)
-   ============================================================ */
+/* Plot Grid View */
 .ns-plotgrid-container {
     background-color: var(--background-primary);
     padding-bottom: 50px;
@@ -1438,12 +1183,10 @@ body.is-mobile .ns-button-row .ns-btn-discard:active,
     padding: 12px;
     display: flex;
     align-items: flex-start;
-    /* 確保字體靠上 */
     font-size: 0.9em;
     word-break: break-word;
 }
 
-/* 🌟 X 軸：頂部屬性表頭 (POV, 地點...) */
 .ns-grid-header-top {
     background-color: var(--background-secondary-alt);
     font-weight: bold;
@@ -1456,7 +1199,6 @@ body.is-mobile .ns-button-row .ns-btn-discard:active,
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
 }
 
-/* 🌟 左上角霸王位 (同時鎖死 Top 同 Left) */
 .ns-grid-header-corner {
     background-color: var(--background-secondary-alt);
     font-weight: bold;
@@ -1471,7 +1213,6 @@ body.is-mobile .ns-button-row .ns-btn-discard:active,
     box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.05);
 }
 
-/* 🌟 Y 軸分隔線：大資料夾 (Book 1, Book 2...) */
 .ns-grid-folder-divider {
     background-color: var(--background-secondary);
     font-weight: bold;
@@ -1480,12 +1221,10 @@ body.is-mobile .ns-button-row .ns-btn-discard:active,
     align-items: center;
     position: sticky;
     left: 0;
-    /* 向右碌嗰陣保持可見 */
     z-index: 5;
     border-bottom: 2px solid var(--background-modifier-border-hover);
 }
 
-/* 🌟 Y 軸標籤：章節名稱 */
 .ns-grid-header-left {
     background-color: var(--background-primary);
     font-weight: bold;
@@ -1498,28 +1237,23 @@ body.is-mobile .ns-button-row .ns-btn-discard:active,
     border-right: 2px solid var(--background-modifier-border-hover);
 }
 
-/* 🌟 可編輯嘅內容格仔 (自動撐高設定) */
 .ns-grid-cell {
     cursor: text;
     background-color: var(--background-primary);
     min-height: 80px;
     transition: background-color 0.2s;
     white-space: pre-wrap;
-    /* 確保換行顯示正確 */
 }
 
 .ns-grid-cell:hover {
     background-color: var(--background-secondary);
 }
 
-/* 🌟 動態撐高嘅 Textarea */
 .ns-grid-auto-textarea {
     width: 100%;
     min-height: 60px;
     resize: none;
-    /* 禁止手動拉大，由 JS 自動撐高 */
     overflow: hidden;
-    /* 隱藏 Scrollbar */
     border: 1px solid var(--interactive-accent);
     outline: none;
     background: var(--background-primary-alt);

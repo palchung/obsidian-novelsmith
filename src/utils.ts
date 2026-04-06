@@ -302,7 +302,8 @@ export function cleanSceneTitle(header: string): string {
 export const RE_EXTRACT_COLOR = /data-color="([a-zA-Z0-9-]+)"/;
 
 export const SCENE_COLORS = [
-    { id: "default", icon: "⚪️", name: "Default (Colorless)", cssClass: "ns-color-grey", color: "var(--background-modifier-border)" },
+    //{ id: "default", icon: "⚪️", name: "Default (Colorless)", cssClass: "ns-color-grey", color: "var(--background-modifier-border)" },
+    { id: "default", icon: "⚪️", name: "Default (Colorless)", cssClass: "ns-color-grey", color: "#e5e8dc" },
     { id: "red", icon: "🔴", name: "Red (Conflict/Villain)", cssClass: "ns-color-red", color: "#e5534b" },
     { id: "orange", icon: "🟠", name: "Orange (Slice of Life/Suspense)", cssClass: "ns-color-orange", color: "#d9813b" },
     { id: "green", icon: "🟢", name: "Green (Growth/Supporting)", cssClass: "ns-color-green", color: "#4bbf6b" },

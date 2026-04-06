@@ -315,7 +315,7 @@ export class CorkboardModal extends Modal {
         };
 
         const { foundSynopsis, dynamicTags } = extractSynopsisAndTags(scene.meta || []);
-        const noteText = foundSynopsis || (card.dataset.isNew === "true" ? "(New scene, edit later)" : "(No synopsis)");
+        const noteText = foundSynopsis || (card.dataset.isNew === "true" ? "(New scene, edit later)" : ""); //(No synopsis)
         const noteEl = card.createDiv({ text: noteText, cls: "ns-scene-note" });
         noteEl.setCssStyles({ flexGrow: "1", fontSize: "0.9em", opacity: foundSynopsis ? "0.8" : "0.4", whiteSpace: "pre-wrap", maxHeight: "150px", overflow: "hidden", textOverflow: "ellipsis" });
 

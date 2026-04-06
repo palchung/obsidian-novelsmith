@@ -291,18 +291,11 @@ export class WritingManager {
         if (totalCount > 0) {
             const finalContent = processedLines.join("\n");
             if (finalContent !== content) {
-                // 🌟 1. 記低目前嘅游標同捲動位置
-                const cursorInfo = view.editor.getCursor();
-                const scrollInfo = view.editor.getScrollInfo();
+                // 🌟 終極無痕更新魔法：捨棄 replaceEntireDocument，改用底層寫入！
+                // Obsidian 會自動做 Smart Diff，只更新改錯字嗰一行，畫面 100% 零閃爍、不跳頂！
+                await this.app.vault.modify(view.file, finalContent);
 
-                // 🔥 P2 Optimization: Call global silent replacement
-                replaceEntireDocument(view.editor, finalContent);
-
-                // 🌟 2. 瞬間還原位置，完美防止畫面飛上頂！
-                view.editor.setCursor(cursorInfo);
-                view.editor.scrollTo(scrollInfo.left, scrollInfo.top);
-
-                new Notice(`✅ Corrected ${totalCount} typos.\n` + changesLog.slice(0, 3).join("\n") + (changesLog.length > 3 ? "\n..." : ""), 5000);
+                new Notice(`Corrected ${totalCount} typos.\n` + changesLog.slice(0, 3).join("\n") + (changesLog.length > 3 ? "\n..." : ""), 5000);
             }
         } else {
             new Notice("Perfect! No typos found.");
@@ -310,11 +303,11 @@ export class WritingManager {
     }
 
     // =================================================================
-    // 🧹 Clean Draft (Upgraded: Supports options and internal links)
+    // 🧹 Clean Draft (Upgraded: Smart Diff & options)
     // =================================================================
     cleanDraft(view: MarkdownView) {
-        // 🚨 留意：呢度 options 加咗 any，方便接收新增嘅 removeBold
-        new CleanDraftModal(this.app, (options: any) => {
+        // 🌟 注意呢度加咗 async
+        new CleanDraftModal(this.app, async (options: any) => {
             let content = view.editor.getValue();
             const originalContent = content;
 
@@ -326,20 +319,21 @@ export class WritingManager {
             // Remove internal links
             if (options.removeInternalLinks) content = content.replace(/(?<!!)\[\[(?:[^\]]*\|)?([^\]]+)\]\]/g, "$1");
 
-            // 🌟 新增功能：清除粗體 **符號**，但保留中間嘅文字 ($1)
+            // Remove Bold
             if (options.removeBold) content = content.replace(/\*\*([\s\S]*?)\*\*/g, "$1");
 
+            // 🌟 替換為以下加入咗「防大地震鎖定」嘅版本：
             if (content !== originalContent) {
-                // 🌟 1. 記低目前嘅游標同捲動位置
-                const cursorInfo = view.editor.getCursor();
+                // 1. 記低捲軸，專門用嚟應付 Internal Link 刪除引起嘅 Smart Diff 罷工！
                 const scrollInfo = view.editor.getScrollInfo();
 
-                // 🔥 P2 Optimization: Call global silent replacement
-                replaceEntireDocument(view.editor, content);
+                // 2. 底層寫入
+                await this.app.vault.modify(view.file, content);
 
-                // 🌟 2. 瞬間還原位置，防止畫面飛上頂
-                view.editor.setCursor(cursorInfo);
-                view.editor.scrollTo(scrollInfo.left, scrollInfo.top);
+                // 3. 強制鎖死捲軸 (拯救飛上頂嘅情況)
+                setTimeout(() => {
+                    view.editor.scrollTo(scrollInfo.left, scrollInfo.top);
+                }, 100);
 
                 new Notice("Clean draft complete! Selected markers have been removed.");
             } else {
@@ -347,4 +341,24 @@ export class WritingManager {
             }
         }).open();
     }
+
+    // =================================================================
+    // ✨ 魔法閃爍視覺回饋
+    // =================================================================
+    triggerMagicFlash(view: MarkdownView) {
+        const editorEl = view.containerEl.querySelector('.markdown-source-view');
+        if (editorEl) {
+            editorEl.classList.remove('ns-editor-flash');
+            void (editorEl as HTMLElement).offsetWidth; // 強制重繪 (Trigger Reflow)
+            editorEl.classList.add('ns-editor-flash');
+
+            // 動畫完結後清理 Class
+            setTimeout(() => {
+                editorEl.classList.remove('ns-editor-flash');
+            }, 1500);
+        }
+    }
+
+
+
 }
