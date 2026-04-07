@@ -433,7 +433,7 @@ export class CleanDraftModal extends Modal {
 
         new Setting(contentEl).setName("Remove comments (%%...%%)").addToggle(t => t.setValue(this.options.removeComments).onChange(v => this.options.removeComments = v));
         new Setting(contentEl).setName("Remove strikethrough (~~...~~)").addToggle(t => t.setValue(this.options.removeStrikethrough).onChange(v => this.options.removeStrikethrough = v));
-        new Setting(contentEl).setName("Remove Bold ( ** )").setDesc("Remove the ** symbols but keep the text inside.").addToggle(toggle => toggle.setValue(this.options.removeBold).onChange(v => { this.options.removeBold = v; }));
+        new Setting(contentEl).setName("Remove bold ( ** )").setDesc("Remove the ** symbols but keep the text inside.").addToggle(toggle => toggle.setValue(this.options.removeBold).onChange(v => { this.options.removeBold = v; }));
 
         new Setting(contentEl).setName("Remove highlights (==...==)").addToggle(t => t.setValue(this.options.removeHighlights).onChange(v => this.options.removeHighlights = v));
         new Setting(contentEl).setName("Remove internal links ([...])").setDesc("Keep display text, remove only the double brackets.").addToggle(t => t.setValue(this.options.removeInternalLinks).onChange(v => this.options.removeInternalLinks = v));

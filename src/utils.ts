@@ -429,7 +429,7 @@ export const GROUP_COLORS = SCENE_COLORS.filter(c => c.id !== "default").map(c =
 export function getConvexHull(points: { x: number, y: number }[]): { x: number, y: number }[] {
     if (points.length <= 2) return points;
     const pts = [...points].sort((a, b) => a.x !== b.x ? a.x - b.x : a.y - b.y);
-    const cross = (o: any, a: any, b: any) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    const cross = (o: unknown, a: unknown, b: unknown) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
     const lower = [];
     for (let i = 0; i < pts.length; i++) {
         while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], pts[i]) <= 0) lower.pop();

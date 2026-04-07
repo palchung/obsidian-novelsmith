@@ -20,10 +20,10 @@ export class PlotColumnModal extends Modal {
     onOpen() {
         const { contentEl } = this;
         contentEl.empty();
-        contentEl.createEl("h2", { text: "Add New Plot Column" });
+        contentEl.createEl("h2", { text: "Add new plot column" });
 
         new Setting(contentEl)
-            .setName("Column Name (屬性名稱)")
+            .setName("Column name (屬性名稱)")
             .setDesc("例如：主角線、反派線、地點、時間")
             .addText(text => text
                 .setPlaceholder("輸入名稱...")
@@ -31,11 +31,11 @@ export class PlotColumnModal extends Modal {
                 .onChange(value => this.colName = value));
 
         new Setting(contentEl)
-            .setName("Column Type (屬性類別)")
-            .setDesc("Scene (劇情行)：從劇情卡片中提取。Tracking (追蹤行)：從章節頂部備註中提取。")
+            .setName("Column type (屬性類別)")
+            .setDesc("Scene (劇情行)：從劇情卡片中提取。tracking (追蹤行)：從章節頂部備註中提取。")
             .addDropdown(drop => drop
-                .addOption("scene", "🎭 Scene (劇情行)")
-                .addOption("tracking", "📌 Tracking (追蹤行)")
+                .addOption("scene", "Scene (劇情行)")
+                .addOption("tracking", "Tracking (追蹤行)")
                 .setValue(this.colType)
                 .onChange(value => this.colType = value as "tracking" | "scene"));
 
@@ -75,7 +75,7 @@ export class PlotGridView extends ItemView {
     }
 
     getViewType() { return VIEW_TYPE_PLOTGRID; }
-    getDisplayText() { return "Plot Grid"; }
+    getDisplayText() { return "Plot grid"; }
     getIcon() { return "table"; }
 
     async onOpen() {
@@ -95,13 +95,13 @@ export class PlotGridView extends ItemView {
         const iconSpan = titleGroup.createSpan();
         setIcon(iconSpan, "table");
         iconSpan.setCssStyles({ color: "var(--interactive-accent)" });
-        titleGroup.createEl("h3", { text: "Plot Grid", attr: { style: "margin: 0;" } });
+        titleGroup.createEl("h3", { text: "Plot grid", attr: { style: "margin: 0;" } });
 
         const controlsGroup = headerEl.createDiv({ attr: { style: "display: flex; gap: 10px; alignItems: center;" } });
 
         const scopeSelect = controlsGroup.createEl("select", { cls: "dropdown" });
-        scopeSelect.createEl("option", { value: "micro", text: "📍 Current Book" });
-        scopeSelect.createEl("option", { value: "macro", text: "🌌 Entire Series (God Mode)" });
+        scopeSelect.createEl("option", { value: "micro", text: "Current book" });
+        scopeSelect.createEl("option", { value: "macro", text: "Entire series (god mode)" });
         scopeSelect.value = this.viewScope;
 
         scopeSelect.onchange = async () => {
@@ -149,7 +149,7 @@ export class PlotGridView extends ItemView {
     // 🎨 渲染網格邏輯
     // ==========================================
     async renderGrid() {
-        const gridContainer = this.contentEl.querySelector(".ns-plotgrid-container") as HTMLElement;
+        const gridContainer = this.contentEl.querySelector(".ns-plotgrid-container");
         if (!gridContainer) return;
         gridContainer.empty();
         gridContainer.createDiv({ text: "Scanning manuscript...", attr: { style: "padding: 20px; opacity: 0.5;" } });
@@ -178,7 +178,7 @@ export class PlotGridView extends ItemView {
         for (const file of allFiles) {
             const folderName = file.parent?.name || "Root";
             if (!foldersMap.has(folderName)) foldersMap.set(folderName, []);
-            foldersMap.get(folderName)!.push(file);
+            foldersMap.get(folderName).push(file);
 
             const content = await this.plugin.app.vault.read(file);
             const parsed = parseContent(content, true, this.plugin.app, file);
@@ -277,7 +277,7 @@ export class PlotGridView extends ItemView {
                 position: "absolute", left: "250px", top: "80px",
                 color: "var(--text-muted)", opacity: "0.5", fontStyle: "italic", padding: "20px"
             });
-            emptyPrompt.innerText = "👈 只有章節。請撳右上角「Add Column」建立你專屬嘅大綱網格。";
+            emptyPrompt.innerText = "只有章節。請撳右上角「Add column」建立你專屬嘅大綱網格。";
         }
     }
 

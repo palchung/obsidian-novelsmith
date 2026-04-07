@@ -1,8 +1,13 @@
-import { App, Notice, MarkdownView, TFile } from 'obsidian';
+import { App, Notice, MarkdownView, TFile, Editor } from 'obsidian';
+import { EditorView } from '@codemirror/view';
 import { NovelSmithSettings } from '../settings';
 import { updateRedundantPatterns } from '../decorators';
 import { AIDS_DIR, ensureFolderExists, replaceEntireDocument } from '../utils';
 import { CleanDraftModal } from '../modals';
+
+interface EditorWithCM extends Editor {
+    cm: EditorView;
+}
 
 export class WritingManager {
     app: App;
@@ -21,7 +26,7 @@ export class WritingManager {
         this.app.workspace.iterateAllLeaves((leaf) => {
             if (leaf.view instanceof MarkdownView) {
 
-                const cm = (leaf.view.editor as any).cm;
+                const cm = (leaf.view.editor as unknown as EditorWithCM).cm;
 
                 if (cm) cm.dispatch({ effects: [] });
             }
@@ -307,7 +312,7 @@ export class WritingManager {
     // =================================================================
     cleanDraft(view: MarkdownView) {
         // 🌟 注意呢度加咗 async
-        new CleanDraftModal(this.app, async (options: any) => {
+        new CleanDraftModal(this.app, async (options: unknown) => {
             let content = view.editor.getValue();
             const originalContent = content;
 

@@ -1,4 +1,4 @@
-import { MarkdownView, Notice, Plugin, TFile, debounce } from 'obsidian';
+import { MarkdownView, Notice, Plugin, TFile } from 'obsidian';
 import { WorkspaceLeaf } from 'obsidian';
 import { NovelSmithSettings, DEFAULT_SETTINGS, NovelSmithSettingTab } from './src/settings';
 import { ScrivenerManager } from './src/managers/ScrivenerManager';
@@ -421,6 +421,39 @@ export default class NovelSmithPlugin extends Plugin {
             }
         });
 
+
+        // 🌟 啟動改名追蹤雷達 (自動更新 data.json 內的路徑)
+        this.registerEvent(
+            this.app.vault.on('rename', async (file, oldPath) => {
+                // 如果 data.json 入面有記錄舊路徑嘅字數
+                if (this.settings.wordTargets && this.settings.wordTargets[oldPath]) {
+                    // 將舊資料搬去新路徑
+                    this.settings.wordTargets[file.path] = this.settings.wordTargets[oldPath];
+                    // 刪除舊路徑記錄
+                    delete this.settings.wordTargets[oldPath];
+                    // 儲存落硬碟 (data.json)
+                    await this.saveSettings();
+                }
+            })
+        );
+
+        // 🌟 順手加埋刪除追蹤 (如果刪除咗檔案，就清走垃圾數據)
+        this.registerEvent(
+            this.app.vault.on('delete', async (file) => {
+                if (this.settings.wordTargets && this.settings.wordTargets[file.path]) {
+                    delete this.settings.wordTargets[file.path];
+                    await this.saveSettings();
+                }
+            })
+        );
+
+
+
+
+
+
+
+
         // Ribbon Icons
         // this.addRibbonIcon('save', 'Smart Save', () => {
         //     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -441,6 +474,14 @@ export default class NovelSmithPlugin extends Plugin {
         // this.addRibbonIcon('layout-list', 'Open Outline', () => {
         //     this.activateView();
         // });
+
+
+
+
+
+
+
+
     }
 
     // =================================================================
@@ -488,7 +529,7 @@ export default class NovelSmithPlugin extends Plugin {
         // 只有真係加咗嘢，先至 Save 檔案，並且彈 Notice 提示用家！
         if (modified) {
             await this.app.vault.modify(tplFile, content);
-            new Notice(`🪄 Auto-Sync: Scene Card template updated with new worldboard categories!`);
+            new Notice(`Auto-sync: scene card template updated with new worldboard categories!`);
         }
     }
 

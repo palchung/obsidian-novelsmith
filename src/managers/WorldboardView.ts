@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, Notice, TFolder, TFile, debounce, MarkdownRenderer, setIcon, Modal, Setting, App } from 'obsidian';
+import { ItemView, WorkspaceLeaf, Notice, TFolder, TFile, MarkdownRenderer, setIcon, Modal, Setting, App } from 'obsidian';
 import NovelSmithPlugin from '../../main';
 import { Network, Options } from 'vis-network';
 import { sanitizeFileName, IMAGE_PROPERTY_KEYS, GROUP_COLORS, getConvexHull } from '../utils';
@@ -18,7 +18,7 @@ export class WorldboardView extends ItemView {
     returnJumpTarget: { tab: string, node: string, label: string } | null = null;
 
     currentEditingFile: TFile | null = null;
-    currentProperties: Record<string, any> = {};
+    currentProperties: Record<string, unknown> = {};
     currentBodyContent: string = "";
 
     // ==========================================
@@ -61,7 +61,7 @@ export class WorldboardView extends ItemView {
             // 如果空空如也，直接畀個大掣佢加
             const emptyBox = contentEl.createDiv({ attr: { style: "padding: 50px; text-align: center;" } });
             emptyBox.createEl("h3", { text: "Your world is empty", attr: { style: "color: var(--text-muted); margin-bottom: 20px;" } });
-            const firstAddBtn = emptyBox.createEl("button", { text: "Add your first Worldboard category", cls: "mod-cta" });
+            const firstAddBtn = emptyBox.createEl("button", { text: "Add your first worldboard category", cls: "mod-cta" });
             firstAddBtn.onclick = () => {
                 new AddWikiCategoryModal(this.app, this.plugin, (newCatName) => {
                     this.activeTabName = newCatName;
@@ -231,8 +231,8 @@ export class WorldboardView extends ItemView {
         // ==========================================
         // 🌟 我哋將個搜尋框由「畫布上面 (absolute)」搬去「頂部導航列 (flex)」！
         // 咁樣可以 100% 避開 iOS Safari 所有絕對座標 Bug 同鍵盤衝突！
-        const headerEl = this.contentEl.querySelector(".ns-worldboard-header") as HTMLElement;
-        let searchBox = headerEl?.querySelector(".ns-wb-search-box") as HTMLElement;
+        const headerEl = this.contentEl.querySelector(".ns-worldboard-header");
+        let searchBox = headerEl?.querySelector(".ns-wb-search-box");
         if (searchBox) searchBox.remove();
 
         if (headerEl) {
@@ -355,20 +355,20 @@ export class WorldboardView extends ItemView {
 
         const updateGroupOptions = () => {
             groupSelect.empty();
-            groupSelect.createEl("option", { text: "No Grouping (Clear)", value: "" });
+            groupSelect.createEl("option", { text: "No Grouping (clear)", value: "" });
             Array.from(allMetaKeys).sort().forEach(k => groupSelect.createEl("option", { text: `Group by: ${k}`, value: k }));
-            groupSelect.createEl("option", { text: "➕ Create new group...", value: "_new_group_" });
+            groupSelect.createEl("option", { text: "Create new group...", value: "_new_group_" });
             if (this.activeGroupKey) groupSelect.value = this.activeGroupKey;
         };
         updateGroupOptions();
 
         const updateStampOptions = () => {
             stampSelect.empty();
-            stampSelect.createEl("option", { text: "🖌️ Select value to stamp...", value: "" });
+            stampSelect.createEl("option", { text: "Select value to stamp...", value: "" });
             if (this.activeGroupKey && allMetaValues[this.activeGroupKey]) {
                 Array.from(allMetaValues[this.activeGroupKey]).sort().forEach(v => stampSelect.createEl("option", { text: `🖌️ Stamp: ${v}`, value: v }));
             }
-            stampSelect.createEl("option", { text: "➕ Create new value...", value: "_new_" });
+            stampSelect.createEl("option", { text: "Create new value...", value: "_new_" });
             if (this.activeStampValue) stampSelect.value = this.activeStampValue;
         };
         updateStampOptions();
@@ -444,8 +444,8 @@ export class WorldboardView extends ItemView {
         const satColor = this.getCssVar('--background-modifier-border') || '#444444';
         const satText = this.getCssVar('--text-muted') || '#888888';
 
-        const nodesData: any[] = [];
-        const edgesData: any[] = [];
+        const nodesData: unknown[] = [];
+        const edgesData: unknown[] = [];
         const existingNodeIds = new Set<string>();
 
         files.forEach(file => {
@@ -478,7 +478,7 @@ export class WorldboardView extends ItemView {
             };
 
             // 🗂️ 2. 卡片基礎設定 (加入 3D 懸浮陰影)
-            const nodeObj: any = {
+            const nodeObj: unknown = {
                 id: file.basename,
                 label: file.basename,
                 color: origColor,
@@ -544,7 +544,7 @@ export class WorldboardView extends ItemView {
                     const relationLabel = key;
                     const customColor = this.plugin.settings.relationColors?.[relationLabel];
 
-                    const edgeObj: any = { id: `edge-${edgeCounter++}`, from: file.basename, to: target, label: relationLabel, arrows: 'to' };
+                    const edgeObj: unknown = { id: `edge-${edgeCounter++}`, from: file.basename, to: target, label: relationLabel, arrows: 'to' };
 
                     if (customColor) {
                         const customEdgeFont = { align: 'middle', color: customColor, size: 13, strokeWidth: 2, strokeColor: bgColor, bold: true };
@@ -654,7 +654,7 @@ export class WorldboardView extends ItemView {
         this.network.on("dragEnd", async (params) => {
             if (params.nodes && params.nodes.length > 0) {
                 const updates = params.nodes.map((id: string) => ({ id: id, physics: false }));
-                (this.network as any).body.data.nodes.update(updates);
+                (this.network as unknown).body.data.nodes.update(updates);
                 const positions = this.network?.getPositions(params.nodes);
                 if (!positions) return;
                 if (!this.plugin.settings.worldboardCoords) this.plugin.settings.worldboardCoords = {};
@@ -734,8 +734,8 @@ export class WorldboardView extends ItemView {
             btnReturn.title = `Return to ${this.returnJumpTarget.label} canvas`;
             btnReturn.setCssStyles({ padding: "6px", backgroundColor: "transparent", boxShadow: "none", color: "var(--interactive-accent)" });
             btnReturn.onclick = () => {
-                const targetTab = this.returnJumpTarget!.tab;
-                const targetNode = this.returnJumpTarget!.node;
+                const targetTab = this.returnJumpTarget.tab;
+                const targetNode = this.returnJumpTarget.node;
                 this.returnJumpTarget = null; // 消耗記憶
 
                 this.activeTabName = targetTab;
@@ -811,24 +811,24 @@ export class WorldboardView extends ItemView {
     // ==========================================
     private handleSearch(query: string) {
         if (!this.network) return;
-        const nodesData = (this.network as any).body.data.nodes;
-        const edgesData = (this.network as any).body.data.edges;
+        const nodesData = (this.network as unknown).body.data.nodes;
+        const edgesData = (this.network as unknown).body.data.edges;
 
         const q = query.toLowerCase().trim();
-        const nodeUpdates: any[] = [];
-        const edgeUpdates: any[] = [];
+        const nodeUpdates: unknown[] = [];
+        const edgeUpdates: unknown[] = [];
         let matchCount = 0;
         let lastMatchId = null;
 
         if (q === "") {
-            nodesData.forEach((node: any) => {
+            nodesData.forEach((node: unknown) => {
                 nodeUpdates.push({ id: node.id, color: node._origColor, font: node._origFont });
             });
-            edgesData.forEach((edge: any) => {
+            edgesData.forEach((edge: unknown) => {
                 edgeUpdates.push({ id: edge.id, color: edge._origColor, font: edge._origFont });
             });
         } else {
-            nodesData.forEach((node: any) => {
+            nodesData.forEach((node: unknown) => {
                 const isMatch = node._searchString && node._searchString.includes(q);
                 if (isMatch) {
                     nodeUpdates.push({ id: node.id, color: node._origColor, font: node._origFont });
@@ -843,7 +843,7 @@ export class WorldboardView extends ItemView {
                 }
             });
 
-            edgesData.forEach((edge: any) => {
+            edgesData.forEach((edge: unknown) => {
                 const fromNode = nodesData.get(edge.from);
                 const toNode = nodesData.get(edge.to);
                 const isFromMatch = fromNode && fromNode._searchString && fromNode._searchString.includes(q);
@@ -872,7 +872,7 @@ export class WorldboardView extends ItemView {
     // ==========================================
     private focusSearchMatches() {
         if (!this.network) return;
-        const searchInput = this.contentEl.querySelector(".ns-wb-search-input") as HTMLInputElement;
+        const searchInput = this.contentEl.querySelector(".ns-wb-search-input");
         if (!searchInput) return;
         const q = searchInput.value.toLowerCase().trim();
 
@@ -885,9 +885,9 @@ export class WorldboardView extends ItemView {
                 return;
             }
 
-            const nodesData = (this.network as any).body.data.nodes;
+            const nodesData = (this.network as unknown).body.data.nodes;
             const matchIds: string[] = [];
-            nodesData.forEach((node: any) => {
+            nodesData.forEach((node: unknown) => {
                 if (node._searchString && node._searchString.includes(q)) {
                     matchIds.push(node.id);
                 }
@@ -942,8 +942,8 @@ export class WorldboardView extends ItemView {
     // ==========================================
     // 🖱️ 獨立事件 2：處理關係線顏色點擊 (Edge Color Picker)
     // ==========================================
-    private handleEdgeColorClick(edgeId: string, pointerDOM: { x: number, y: number }, edgesData: any[], canvasContainer: HTMLElement) {
-        const edgeData = edgesData.find((e: any) => e.id === edgeId);
+    private handleEdgeColorClick(edgeId: string, pointerDOM: { x: number, y: number }, edgesData: unknown[], canvasContainer: HTMLElement) {
+        const edgeData = edgesData.find((e: unknown) => e.id === edgeId);
         if (!edgeData || !edgeData.label) return;
 
         const relationLabel = edgeData.label;
@@ -1058,7 +1058,7 @@ class AddWikiCategoryModal extends Modal {
 
         new Setting(contentEl)
             .setName("Layout mode")
-            .addDropdown(d => d.addOption("network", "Network (free form)").addOption("hierarchy", "Hierarchy (Tree)")
+            .addDropdown(d => d.addOption("network", "Network (free form)").addOption("hierarchy", "Hierarchy (tree)")
                 .onChange(v => this.layoutMode = v as 'network' | 'hierarchy'));
 
         new Setting(contentEl)
@@ -1073,7 +1073,7 @@ class AddWikiCategoryModal extends Modal {
 
         new Setting(contentEl)
             .addButton(btn => btn
-                .setButtonText("Generate & Add")
+                .setButtonText("Generate & add")
                 .setCta()
                 .onClick(async () => {
                     if (!this.catName || !this.folderPath) {
@@ -1138,7 +1138,7 @@ class ManageEdgeColorsModal extends Modal {
             .setName("Clear all colors")
             .setDesc("Reset all relationship lines to default gray.")
             .addButton(btn => btn
-                .setButtonText("Clear All")
+                .setButtonText("Clear all")
                 .setWarning()
                 .onClick(async () => {
                     this.plugin.settings.relationColors = {};

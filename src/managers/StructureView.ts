@@ -1,8 +1,8 @@
-import { ItemView, WorkspaceLeaf, MarkdownView, Notice, Menu, setIcon, MarkdownRenderer, TFolder, TFile } from 'obsidian';
-import Sortable from 'sortablejs';
+import { ItemView, WorkspaceLeaf, MarkdownView, Notice, Menu, setIcon, MarkdownRenderer, TFolder, TFile, TAbstractFile } from 'obsidian';
+import Sortable, { SortableEvent } from 'sortablejs';
 import NovelSmithPlugin from '../../main';
 import { SimpleConfirmModal, DashboardBuilderModal, CorkboardModal, CorkboardDraftActionModal } from '../modals';
-import { getAnchorSceneIdFromCursor, createIconButton, isScriveningsDraft, replaceEntireDocument, extractSceneId, cleanSceneTitle, DRAFT_FILENAME, extractSceneColor, getColorById, SCENE_COLORS } from '../utils';
+import { getAnchorSceneIdFromCursor, createIconButton, isScriveningsDraft, extractSceneId, cleanSceneTitle, DRAFT_FILENAME, extractSceneColor, getColorById, SCENE_COLORS } from '../utils';
 
 
 export const VIEW_TYPE_STRUCTURE = "novelsmith-structure-view";
@@ -32,6 +32,7 @@ interface ChapterNode {
 export class StructureView extends ItemView {
     plugin: NovelSmithPlugin;
     private sortables: Sortable[] = [];
+    private targetUpdateTimer: number | null = null;
     private docYaml: string = "";
     private isRefreshing: boolean = false;
 
@@ -72,7 +73,7 @@ export class StructureView extends ItemView {
 
 
 
-    private activeTab: 'outline' | 'history' | 'info' = 'outline';
+    private activeTab: 'outline' | 'history' | 'info' | 'target' = 'outline';
     private lastTab: string = "";
     private lastDraftMode: boolean = false;
     private selectedSceneId: string | null = null;
@@ -178,6 +179,22 @@ export class StructureView extends ItemView {
             }
         });
 
+        // 🌟 核心升級：打字感應器 (結合 1.5 秒慳電節流閥)
+        this.registerEvent(
+            this.app.workspace.on('editor-change', () => {
+                // 1. 如果依家唔係開緊「字數 Tab」，即刻罷工，保證 100% 零耗電！
+                if (this.activeTab !== 'target') return;
+
+                // 2. 如果 1.5 秒內又打咗字，就取消上次嘅計時
+                if (this.targetUpdateTimer) window.clearTimeout(this.targetUpdateTimer);
+
+                // 3. 重新倒數：只要停手唔打字超過 1.5 秒，先至執行更新！
+                this.targetUpdateTimer = window.setTimeout(() => {
+                    void this.parseAndRender();
+                }, 1500);
+            })
+        );
+
 
     }
 
@@ -212,7 +229,7 @@ export class StructureView extends ItemView {
                 return;
             }
 
-            const container = this.contentEl.querySelector(".ns-structure-container") as HTMLElement | null;;
+            const container = this.contentEl.querySelector(".ns-structure-container");;
             if (!container) return;
 
             // 🌟 變身魔法：如果衝刺緊，清空大綱，畫出巨大時鐘，直接 return！
@@ -241,9 +258,13 @@ export class StructureView extends ItemView {
                 const editor = view.editor;
                 const text = editor.getValue();
                 const matches = text.match(/^(?:# 📄|######|> \[!NSmith|> -).*$/gm);
-                const hashBuilder = matches ? matches.join("|") : "";
 
-                if (hashBuilder === this.lastOutlineHash) return;
+                // 🌟 核心修復 1：將「檔案路徑」綁定落 Hash 度！
+                // 咁樣就算兩篇筆記都係空白 ("" === "")，只要路徑唔同，系統都一定會強制刷新畫面！
+                const hashBuilder = (view.file ? view.file.path : "") + "|" + (matches ? matches.join("|") : "");
+
+                // 🌟 加強防護：如果個面板連 Header 按鈕都未畫，絕對唔可以提早收工！
+                if (hashBuilder === this.lastOutlineHash && container.querySelector(".ns-control-header")) return;
                 this.lastOutlineHash = hashBuilder;
             }
 
@@ -295,7 +316,7 @@ export class StructureView extends ItemView {
             // 🚀 神級優化：防止頻繁清空整個側邊欄 (DOM Reuse)
             // ==========================================
             let header = container.querySelector(":scope > .ns-control-header");
-            let contentDiv = container.querySelector(":scope > .ns-tab-content") as HTMLElement | null;
+            let contentDiv = container.querySelector(":scope > .ns-tab-content");
 
             const isDraftMode = view && view.file && view.file.name === DRAFT_FILENAME;
             const draftModeChanged = this.lastDraftMode !== !!isDraftMode;
@@ -324,13 +345,19 @@ export class StructureView extends ItemView {
                 this.renderOutline(contentDiv, view);
             }
             else if (this.activeTab === 'info') {
-                contentDiv.empty(); // Info 暫時保留清空重畫
+                contentDiv.empty();
                 this.renderInfo(contentDiv, view);
             }
-            else {
-                contentDiv.empty(); // History 暫時保留清空重畫
+            else if (this.activeTab === 'history') {
+                contentDiv.empty();
                 await this.renderHistory(contentDiv, view);
             }
+            // 🌟 新增：分發畀 Target 面板
+            else if (this.activeTab === 'target') {
+                contentDiv.empty();
+                this.renderTarget(contentDiv, view);
+            }
+
 
         } finally {
             // ==========================================
@@ -356,7 +383,7 @@ export class StructureView extends ItemView {
         const header = container.createDiv({ cls: "ns-control-header" });
         const isDraftMode = view && view.file && view.file.name === DRAFT_FILENAME;
 
-        const isArchivedDraft = (file: any, content: string) => {
+        const isArchivedDraft = (file: TAbstractFile, content: string) => {
             return file.name !== DRAFT_FILENAME && (isScriveningsDraft(content));
         };
 
@@ -452,7 +479,7 @@ export class StructureView extends ItemView {
 
         // 1. 同步 (Sync) -> 搬落嚟第一格
         const btnSave = createIconButton(row2, "save", "", { flex: "1", padding: "6px 0", backgroundColor: "var(--interactive-accent)", color: "var(--text-on-accent)" });
-        btnSave.title = "Smart Sync & Save";
+        btnSave.title = "Smart sync & save";
         btnSave.onclick = async () => {
             const currentView = this.getValidMarkdownView();
             if (currentView && this.plugin.checkInBookFolder(currentView.file)) {
@@ -479,7 +506,7 @@ export class StructureView extends ItemView {
 
         // 2. 插入場景 (Insert)
         const btnInsert = createIconButton(row2, "file-plus", "", { flex: "1", padding: "6px 0" });
-        btnInsert.title = "Insert Scene";
+        btnInsert.title = "Insert scene";
         btnInsert.onclick = () => {
             const currentView = this.getValidMarkdownView();
             if (currentView && this.plugin.checkInBookFolder(currentView.file)) {
@@ -493,7 +520,7 @@ export class StructureView extends ItemView {
 
         // 3. 拆分 (Split)
         const btnSplit = createIconButton(row2, "scissors", "", { flex: "1", padding: "6px 0" });
-        btnSplit.title = "Split Scene";
+        btnSplit.title = "Split scene";
         btnSplit.onclick = () => {
             const currentView = this.getValidMarkdownView();
             if (currentView && this.plugin.checkInBookFolder(currentView.file)) {
@@ -507,7 +534,7 @@ export class StructureView extends ItemView {
 
         // 4. 合併 (Merge)
         const btnMerge = createIconButton(row2, "combine", "", { flex: "1", padding: "6px 0" });
-        btnMerge.title = "Merge Scene";
+        btnMerge.title = "Merge scene";
         btnMerge.onclick = () => {
             const currentView = this.getValidMarkdownView();
             if (currentView && this.plugin.checkInBookFolder(currentView.file)) {
@@ -581,15 +608,19 @@ export class StructureView extends ItemView {
         };
 
         // =========================================================
-        // 🌟 Row 3: 導航分頁 (Tabs)
+        // 🌟 Row 3: 導航分頁 (Tabs) - 純 Icon 極簡版
         // =========================================================
         const tabsRow = header.createDiv({ cls: "ns-tabs-row" });
 
-        const tabOutline = createIconButton(tabsRow, "list-tree", "Outline");
+        // 1. Outline (大綱)
+        const tabOutline = createIconButton(tabsRow, "list-tree", "");
+        tabOutline.title = "Outline"; // 💡 加入 Title，等滑鼠 Hover 嗰陣會有原生提示字！
         tabOutline.className = "ns-tab-btn" + (this.activeTab === 'outline' ? " is-active" : "");
         tabOutline.onclick = () => { this.activeTab = 'outline'; this.lastOutlineHash = ""; void this.parseAndRender(); };
 
-        const tabInfo = createIconButton(tabsRow, "info", "Info");
+        // 2. Info (資訊)
+        const tabInfo = createIconButton(tabsRow, "info", "");
+        tabInfo.title = "Scene Info";
         tabInfo.className = "ns-tab-btn" + (this.activeTab === 'info' ? " is-active" : "");
         tabInfo.onclick = () => {
             this.activeTab = 'info';
@@ -600,14 +631,50 @@ export class StructureView extends ItemView {
             void this.parseAndRender();
         };
 
-        const tabHistory = createIconButton(tabsRow, "history", "Backup");
+        // 3. Backup (歷史備份)
+        const tabHistory = createIconButton(tabsRow, "history", "");
+        tabHistory.title = "Backup History";
         tabHistory.className = "ns-tab-btn" + (this.activeTab === 'history' ? " is-active" : "");
         tabHistory.onclick = () => { this.activeTab = 'history'; void this.parseAndRender(); };
+
+        // 🌟 新增：第 4 個 Tab (Target / 字數圓環)
+        const tabTarget = createIconButton(tabsRow, "target", "");
+        tabTarget.title = "Writing Target";
+        tabTarget.className = "ns-tab-btn" + (this.activeTab === 'target' ? " is-active" : "");
+        tabTarget.onclick = () => { this.activeTab = 'target'; void this.parseAndRender(); };
+
+
+
     }
+
+
+
+
+
 
     renderOutline(container: HTMLElement, view: MarkdownView) {
         const text = view.editor.getValue();
-        if (!text.trim()) { container.setText("This file is empty"); return; }
+
+
+        // 🌟 核心修復 2：遇到空筆記，徹底清空殘留卡片，並用正規 DOM 元素裝住句說話
+        if (!text.trim()) {
+            container.empty();
+            container.createDiv({
+                text: "This file is empty",
+                cls: "ns-empty-msg",
+                attr: { style: "text-align: center; margin-top: 40px; opacity: 0.5; font-style: italic;" }
+            });
+            return;
+        }
+
+        // 🌟 核心修復 3：如果有文字，確保開始畫卡片之前，清走可能殘留嘅 Empty Message
+        const oldEmptyMsg = container.querySelector(".ns-empty-msg");
+        if (oldEmptyMsg) oldEmptyMsg.remove();
+
+
+
+
+
 
         // 1. 處理頂部標題區 (只更新文字，不摧毀 DOM)
         let headerContainer = container.querySelector(".ns-outline-header");
@@ -647,7 +714,7 @@ export class StructureView extends ItemView {
         // ==========================================
         // 🌟 DOM Diffing 魔法開始：只更新有變動嘅卡片！
         // ==========================================
-        const existingChapters = Array.from(bodyContainer.querySelectorAll(":scope > .ns-chapter-box")) as HTMLElement[];
+        const existingChapters = Array.from(bodyContainer.querySelectorAll(":scope > .ns-chapter-box"));
         const chapterMap = new Map<string, HTMLElement>();
         existingChapters.forEach(ch => chapterMap.set(ch.dataset.name || "", ch));
 
@@ -671,7 +738,7 @@ export class StructureView extends ItemView {
                 this.sortables.push(new Sortable(sceneList, {
                     group: 'scenes', animation: 150, ghostClass: 'ns-sortable-ghost', dragClass: 'ns-sortable-drag',
                     delay: 100, delayOnTouchOnly: true,
-                    onEnd: (evt: any) => {
+                    onEnd: (evt: SortableEvent) => {
                         if (evt.newIndex !== evt.oldIndex || evt.from !== evt.to) this.saveChanges(container, view);
                     }
                 }));
@@ -684,15 +751,15 @@ export class StructureView extends ItemView {
             this.chapterPreambleMap.set(chapterBox, chapter.preamble);
 
             if (chapter.name !== "root") {
-                const chCard = chapterBox.querySelector(".ns-chapter-card") as HTMLElement;
+                const chCard = chapterBox.querySelector(".ns-chapter-card");
                 chCard.onclick = (e) => { e.stopPropagation(); e.preventDefault(); this.jumpToLine(chapter.lineNumber); };
             }
 
-            const sceneList = chapterBox.querySelector(".ns-scene-list") as HTMLElement;
+            const sceneList = chapterBox.querySelector(".ns-scene-list");
             sceneList.dataset.chapterIndex = chIndex.toString();
 
             // --- 處理 Scene Card (卡片層級比對) ---
-            const existingScenes = Array.from(sceneList.querySelectorAll(":scope > .ns-scene-card")) as HTMLElement[];
+            const existingScenes = Array.from(sceneList.querySelectorAll(":scope > .ns-scene-card"));
             const sceneMap = new Map<string, HTMLElement>();
             existingScenes.forEach(sc => sceneMap.set(sc.dataset.safeKey || "", sc));
 
@@ -747,7 +814,7 @@ export class StructureView extends ItemView {
                 }
 
                 // 處理標題更新 (唔好盲目覆寫，避免浪費效能)
-                const titleText = scCard.querySelector(".ns-scene-title-text") as HTMLElement;
+                const titleText = scCard.querySelector(".ns-scene-title-text");
                 if (titleText.innerText !== scene.name) titleText.innerText = scene.name;
 
                 // 重新綁定事件
@@ -1053,6 +1120,102 @@ export class StructureView extends ItemView {
         }
 
 
+    }
+
+    // =========================================================
+    // 🎯 Target Tab (防彈升級版 Ulysses Circular Ring)
+    // =========================================================
+    renderTarget(container: HTMLElement, view: MarkdownView) {
+        // 1. 取得文本並過濾出純淨正文
+        const text = view.editor.getValue();
+        // 確保 parseContent 存在 (防呆)
+        const parsed = (this.plugin as any).utils?.parseContent ? (this.plugin as any).utils.parseContent(text, false) : { preamble: text, cards: [] };
+
+        let pureText = parsed.preamble + "\n";
+        if (parsed.cards && parsed.cards.length > 0) {
+            parsed.cards.forEach((card: any) => pureText += card.body + "\n");
+        }
+
+        // 2. 超精準字數計算 (只計中文字、英數字，無視標點及 Markdown)
+        const words = pureText.match(/[\u4e00-\u9fa5]|[a-zA-Z0-9]+/g);
+        const currentCount = words ? words.length : 0;
+
+
+        // 🌟 核心修改 1：由 plugin settings (data.json) 讀取字數！
+        // 確保 wordTargets 物件存在
+        if (!this.plugin.settings.wordTargets) this.plugin.settings.wordTargets = {};
+        const currentPath = view.file ? view.file.path : "";
+
+
+        // 🌟 3. 讀取目標字數 (改為直接從 data.json 設定檔讀取！)
+        const targetCount = this.plugin.settings.wordTargets[currentPath] || 2000;
+
+        // 4. 計算百分比 (防呆：防止出現 NaN 或無限大)
+        let percentage = Math.round((currentCount / targetCount) * 100);
+        if (isNaN(percentage)) percentage = 0;
+        let displayPercent = percentage; // 🌟 準備一個變數畀畫面顯示用 (可以超過 100%)
+        if (percentage > 100) percentage = 100; // SVG 畫圖用，鎖死最高 100
+        const dashArray = `${percentage}, 100`;
+        const isDone = percentage >= 100;
+
+        // 5. 畫出「防爆框」頂級 UI
+        const targetBox = container.createDiv({ cls: "ns-target-container" });
+        targetBox.setCssStyles({ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: "1", gap: "25px", marginTop: "10px" });
+
+        // 🌟 SVG 圓環 + 中心百分比
+        const ringWrapper = targetBox.createDiv({ cls: "ns-ring-wrapper" });
+        const svgHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" class="ns-circular-chart ${isDone ? 'is-done' : ''}">
+                <defs>
+                    <linearGradient id="ns-ring-grad" x1="0%" y1="100%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="var(--interactive-accent)" />
+                        <stop offset="100%" stop-color="var(--text-accent)" /> 
+                    </linearGradient>
+                    <linearGradient id="ns-ring-grad-done" x1="0%" y1="100%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="var(--color-green)" />
+                        <stop offset="100%" stop-color="var(--color-cyan)" />
+                    </linearGradient>
+                </defs>
+                <path class="ns-circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                <path class="ns-circle" stroke-dasharray="${dashArray}" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+            </svg>
+            <div class="ns-ring-percentage">${displayPercent}%</div>
+        `;
+        ringWrapper.innerHTML = svgHTML;
+
+        // 🌟 獨立釋放嘅大字數與目標按鈕
+        const countDisplay = targetBox.createDiv({ cls: "ns-word-count-display" });
+        countDisplay.createDiv({ text: currentCount.toLocaleString(), cls: "ns-current-words" });
+
+        // 藥丸按鈕
+        const targetBtn = countDisplay.createDiv({ text: `Target: ${targetCount.toLocaleString()}`, cls: "ns-target-words" });
+
+        // 點擊更改目標 (邏輯不變)
+        targetBtn.onclick = () => {
+            if (!currentPath) { new Notice("Error: No active file."); return; }
+            import('../modals').then(({ InputModal }) => {
+                new InputModal(this.plugin.app, "Set Word Count Target", async (result) => {
+                    const num = parseInt(result);
+                    if (!isNaN(num) && num > 0) {
+                        try {
+                            if (!this.plugin.settings.wordTargets) this.plugin.settings.wordTargets = {};
+                            this.plugin.settings.wordTargets[currentPath] = num;
+                            if (typeof this.plugin.saveSettings === 'function') { await this.plugin.saveSettings(); }
+                            else { await this.plugin.saveData(this.plugin.settings); }
+
+                            new Notice(`🎯 Target updated to ${num.toLocaleString()} words!`);
+                            container.empty(); this.renderTarget(container, view);
+                        } catch (error) {
+                            console.error("Failed to save target:", error);
+                            new Notice("❌ Error saving target");
+                        }
+                    } else { new Notice("⚠️ Please enter a valid number."); }
+                }, targetCount.toString()).open();
+            });
+        };
+
+        const msg = isDone ? "Target achieved! Brilliant writing." : "Keep flowing. Every word counts.";
+        targetBox.createDiv({ text: msg, cls: "ns-target-msg" });
     }
 
 
@@ -1504,6 +1667,12 @@ export class StructureView extends ItemView {
 
         // 5. 清空畫面
         this.contentEl.empty();
+
+        // 🌟 新增：清走字數計時器
+        if (this.targetUpdateTimer) {
+            window.clearTimeout(this.targetUpdateTimer);
+            this.targetUpdateTimer = null;
+        }
     }
 
 }

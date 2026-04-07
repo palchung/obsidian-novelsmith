@@ -22,6 +22,7 @@ export interface NovelSmithSettings {
     worldboardCoords: Record<string, { x: number, y: number }>;
     relationColors: Record<string, string>;
     plotGridColumns: { name: string, type: "tracking" | "scene" }[];
+    wordTargets: Record<string, number>;
 }
 
 export const DEFAULT_SETTINGS: NovelSmithSettings = {
@@ -34,6 +35,7 @@ export const DEFAULT_SETTINGS: NovelSmithSettings = {
     worldboardCoords: {},
     relationColors: {},
     plotGridColumns: [],
+    wordTargets: {}
 }
 
 export class NovelSmithSettingTab extends PluginSettingTab {
@@ -174,10 +176,10 @@ export class NovelSmithSettingTab extends PluginSettingTab {
             // 🌟 新增：畫布排版模式設定
             new Setting(box)
                 .setName('Canvas layout mode')
-                .setDesc('Network (for character relations) or Hierarchy (for locations/magic trees)')
+                .setDesc('Network (for character relations) or hierarchy (for locations/magic trees)')
                 .addDropdown(drop => drop
-                    .addOption('network', 'Network (Physics/Free form)')
-                    .addOption('hierarchy', 'Hierarchy (Strict Tree)')
+                    .addOption('network', 'Network (physics/free form)')
+                    .addOption('hierarchy', 'Hierarchy (strict tree)')
                     .setValue(category.layoutMode || 'network')
                     .onChange(async (value) => {
                         category.layoutMode = value as 'network' | 'hierarchy';
@@ -189,9 +191,9 @@ export class NovelSmithSettingTab extends PluginSettingTab {
             if (category.layoutMode === 'hierarchy') {
                 new Setting(box)
                     .setName('Parent attribute key')
-                    .setDesc('Which attribute defines the parent node? (e.g., "Belongs to" or "所屬地區")')
+                    .setDesc('Which attribute defines the parent node? (E.g., "belongs to")')
                     .addText(text => text
-                        .setPlaceholder('e.g., Belongs to')
+                        .setPlaceholder('E.g., belongs to')
                         .setValue(category.parentKey || '')
                         .onChange(async (value) => {
                             category.parentKey = value;
@@ -236,7 +238,7 @@ export class NovelSmithSettingTab extends PluginSettingTab {
                     if (file) {
                         // 🌟 如果檔案已存在，就執行「逆向同步」，幫佢補返齊啲屬性！
                         await this.plugin.syncSceneTemplateWithCategories();
-                        new Notice("Template updated with current Wiki categories!");
+                        new Notice("Template updated with current wiki categories!");
                     } else {
                         // 如果檔案唔存在，就由頭建立一個全新嘅！
                         void this.plugin.ensureTemplateFileExists(true);
