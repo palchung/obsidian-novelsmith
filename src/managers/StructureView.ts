@@ -1136,6 +1136,19 @@ export class StructureView extends ItemView {
             parsed.cards.forEach((card: any) => pureText += card.body + "\n");
         }
 
+        // =========================================================
+        // 🌟 神級過濾器：剷走不需要計算嘅 Markdown 區塊
+        // =========================================================
+        // 1. 剷走 %% 註解區塊 ([\s\S]*? 代表包含換行符，? 代表非貪婪模式，免得一次過刪除兩個註解中間嘅正文)
+        pureText = pureText.replace(/%%[\s\S]*?%%/g, "");
+
+        // 2. 剷走 ~~ 刪除線區塊
+        pureText = pureText.replace(/~~[\s\S]*?~~/g, "");
+
+
+
+
+
         // 2. 超精準字數計算 (只計中文字、英數字，無視標點及 Markdown)
         const words = pureText.match(/[\u4e00-\u9fa5]|[a-zA-Z0-9]+/g);
         const currentCount = words ? words.length : 0;
