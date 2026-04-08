@@ -124,7 +124,7 @@ export class HistoryManager {
 
         if (!(historyFile instanceof TFile)) return [];
 
-        const hContent = await this.app.vault.read(historyFile);
+        const hContent = await this.app.vault.cachedRead(historyFile);
         const verRegex = /> \[!save\]- 💾 Ver: (.*?)\n((?:> .*\n?)*)/g;
         let verMatches;
         const versions = [];

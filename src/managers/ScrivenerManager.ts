@@ -29,7 +29,7 @@ export class ScrivenerManager {
         if (!currentFolder) { new Notice("Abnormal file location."); return; }
 
         if (activeFile.name === DRAFT_FILENAME) {
-            new Notice("Preparing to sync back ...");
+            //new Notice("Preparing to sync back ...");
             await this.syncBack(activeFile, currentFolder);
         } else {
             // 🔥 Anti-self-destruct mechanism
@@ -80,7 +80,7 @@ export class ScrivenerManager {
 
 
                 new ChapterSelectionModal(this.app, validFiles, async (selectedFiles) => {
-                    new Notice("Compiling scrivenings draft...");
+                    //new Notice("Compiling scrivenings draft...");
                     await this.compileDraft(currentFolder, selectedFiles, targetFileName, targetSceneRaw);
                 }, "Enter Scrivenings Mode").open();
             };
@@ -107,7 +107,7 @@ export class ScrivenerManager {
         contentChunks.push(`## 📜 Scrivenering mode：${folder.name}\n`);
 
         for (const file of files) {
-            const content = await this.app.vault.read(file);
+            const content = await this.app.vault.cachedRead(file);
             const parsedData = parseContent(content, true, this.app, file);
 
             // 🌟 1. 洗乾淨章節標題！
@@ -214,7 +214,7 @@ export class ScrivenerManager {
             new Notice("File ID can't be found, sync abort", 0); return;
         }
 
-        new Notice("Sync in process…");
+        //new Notice("Sync in process…");
 
         let leafToClose = null;
         const view = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -388,7 +388,7 @@ export class ScrivenerManager {
             const newPath = `${backstageDrafts}/${timestamp}_${baseName}.md`;
 
             await this.app.fileManager.renameFile(draftFile, newPath);
-            new Notice(`Sync complete, draft saved`);
+            //new Notice(`Sync complete, draft saved`);
         } else {
             await this.app.fileManager.trashFile(draftFile);
             new Notice(`Sync complete, updated ${updatedCount} files.`);

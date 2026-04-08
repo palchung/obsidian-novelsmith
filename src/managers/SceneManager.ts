@@ -215,7 +215,7 @@ export class SceneManager {
             let fileScenes: SceneData[] = [];
 
             if (isEditing || !this.fileCache.has(file.path) || this.fileCache.get(file.path).mtime !== file.stat.mtime) {
-                const content = isEditing ? view.editor.getValue() : await this.app.vault.read(file);
+                const content = isEditing ? view.editor.getValue() : await this.app.vault.cachedRead(file);
 
                 if (isScriveningsDraft(content)) continue;
 

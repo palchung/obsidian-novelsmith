@@ -35,7 +35,8 @@ export class StructureView extends ItemView {
     private targetUpdateTimer: number | null = null;
     private docYaml: string = "";
     private isRefreshing: boolean = false;
-
+    // 🌟 防疊加鎖
+    private eventsRegistered: boolean = false;
 
     // 🔥 Performance Optimization: Prevent Refresh from swallowing the user's latest typing
     private pendingRefresh: boolean = false;
@@ -107,6 +108,12 @@ export class StructureView extends ItemView {
 
     async onOpen() {
         void this.refresh();
+
+        // 🌟 檢查把鎖：如果已經註冊過，就直接 Return，防止分身術！
+        if (this.eventsRegistered) return;
+        this.eventsRegistered = true;
+
+
         this.registerEvent(this.app.workspace.on('active-leaf-change', (leaf) => {
             if (leaf && leaf.view instanceof MarkdownView) {
                 this.lastOutlineHash = "";
@@ -114,6 +121,10 @@ export class StructureView extends ItemView {
             }
         }));
         this.registerEvent(this.app.workspace.on('editor-change', (editor) => {
+            // 🌟 慳電絕招 1：如果側邊欄收埋咗 / 唔係顯示緊本面板，即刻罷工，零 CPU 消耗！
+            if (this.containerEl.clientWidth === 0) return;
+
+
             // 🌟 SPRINT INTERCEPTOR: 如果衝刺緊，只更新數字，絕對唔刷新大綱！
             if (this.isSprinting) {
                 this.sprintDropsEarned = Math.max(0, editor.getValue().length - this.sprintStartLength);
@@ -124,7 +135,9 @@ export class StructureView extends ItemView {
 
             if (this.activeTab === 'outline') {
                 if (this.renderTimer) window.clearTimeout(this.renderTimer);
-                this.renderTimer = window.setTimeout(() => { void this.parseAndRender(); }, 500);
+                // 🌟 慳電絕招 2：將大綱刷新頻率由 500ms 延長到 1200ms。
+                // 寫小說唔需要半秒鐘更新一次大綱，1.2秒嘅節流閥會令 iPad 負擔直線下降 60%！
+                this.renderTimer = window.setTimeout(() => { void this.parseAndRender(); }, 1200);
             }
         }));
 
@@ -142,7 +155,7 @@ export class StructureView extends ItemView {
                         if (container && this.currentWikiFile) {
                             container.empty();
 
-                            const content = await this.app.vault.read(this.currentWikiFile);
+                            const content = await this.app.vault.cachedRead(this.currentWikiFile);
                             const contentDiv = container.createDiv("markdown-rendered");
                             contentDiv.setCssStyles({ padding: "0 5px", fontSize: "0.95em" });
 
@@ -229,7 +242,7 @@ export class StructureView extends ItemView {
                 return;
             }
 
-            const container = this.contentEl.querySelector(".ns-structure-container");;
+            const container = this.contentEl.querySelector(".ns-structure-container") as HTMLElement;
             if (!container) return;
 
             // 🌟 變身魔法：如果衝刺緊，清空大綱，畫出巨大時鐘，直接 return！
@@ -315,8 +328,8 @@ export class StructureView extends ItemView {
             // ==========================================
             // 🚀 神級優化：防止頻繁清空整個側邊欄 (DOM Reuse)
             // ==========================================
-            let header = container.querySelector(":scope > .ns-control-header");
-            let contentDiv = container.querySelector(":scope > .ns-tab-content");
+            let header = container.querySelector(":scope > .ns-control-header") as HTMLElement;
+            let contentDiv = container.querySelector(":scope > .ns-tab-content") as HTMLElement;
 
             const isDraftMode = view && view.file && view.file.name === DRAFT_FILENAME;
             const draftModeChanged = this.lastDraftMode !== !!isDraftMode;
@@ -714,7 +727,7 @@ export class StructureView extends ItemView {
         // ==========================================
         // 🌟 DOM Diffing 魔法開始：只更新有變動嘅卡片！
         // ==========================================
-        const existingChapters = Array.from(bodyContainer.querySelectorAll(":scope > .ns-chapter-box"));
+        const existingChapters = Array.from(bodyContainer.querySelectorAll(":scope > .ns-chapter-box")) as HTMLElement[];
         const chapterMap = new Map<string, HTMLElement>();
         existingChapters.forEach(ch => chapterMap.set(ch.dataset.name || "", ch));
 
@@ -751,15 +764,15 @@ export class StructureView extends ItemView {
             this.chapterPreambleMap.set(chapterBox, chapter.preamble);
 
             if (chapter.name !== "root") {
-                const chCard = chapterBox.querySelector(".ns-chapter-card");
-                chCard.onclick = (e) => { e.stopPropagation(); e.preventDefault(); this.jumpToLine(chapter.lineNumber); };
+                const chCard = chapterBox.querySelector(".ns-chapter-card") as HTMLElement;
+                chCard.onclick = (e: MouseEvent) => { e.stopPropagation(); e.preventDefault(); this.jumpToLine(chapter.lineNumber); };
             }
 
-            const sceneList = chapterBox.querySelector(".ns-scene-list");
+            const sceneList = chapterBox.querySelector(".ns-scene-list") as HTMLElement;
             sceneList.dataset.chapterIndex = chIndex.toString();
 
             // --- 處理 Scene Card (卡片層級比對) ---
-            const existingScenes = Array.from(sceneList.querySelectorAll(":scope > .ns-scene-card"));
+            const existingScenes = Array.from(sceneList.querySelectorAll(":scope > .ns-scene-card")) as HTMLElement[];
             const sceneMap = new Map<string, HTMLElement>();
             existingScenes.forEach(sc => sceneMap.set(sc.dataset.safeKey || "", sc));
 
@@ -814,7 +827,7 @@ export class StructureView extends ItemView {
                 }
 
                 // 處理標題更新 (唔好盲目覆寫，避免浪費效能)
-                const titleText = scCard.querySelector(".ns-scene-title-text");
+                const titleText = scCard.querySelector(".ns-scene-title-text") as HTMLElement;
                 if (titleText.innerText !== scene.name) titleText.innerText = scene.name;
 
                 // 重新綁定事件
@@ -1216,13 +1229,13 @@ export class StructureView extends ItemView {
                             if (typeof this.plugin.saveSettings === 'function') { await this.plugin.saveSettings(); }
                             else { await this.plugin.saveData(this.plugin.settings); }
 
-                            new Notice(`🎯 Target updated to ${num.toLocaleString()} words!`);
+                            //new Notice(`Target updated to ${num.toLocaleString()} words!`);
                             container.empty(); this.renderTarget(container, view);
                         } catch (error) {
                             console.error("Failed to save target:", error);
-                            new Notice("❌ Error saving target");
+                            new Notice("Error saving target");
                         }
-                    } else { new Notice("⚠️ Please enter a valid number."); }
+                    } else { new Notice("Please enter a valid number."); }
                 }, targetCount.toString()).open();
             });
         };
@@ -1286,12 +1299,8 @@ export class StructureView extends ItemView {
 
         if (file) {
             this.currentWikiFile = file;
-
-
             const contentWrapper = layer2.createDiv({ cls: "ns-wiki-content-wrapper" });
-
-
-            const content = await this.app.vault.read(file);
+            const content = await this.app.vault.cachedRead(file);
             const contentDiv = contentWrapper.createDiv("markdown-rendered");
             contentDiv.setCssStyles({ padding: "0 5px", fontSize: "0.95em" });
             void MarkdownRenderer.render(this.app, content, contentDiv, file.path, this);

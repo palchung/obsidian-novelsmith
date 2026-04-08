@@ -96,7 +96,7 @@ export class WikiManager {
                         let fileContent = `---\ntags:\n  - ${key}\n---\n# ${cleanItem}\n\n`;
 
                         if (tplFile instanceof TFile) {
-                            fileContent = await this.app.vault.read(tplFile);
+                            fileContent = await this.app.vault.cachedRead(tplFile);
                             fileContent = fileContent.replace(/\{\{WikiName\}\}/g, cleanItem);
                         }
 

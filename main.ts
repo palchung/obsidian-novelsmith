@@ -63,7 +63,7 @@ export default class NovelSmithPlugin extends Plugin {
         // 🌟 4. Listen to file open to baseline the character count
         this.registerEvent(this.app.workspace.on('file-open', async (file) => {
             if (file && file.extension === 'md' && this.checkInBookFolderSilent(file)) {
-                const content = await this.app.vault.read(file);
+                const content = await this.app.vault.cachedRead(file);
                 this.fileLengthCache.set(file.path, content.length);
             }
         }));

@@ -1046,15 +1046,9 @@ body.ns-mode-dialogue .cm-dialogue-text {
     background-color: var(--interactive-accent);
 }
 
-/* 升級版：拖拉卡片時的物理彈簧與傾斜感 */
+/* 恢復原狀：安全平穩拖拽狀態 (解決 iPad 觸控漂移問題) */
 .ns-sortable-drag {
     cursor: grabbing !important;
-    /* 放大 3%，微微傾斜 2 度，模擬手持卡片的真實物理感 */
-    transform: scale(1.03) rotate(2deg) !important;
-    /* 巨大而柔和的浮空陰影 */
-    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25), 0 0 0 1px var(--interactive-accent) !important;
-    opacity: 0.95 !important;
-    transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.15s ease !important;
 }
 
 @keyframes ns-button-click-pulse {
@@ -1481,6 +1475,13 @@ body.is-mobile .ns-button-row .ns-btn-discard:active,
     z-index: 1;
 }
 
+/* 順手幫 Target 圓環加埋，因為佢有漸變同呼吸燈，最需要 GPU 幫手 */
+.ns-circular-chart {
+    transform: translateZ(0);
+    will-change: filter, transform;
+}
+
+
 /* 軌道稍微變幼，突出優雅感 */
 .ns-circle-bg {
     fill: none;
@@ -1591,43 +1592,77 @@ body.is-mobile .ns-button-row .ns-btn-discard:active,
     }
 }
 
+/* ============================================================
+   📌 Corkboard 軟木板 Hover 效能極限優化 (取代 JS 監聽器)
+   ============================================================ */
+
+/* 場景卡片內的小按鈕 (Jump, Edit, Color) */
+.ns-corkboard-card .lucide-external-link:hover,
+.ns-corkboard-card .lucide-pencil:hover,
+.ns-corkboard-card .lucide-palette:hover {
+    opacity: 1 !important;
+    color: var(--interactive-accent) !important;
+}
+
+/* 刪除按鈕特別處理紅色 */
+.ns-corkboard-card .lucide-trash-2:hover {
+    opacity: 1 !important;
+    color: var(--text-error) !important;
+}
+
+/* 標籤 Chips 嘅高亮發光 */
+.ns-scene-footer span span:hover {
+    filter: brightness(1.3) !important;
+}
+
+/* 章節列 (Column) 頂部嘅按鈕 */
+.ns-corkboard-column h3 .lucide-pencil:hover,
+.ns-corkboard-column h3 .lucide-plus:hover {
+    opacity: 1 !important;
+    color: var(--interactive-accent) !important;
+    background-color: var(--background-modifier-hover) !important;
+}
+
+.ns-corkboard-column h3 .lucide-trash-2:hover {
+    opacity: 1 !important;
+    color: var(--text-error) !important;
+    background-color: var(--background-modifier-error-hover) !important;
+}
+
+/* 雷達/印章選單嘅按鈕 */
+.ns-radar-console .lucide-check:hover {
+    opacity: 1 !important;
+    color: var(--interactive-accent) !important;
+    background-color: var(--background-modifier-hover) !important;
+}
+
+.ns-radar-console .lucide-x:hover {
+    opacity: 1 !important;
+    color: var(--text-error) !important;
+    background-color: var(--background-modifier-error-hover) !important;
+}
+
 
 
 /* ============================================================
    🎨 Stylish
    ============================================================ */
 
-/* 頂部 Header 與側滑面板的毛玻璃特效 */
-.ns-control-header,
-.ns-corkboard-wiki-panel {
-    /* 將背景色改為 85% 透明度 */
-    background-color: rgba(var(--background-primary-rgb), 0.85) !important;
-    /* 加入蘋果標準磨砂濾鏡 */
-    backdrop-filter: blur(12px) saturate(150%);
-    -webkit-backdrop-filter: blur(12px) saturate(150%);
-}
 
 /* 取代原本的單調陰影，換成多層柔和陰影 */
-.ns-scene-card,
+/* .ns-scene-card,
 .ns-corkboard-card,
 .ns-chapter-box {
     box-shadow:
         0 2px 4px rgba(0, 0, 0, 0.02),
         0 4px 12px rgba(0, 0, 0, 0.04),
         0 1px 0 rgba(255, 255, 255, 0.1) inset !important;
-    /* 頂部微光邊緣 */
-    transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.2s ease !important;
+    
+transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1),
+box-shadow 0.2s ease !important;
 }
 
-/* 懸浮或觸控時的浮起效果 */
-.ns-scene-card:hover,
-.ns-corkboard-card:hover {
-    transform: translateY(-2px);
-    box-shadow:
-        0 4px 8px rgba(0, 0, 0, 0.04),
-        0 12px 24px rgba(0, 0, 0, 0.08),
-        0 1px 0 rgba(255, 255, 255, 0.15) inset !important;
-}
+*/
 
 /* 美化所有 Empty Message */
 .ns-empty-msg {
@@ -1663,15 +1698,15 @@ body.is-mobile .ns-button-row .ns-btn-discard:active,
 }
 
 /* 覆蓋外掛面板內的文字選取顏色 */
-.ns-structure-container ::selection,
+/* .ns-structure-container ::selection,
 .ns-corkboard-modal ::selection {
     background-color: rgba(var(--interactive-accent-rgb), 0.25) !important;
     color: var(--text-normal) !important;
     text-shadow: none !important;
-}
+} */
 
 /* 軟木板四周邊緣的微弱暗角 (Vignette)，提升視線聚焦度 */
-.ns-corkboard-modal .modal-content::after {
+/* .ns-corkboard-modal .modal-content::after {
     content: "";
     position: absolute;
     top: 0;
@@ -1679,11 +1714,11 @@ body.is-mobile .ns-button-row .ns-btn-discard:active,
     right: 0;
     bottom: 0;
     pointer-events: none;
-    /* 確保唔會阻擋點擊 */
+    
     z-index: 999;
-    /* 四周加上非常柔和的漸變陰影 */
+    
     box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.06);
-}
+} */
 
 .theme-dark .ns-corkboard-modal .modal-content::after {
     box-shadow: inset 0 0 150px rgba(0, 0, 0, 0.4);
@@ -1722,41 +1757,4 @@ body.is-mobile .ns-button-row .ns-btn-discard:active,
     animation: ns-breath-glow 3s infinite ease-in-out !important;
     border-left-color: var(--interactive-accent) !important;
     background-color: rgba(var(--interactive-accent-rgb), 0.05) !important;
-}
-
-
-/* 🌟 蘋果級流光按鈕特效 */
-button.mod-cta {
-    position: relative;
-    overflow: hidden;
-    /* 確保流光唔會凸出個掣外面 */
-    border-radius: var(--radius-s);
-}
-
-button.mod-cta::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 50%;
-    height: 100%;
-    /* 畫一條半透明嘅斜線白光 */
-    background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.4), transparent);
-    transform: skewX(-20deg);
-    /* 每 4 秒閃一次，唔會太密搞到眼花 */
-    animation: ns-shimmer 4s infinite cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-@keyframes ns-shimmer {
-    0% {
-        left: -100%;
-    }
-
-    15% {
-        left: 200%;
-    }
-
-    100% {
-        left: 200%;
-    }
 }

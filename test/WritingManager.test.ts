@@ -1,5 +1,5 @@
 import { WritingManager } from '../src/managers/WritingManager';
-
+import { TFile } from 'obsidian';
 
 
 // =========================================================
@@ -9,6 +9,7 @@ jest.mock('obsidian', () => ({
     App: jest.fn(),
     Notice: jest.fn(),
     MarkdownView: jest.fn(),
+    TFile: class { }
 }), { virtual: true });
 
 // 🔥 假扮 Utils 嘅 replaceEntireDocument (我哋要攔截佢嚟檢查最終結果)
@@ -41,7 +42,11 @@ describe('WritingManager - 編輯器大掃除 (Clean Draft)', () => {
     beforeEach(() => {
         app = {
             workspace: { iterateAllLeaves: jest.fn() },
-            vault: { modify: jest.fn().mockResolvedValue(undefined) } // 🌟 補返假嘅寫入檔案功能
+            vault: {
+                modify: jest.fn().mockResolvedValue(undefined),// 🌟 補返假嘅寫入檔案功能
+                cachedRead: jest.fn(), // 🌟 3. 補返 cachedRead (對應我哋嘅慳電優化)
+                getAbstractFileByPath: jest.fn() // 🌟 補返 getAbstractFileByPath
+            }
         };
         settings = { bookFolderPath: 'MyBook' };
         manager = new WritingManager(app, settings);
@@ -103,4 +108,50 @@ describe('WritingManager - 編輯器大掃除 (Clean Draft)', () => {
         // 🔥 終極防禦測試：圖片必須原好無缺！
         expect(finalContent).toContain('![[地圖.png]]');
     });
+
+
+    test('correctNames - 應該精準改錯字，並完美啟動「面具魔法」保護 URL 與 Code Block', async () => {
+        // 1. 模擬 FixList.md 嘅內容
+        const fakeFixList = "// 錯字表\nJonathan | Jon, John\nHogwarts | Hogwart";
+
+        // 🌟 4. 製造一個假嘅 TFile 實體畀系統，咁 instanceof 就會 Pass！
+        const fakeFile = new TFile();
+        app.vault.getAbstractFileByPath = jest.fn().mockReturnValue(fakeFile);
+
+        // 🌟 5. 確保呢度係 mock `cachedRead` 而唔係 `read`
+        app.vault.cachedRead = jest.fn().mockResolvedValue(fakeFixList);
+
+        // 2. 準備極限陷阱原稿
+        const rawContent = `
+Jon 去了 Hogwart。
+請參考網址：https://john.com/jon-page
+或者執行代碼 \`console.log("Jon");\`
+> - POV:: John
+`;
+        fakeView.editor.getValue.mockReturnValue(rawContent);
+
+        // 3. 執行改名
+        await manager.correctNames(fakeView);
+
+        expect(app.vault.modify).toHaveBeenCalled();
+        const finalContent = app.vault.modify.mock.calls[0][1];
+
+        // 🕵️‍♂️ 斷言：正文嘅錯字必須被改
+        expect(finalContent).toContain('Jonathan 去了 Hogwarts。');
+
+        // 🛡️ 防彈斷言：URL 絕對唔可以被改！
+        expect(finalContent).toContain('https://john.com/jon-page');
+
+        // 🛡️ 防彈斷言：Code Block 絕對唔可以被改！
+        expect(finalContent).toContain('`console.log("Jon");`');
+
+        // 🛡️ 防彈斷言：系統屬性 (Callout) 絕對唔可以被改！
+        expect(finalContent).toContain('> - POV:: John');
+    });
+
+
+
+
+
+
 });

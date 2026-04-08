@@ -35,6 +35,7 @@ describe('ScrivenerManager - 核心串聯與同步測試', () => {
         app = {
             vault: {
                 read: jest.fn(),
+                cachedRead: jest.fn(),
                 modify: jest.fn(),
                 create: jest.fn(),
                 getAbstractFileByPath: jest.fn()
@@ -90,7 +91,7 @@ describe('ScrivenerManager - 核心串聯與同步測試', () => {
         const file2 = { name: 'Scene2.md', basename: 'Scene2' };
 
         // 告訴系統：當你讀取 Scene1 嗰陣俾呢段字佢，讀 Scene2 俾另一段
-        app.vault.read.mockImplementation(async (file: any) => {
+        app.vault.cachedRead.mockImplementation(async (file: any) => {
             if (file.name === 'Scene1.md') return "---\ntags: novel\n---\n我是被保留的引言\n###### 第一場戲\n內文1";
             if (file.name === 'Scene2.md') return "###### 第二場戲\n內文2";
             return "";
@@ -236,5 +237,42 @@ tags: novel
         expect(app.vault.modify).not.toHaveBeenCalled();
         expect(app.fileManager.trashFile).not.toHaveBeenCalled();
     });
+
+    test('syncBack - 極限防禦：如果用家在草稿中意外刪除整張場景卡，系統應如何處置？', async () => {
+        const fakeSceneFile = new TFile() as any;
+        fakeSceneFile.name = 'Scene1.md'; fakeSceneFile.extension = 'md';
+
+        const fakeFolder = { name: '第一章', path: 'MyBook/第一章', children: [fakeSceneFile] };
+        const fakeDraftFile = { path: `MyBook/第一章/${DRAFT_FILENAME}`, name: DRAFT_FILENAME, basename: 'NSmith_Scrivenering' };
+
+        // 原始檔案有兩場戲
+        const fakeOriginalContent = `###### 第一場戲 <span class="ns-id" data-scene-id="uuid-111"></span>\n第一場內文\n###### 第二場戲 <span class="ns-id" data-scene-id="uuid-222"></span>\n第二場內文`;
+
+        // ⚠️ 危機：用家喺草稿入面，唔小心將「第一場戲」成段 Delete 咗！只剩低第二場！
+        const fakeDraftContent = `## 📜 Scrivenering mode
+# 📄 Scene1.md
+<span class="ns-file-id">++ FILE_ID: Scene1.md ++</span>
+###### 第二場戲 <span class="ns-id" data-scene-id="uuid-222"></span>
+第二場內文`;
+
+        app.vault.read.mockImplementation(async (file: any) => {
+            if (file.name === DRAFT_FILENAME) return fakeDraftContent;
+            if (file.name === 'Scene1.md') return fakeOriginalContent;
+            return "";
+        });
+
+        await manager.syncBack(fakeDraftFile as any, fakeFolder as any);
+
+        const modifiedContent = app.vault.modify.mock.calls[0][1];
+
+        // 🕵️‍♂️ 驗證系統行為：
+        // 依家你嘅代碼邏輯，的確會將「第一場戲」刪除 (因為草稿冇咗)。
+        // 呢個測試可以令你反思：呢個係咪你想要嘅行為？
+        // 如果你容許刪除，呢個 Test 會 Pass；如果你覺得太危險，你需要喺 syncBack 入面加入「未被匹配的 originalCard 必須保留」嘅邏輯！
+        expect(modifiedContent).not.toContain('第一場戲');
+    });
+
+
+
 
 });

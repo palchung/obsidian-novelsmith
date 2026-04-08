@@ -97,7 +97,7 @@ export class WritingManager {
             const configFile = this.app.vault.getAbstractFileByPath(configPath);
 
             if (configFile instanceof TFile) {
-                const configContent = await this.app.vault.read(configFile);
+                const configContent = await this.app.vault.cachedRead(configFile);
                 const badWords = configContent.split(/[,，、\n]+/)
                     .map(w => w.trim())
                     .filter(w => w.length > 0 && !w.startsWith("//"));
@@ -156,7 +156,7 @@ export class WritingManager {
         const fileObj = this.app.vault.getAbstractFileByPath(dataFileName);
 
         if (!(fileObj instanceof TFile)) return;
-        const rawList = await this.app.vault.read(fileObj);
+        const rawList = await this.app.vault.cachedRead(fileObj);
 
         const fixList: Record<string, string[]> = {};
         const linesList = rawList.trim().split('\n');
@@ -170,12 +170,14 @@ export class WritingManager {
             let wrongNames: string[] = [];
             if (parts[0] !== "") {
                 correctName = parts[0];
-                wrongNames = parts.slice(1).filter(p => p);
+                // 🌟 神級修復：用 flatMap 配合正則表達式，將「Jon, John」用逗號或頓號斬件！
+                wrongNames = parts.slice(1).flatMap(p => p.split(/[,，、]/)).map(p => p.trim()).filter(p => p);
                 lastCorrectName = correctName;
             } else {
                 if (lastCorrectName !== "") {
                     correctName = lastCorrectName;
-                    wrongNames = parts.slice(1).filter(p => p);
+                    // 🌟 同上，確保換行嘅錯字都會被斬件
+                    wrongNames = parts.slice(1).flatMap(p => p.split(/[,，、]/)).map(p => p.trim()).filter(p => p);
                 } else continue;
             }
             if (fixList[correctName]) {
@@ -312,7 +314,7 @@ export class WritingManager {
     // =================================================================
     cleanDraft(view: MarkdownView) {
         // 🌟 注意呢度加咗 async
-        new CleanDraftModal(this.app, async (options: unknown) => {
+        new CleanDraftModal(this.app, async (options: any) => {
             let content = view.editor.getValue();
             const originalContent = content;
 

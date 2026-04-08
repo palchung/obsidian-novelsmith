@@ -92,7 +92,7 @@ export class CorkboardModal extends Modal {
         contentEl.setCssStyles({ display: "flex", flexDirection: "column", height: "100%" });
         this.modalEl.addClass("ns-corkboard-modal");
 
-        const defaultCloseBtn = this.modalEl.querySelector('.modal-close-button');
+        const defaultCloseBtn = this.modalEl.querySelector('.modal-close-button') as HTMLElement;
         if (defaultCloseBtn) defaultCloseBtn.setCssStyles({ display: "none" });
 
         const headerRow = contentEl.createDiv({ cls: "ns-corkboard-header-row" });
@@ -267,15 +267,14 @@ export class CorkboardModal extends Modal {
 
         const jumpSvg = jumpBtn.querySelector("svg");
         if (jumpSvg) { jumpSvg.style.width = "14px"; jumpSvg.style.height = "14px"; }
-        jumpBtn.addEventListener("mouseover", () => jumpBtn.setCssStyles({ opacity: "1", color: "var(--interactive-accent)" }));
-        jumpBtn.addEventListener("mouseout", () => jumpBtn.setCssStyles({ opacity: "0.4", color: "initial" }));
+
         jumpBtn.onclick = (e) => {
             e.stopPropagation();
             new SimpleConfirmModal(this.app, "Save corkboard and jump to this scene?", async () => {
                 this.anchorSceneId = card.dataset.sceneId || card.dataset.sceneTitle || null;
-                const saveBtn = this.contentEl.querySelector(".ns-save-btn");
+                const saveBtn = this.contentEl.querySelector(".ns-save-btn") as HTMLButtonElement;
                 if (saveBtn) { saveBtn.disabled = true; saveBtn.innerText = "Saving & jumping..."; }
-                const gridContainer = this.contentEl.querySelector(".ns-corkboard-grid");
+                const gridContainer = this.contentEl.querySelector(".ns-corkboard-grid") as HTMLElement;
                 await this.saveGlobalCorkboard(gridContainer, saveBtn);
             }).open();
         };
@@ -287,8 +286,7 @@ export class CorkboardModal extends Modal {
             const deleteBtn = titleRight.createDiv();
             setIcon(deleteBtn, "trash-2");
             deleteBtn.setCssStyles({ cursor: "pointer", opacity: "0.4", display: "flex", alignItems: "center", justifyContent: "center", padding: "2px" });
-            deleteBtn.addEventListener("mouseover", () => deleteBtn.setCssStyles({ opacity: "1", color: "var(--text-error)" }));
-            deleteBtn.addEventListener("mouseout", () => deleteBtn.setCssStyles({ opacity: "0.4", color: "initial" }));
+
             deleteBtn.onclick = (e) => {
                 e.stopPropagation();
                 card.remove();
@@ -299,8 +297,7 @@ export class CorkboardModal extends Modal {
         const editBtn = titleRight.createDiv();
         setIcon(editBtn, "pencil");
         editBtn.setCssStyles({ cursor: "pointer", opacity: "0.4", display: "flex", alignItems: "center", justifyContent: "center", padding: "2px" });
-        editBtn.addEventListener("mouseover", () => editBtn.setCssStyles({ opacity: "1", color: "var(--interactive-accent)" }));
-        editBtn.addEventListener("mouseout", () => editBtn.setCssStyles({ opacity: "0.4", color: "initial" }));
+
         editBtn.onclick = (e) => {
             e.stopPropagation();
             this.openScenePanel(card, scene);
@@ -309,8 +306,7 @@ export class CorkboardModal extends Modal {
         const colorBtn = titleRight.createDiv();
         setIcon(colorBtn, "palette");
         colorBtn.setCssStyles({ cursor: "pointer", opacity: "0.3", display: "flex", alignItems: "center", justifyContent: "center", padding: "2px" });
-        colorBtn.addEventListener("mouseover", () => colorBtn.setCssStyles({ opacity: "1" }));
-        colorBtn.addEventListener("mouseout", () => colorBtn.setCssStyles({ opacity: "0.3" }));
+
         colorBtn.onclick = (e) => {
             e.stopPropagation();
             const menu = new Menu();
@@ -353,8 +349,7 @@ export class CorkboardModal extends Modal {
                 rawItems.forEach((item, index) => {
                     const chip = tagSpan.createSpan({ text: item });
                     chip.setCssStyles({ color: "var(--interactive-accent)", cursor: "pointer", fontWeight: "bold", transition: "filter 0.2s" });
-                    chip.addEventListener("mouseover", () => chip.setCssProps({ filter: "brightness(1.3)" }));
-                    chip.addEventListener("mouseout", () => chip.setCssProps({ filter: "brightness(1)" }));
+
                     chip.onclick = (e) => { e.stopPropagation(); this.openWikiPanel(item, wikiCategory.folderPath); };
                     if (index < rawItems.length - 1) tagSpan.createSpan({ text: ", ", attr: { style: "opacity: 0.5;" } });
                 });
@@ -394,8 +389,6 @@ export class CorkboardModal extends Modal {
         const btnEditCol = rightControls.createDiv();
         setIcon(btnEditCol, "pencil");
         btnEditCol.setCssStyles({ cursor: "pointer", opacity: "0.4", display: "flex", alignItems: "center", justifyContent: "center", padding: "4px", borderRadius: "4px" });
-        btnEditCol.addEventListener("mouseover", () => btnEditCol.setCssStyles({ opacity: "1", color: "var(--interactive-accent)" }));
-        btnEditCol.addEventListener("mouseout", () => btnEditCol.setCssStyles({ opacity: "0.4", color: "initial" }));
 
         btnEditCol.onclick = (e) => {
             e.stopPropagation();
@@ -412,8 +405,6 @@ export class CorkboardModal extends Modal {
         const btnDeleteCol = rightControls.createDiv();
         setIcon(btnDeleteCol, "trash-2");
         btnDeleteCol.setCssStyles({ cursor: "pointer", opacity: "0.4", display: "flex", alignItems: "center", justifyContent: "center", padding: "4px", borderRadius: "4px" });
-        btnDeleteCol.addEventListener("mouseover", () => btnDeleteCol.setCssStyles({ opacity: "1", color: "var(--text-error)", backgroundColor: "var(--background-modifier-error-hover)" }));
-        btnDeleteCol.addEventListener("mouseout", () => btnDeleteCol.setCssStyles({ opacity: "0.4", color: "initial", backgroundColor: "transparent" }));
 
         btnDeleteCol.onclick = async (e) => {
             e.stopPropagation();
@@ -431,21 +422,28 @@ export class CorkboardModal extends Modal {
         const btnAddColHere = rightControls.createDiv();
         setIcon(btnAddColHere, "plus");
         btnAddColHere.setCssStyles({ cursor: "pointer", opacity: "0.4", display: "flex", alignItems: "center", justifyContent: "center", padding: "4px", borderRadius: "4px" });
-        btnAddColHere.addEventListener("mouseover", () => btnAddColHere.setCssStyles({ opacity: "1", backgroundColor: "var(--background-modifier-hover)" }));
-        btnAddColHere.addEventListener("mouseout", () => btnAddColHere.setCssStyles({ opacity: "0.4", backgroundColor: "transparent" }));
 
         btnAddColHere.onclick = (e) => {
             e.stopPropagation();
             new InputModal(this.app, "Insert New Chapter Here", (result) => {
                 if (!result.trim()) return;
-                this.buildColumnDOM(container, result, null, [], col.nextElementSibling as HTMLElement);
-                this.isDirty = true; // 🌟 標記：新增章節
+
+                // 🌟 終極修復：動態獲取目前真實嘅 DOM 容器，捨棄已經失效嘅虛擬 Fragment
+                const realContainer = col.parentElement || container;
+
+                try {
+                    this.buildColumnDOM(realContainer, result, null, [], col.nextElementSibling as HTMLElement);
+                    this.isDirty = true; // 🌟 標記：新增章節
+                } catch (err) {
+                    console.error("Insert chapter failed:", err);
+                    new Notice("Error: failed to insert chapter");
+                }
             }).open();
         };
 
         scenes.forEach(scene => this.buildCardDOM(listContainer, scene));
 
-        const btnAddScene = col.createEl("button", { text: "+ add scene card" });
+        const btnAddScene = col.createEl("button", { text: "Add scene card" });
         btnAddScene.setCssStyles({ marginTop: "15px", backgroundColor: "transparent", border: "1px dashed var(--background-modifier-border)", color: "var(--text-muted)", cursor: "pointer", padding: "8px", borderRadius: "6px" });
 
         btnAddScene.onclick = () => {
@@ -462,7 +460,7 @@ export class CorkboardModal extends Modal {
 
         this.sortables.push(new Sortable(listContainer, {
             group: 'global-kanban-board', animation: 150, handle: '.ns-corkboard-card', delay: 100, delayOnTouchOnly: true, ghostClass: 'ns-sortable-ghost',
-            onEnd: (evt: unknown) => {
+            onEnd: (evt: any) => {
                 if (evt.oldIndex !== evt.newIndex || evt.from !== evt.to) this.isDirty = true; // 🌟 標記：拖拉卡片
             }
         }));
@@ -478,7 +476,7 @@ export class CorkboardModal extends Modal {
 
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
-            const content = await this.app.vault.read(file);
+            const content = await this.app.vault.cachedRead(file);
 
             const parsedData = parseContent(content, true, this.app, file);
             for (const card of parsedData.cards) {
@@ -503,7 +501,13 @@ export class CorkboardModal extends Modal {
                     sKey = c === 0 ? s.title : `${s.title}_${c}`;
                     titleCollisionCount.set(s.title + "_ui", c + 1);
                 }
-                return { ...s, safeKey: sKey };
+
+                // 🌟 類型轉換魔法：將 null 轉化為 undefined，完美滿足 TypeScript 要求！
+                return {
+                    ...s,
+                    id: s.id || undefined,
+                    safeKey: sKey
+                };
             });
 
             this.buildColumnDOM(fragment, file.basename, file.path, scenesWithSafeKey);
@@ -517,13 +521,21 @@ export class CorkboardModal extends Modal {
             cursor: "pointer", color: "var(--text-muted)", fontSize: "1.2em", transition: "all 0.2s"
         });
         addColBtn.createSpan({ text: "＋ Add New Chapter" });
-        addColBtn.addEventListener("mouseover", () => addColBtn.setCssStyles({ backgroundColor: "var(--background-secondary)" }));
-        addColBtn.addEventListener("mouseout", () => addColBtn.setCssStyles({ backgroundColor: "transparent" }));
+
         addColBtn.onclick = () => {
             new InputModal(this.app, "New Chapter Name", (result) => {
                 if (!result.trim()) return;
-                this.buildColumnDOM(container, result, null, [], addColBtn);
-                this.isDirty = true; // 🌟 標記：新增章節
+
+                // 🌟 終極修復：動態獲取目前真實嘅 DOM 容器
+                const realContainer = addColBtn.parentElement || container;
+
+                try {
+                    this.buildColumnDOM(realContainer, result, null, [], addColBtn);
+                    this.isDirty = true; // 🌟 標記：新增章節
+                } catch (err) {
+                    console.error("Add chapter failed:", err);
+                    new Notice("❌ Error: Failed to add chapter");
+                }
             }).open();
         };
 
@@ -533,7 +545,7 @@ export class CorkboardModal extends Modal {
 
         this.sortables.push(new Sortable(container, {
             animation: 150, handle: '.ns-column-drag-handle', delay: 100, delayOnTouchOnly: true, ghostClass: 'ns-sortable-ghost',
-            onEnd: (evt: unknown) => {
+            onEnd: (evt: any) => {
                 if (evt.oldIndex !== evt.newIndex) this.isDirty = true; // 🌟 標記：拖拉章節列
             }
         }));
@@ -577,7 +589,7 @@ export class CorkboardModal extends Modal {
         if (!file || !(file instanceof TFile)) file = this.app.metadataCache.getFirstLinkpathDest(noteName, folderPath || "");
 
         if (file && file instanceof TFile) {
-            const content = await this.app.vault.read(file);
+            const content = await this.app.vault.cachedRead(file);
             const dummyComponent = new Component();
             await MarkdownRenderer.render(this.app, content, contentWrapper, file.path, dummyComponent);
         } else {
@@ -784,14 +796,10 @@ export class CorkboardModal extends Modal {
         const btnConfirm = btnControls.createDiv();
         setIcon(btnConfirm, "check");
         btnConfirm.setCssStyles({ cursor: "pointer", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center", opacity: "0.7", borderRadius: "4px" });
-        btnConfirm.addEventListener("mouseover", () => btnConfirm.setCssStyles({ opacity: "1", backgroundColor: "var(--background-modifier-hover)", color: "var(--interactive-accent)" }));
-        btnConfirm.addEventListener("mouseout", () => btnConfirm.setCssStyles({ opacity: "0.7", backgroundColor: "transparent", color: "initial" }));
 
         const btnClear = btnControls.createDiv();
         setIcon(btnClear, "x");
         btnClear.setCssStyles({ cursor: "pointer", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center", opacity: "0.5", borderRadius: "4px" });
-        btnClear.addEventListener("mouseover", () => btnClear.setCssStyles({ opacity: "1", backgroundColor: "var(--background-modifier-hover)", color: "var(--text-error)" }));
-        btnClear.addEventListener("mouseout", () => btnClear.setCssStyles({ opacity: "0.5", backgroundColor: "transparent", color: "initial" }));
 
         this.tokenContainer = topRow.createDiv();
         this.tokenContainer.setCssStyles({ display: "flex", gap: "8px", flexWrap: "wrap", flexGrow: "1", padding: "6px", minHeight: "36px", border: "1px dashed var(--background-modifier-border)", borderRadius: "6px", alignItems: "center" });
@@ -1111,7 +1119,7 @@ export class CorkboardModal extends Modal {
                 setTimeout(async () => {
                     const files = getManuscriptFiles(this.app, this.workingFolderPath, this.plugin.settings.exportFolderPath);
                     for (const file of files) {
-                        const content = await this.app.vault.read(file);
+                        const content = await this.app.vault.cachedRead(file);
                         if (content.includes(`data-scene-id="${this.anchorSceneId}"`) || content.includes(`###### 🎬 ${this.anchorSceneId}`)) {
                             const leaf = this.app.workspace.getLeaf(false);
                             await leaf.openFile(file);
