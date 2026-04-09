@@ -112,4 +112,6 @@ describe('HistoryManager - 原子化備份與還原測試', () => {
         expect(finalBlock).not.toContain("寫壞了的糟糕內文"); // 寫壞嘅內文必須被清走！
     });
 
+
+
 });

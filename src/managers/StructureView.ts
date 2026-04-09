@@ -1136,12 +1136,11 @@ export class StructureView extends ItemView {
     }
 
     // =========================================================
-    // 🎯 Target Tab (防彈升級版 Ulysses Circular Ring)
+    // 🎯 Target Tab (防彈升級版 - 支援資料夾綁定)
     // =========================================================
     renderTarget(container: HTMLElement, view: MarkdownView) {
         // 1. 取得文本並過濾出純淨正文
         const text = view.editor.getValue();
-        // 確保 parseContent 存在 (防呆)
         const parsed = (this.plugin as any).utils?.parseContent ? (this.plugin as any).utils.parseContent(text, false) : { preamble: text, cards: [] };
 
         let pureText = parsed.preamble + "\n";
@@ -1149,37 +1148,32 @@ export class StructureView extends ItemView {
             parsed.cards.forEach((card: any) => pureText += card.body + "\n");
         }
 
-        // =========================================================
-        // 🌟 神級過濾器：剷走不需要計算嘅 Markdown 區塊
-        // =========================================================
-        // 1. 剷走 %% 註解區塊 ([\s\S]*? 代表包含換行符，? 代表非貪婪模式，免得一次過刪除兩個註解中間嘅正文)
+        // 剷走不需要計算嘅 Markdown 區塊
         pureText = pureText.replace(/%%[\s\S]*?%%/g, "");
-
-        // 2. 剷走 ~~ 刪除線區塊
         pureText = pureText.replace(/~~[\s\S]*?~~/g, "");
 
-
-
-
-
-        // 2. 超精準字數計算 (只計中文字、英數字，無視標點及 Markdown)
+        // 2. 超精準字數計算
         const words = pureText.match(/[\u4e00-\u9fa5]|[a-zA-Z0-9]+/g);
         const currentCount = words ? words.length : 0;
 
-
-        // 🌟 核心修改 1：由 plugin settings (data.json) 讀取字數！
-        // 確保 wordTargets 物件存在
+        // =========================================================
+        // 🌟 核心修改：草稿模式綁定資料夾，普通模式綁定檔案！
+        // =========================================================
         if (!this.plugin.settings.wordTargets) this.plugin.settings.wordTargets = {};
+
+        const isDraftMode = view.file && view.file.name === DRAFT_FILENAME;
         const currentPath = view.file ? view.file.path : "";
 
+        // 🎯 智能判定：如果係草稿，就用「FOLDER_ + 資料夾路徑」做鎖匙；否則用檔案路徑。
+        const targetKey = (isDraftMode && view.file?.parent) ? `FOLDER_${view.file.parent.path}` : currentPath;
 
-        // 🌟 3. 讀取目標字數 (改為直接從 data.json 設定檔讀取！)
-        const targetCount = this.plugin.settings.wordTargets[currentPath] || 2000;
+        // 3. 讀取目標字數
+        const targetCount = this.plugin.settings.wordTargets[targetKey] || 2000;
 
-        // 4. 計算百分比 (防呆：防止出現 NaN 或無限大)
+        // 4. 計算百分比
         let percentage = Math.round((currentCount / targetCount) * 100);
         if (isNaN(percentage)) percentage = 0;
-        let displayPercent = percentage; // 🌟 準備一個變數畀畫面顯示用 (可以超過 100%)
+        let displayPercent = percentage;
         if (percentage > 100) percentage = 100; // SVG 畫圖用，鎖死最高 100
         const dashArray = `${percentage}, 100`;
         const isDone = percentage >= 100;
@@ -1213,23 +1207,22 @@ export class StructureView extends ItemView {
         const countDisplay = targetBox.createDiv({ cls: "ns-word-count-display" });
         countDisplay.createDiv({ text: currentCount.toLocaleString(), cls: "ns-current-words" });
 
-        // 藥丸按鈕
+        // 統一叫 Target，簡潔明瞭
         const targetBtn = countDisplay.createDiv({ text: `Target: ${targetCount.toLocaleString()}`, cls: "ns-target-words" });
 
-        // 點擊更改目標 (邏輯不變)
+        // 點擊更改目標
         targetBtn.onclick = () => {
-            if (!currentPath) { new Notice("Error: No active file."); return; }
+            if (!targetKey) { new Notice("Error: No active file."); return; }
             import('../modals').then(({ InputModal }) => {
                 new InputModal(this.plugin.app, "Set Word Count Target", async (result) => {
                     const num = parseInt(result);
                     if (!isNaN(num) && num > 0) {
                         try {
                             if (!this.plugin.settings.wordTargets) this.plugin.settings.wordTargets = {};
-                            this.plugin.settings.wordTargets[currentPath] = num;
+                            this.plugin.settings.wordTargets[targetKey] = num; // 寫入 data.json
                             if (typeof this.plugin.saveSettings === 'function') { await this.plugin.saveSettings(); }
                             else { await this.plugin.saveData(this.plugin.settings); }
 
-                            //new Notice(`Target updated to ${num.toLocaleString()} words!`);
                             container.empty(); this.renderTarget(container, view);
                         } catch (error) {
                             console.error("Failed to save target:", error);

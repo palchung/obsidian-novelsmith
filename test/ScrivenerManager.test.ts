@@ -272,7 +272,56 @@ tags: novel
         expect(modifiedContent).not.toContain('第一場戲');
     });
 
+    test('syncBack - 斷電防禦測試：系統必須在修改任何原檔「之前」，優先建立 Snapshot 備份', async () => {
+        // 🌟 核心修復：假檔案必須使用 `new TFile()` 建立，否則會被底層過濾走！
+        const fakeSceneFile = new TFile() as any;
+        fakeSceneFile.path = 'Scene1.md';
+        fakeSceneFile.name = 'Scene1.md';
+        fakeSceneFile.basename = 'Scene1';
+        fakeSceneFile.extension = 'md';
 
+        const fakeFolder = { name: '第一章', path: 'MyBook/第一章', children: [fakeSceneFile] };
+        const fakeDraftFile = { path: `MyBook/第一章/${DRAFT_FILENAME}`, name: DRAFT_FILENAME, basename: 'NSmith_Scrivenering' };
+
+        const writeOrder: string[] = [];
+
+        // 1. 全面攔截所有可能嘅「備份」動作
+        app.vault.copy = jest.fn().mockImplementation(async (file, path) => writeOrder.push(`CREATE_SNAPSHOT: ${path}`));
+        app.vault.create = jest.fn().mockImplementation(async (path) => writeOrder.push(`CREATE_SNAPSHOT: ${path}`));
+        app.fileManager = {
+            renameFile: jest.fn().mockImplementation(async (file, path) => writeOrder.push(`CREATE_SNAPSHOT: ${path}`)),
+            trashFile: jest.fn().mockResolvedValue(undefined)
+        };
+
+        // 2. 攔截寫入動作
+        app.vault.modify = jest.fn().mockImplementation(async (file) => writeOrder.push(`MODIFY_ORIGINAL: ${file.name}`));
+
+        // 3. 準備有差異嘅假文稿，確保會觸發 Smart Diff 寫入
+        const fakeDraftContent = `## 📜 Scrivenering mode\n# 📄 Scene1.md\n<span class="ns-file-id">++ FILE_ID: Scene1.md ++</span>\n###### 第一場戲 <span class="ns-id" data-scene-id="uuid-123"></span>\n這是我在草稿裡新寫的內文！`;
+        const fakeOriginalContent = `###### 第一場戲 <span class="ns-id" data-scene-id="uuid-123"></span>\n這是舊內文，快點覆寫我！`;
+
+        app.vault.read.mockImplementation(async (file: any) => {
+            if (file.name === DRAFT_FILENAME) return fakeDraftContent;
+            return fakeOriginalContent;
+        });
+
+        app.metadataCache.getFileCache.mockReturnValue(null);
+        app.vault.getAbstractFileByPath = jest.fn().mockReturnValue(fakeSceneFile);
+
+        await manager.syncBack(fakeDraftFile as any, fakeFolder as any);
+
+        // 🕵️‍♂️ 終極斷言：
+        expect(writeOrder.length).toBeGreaterThan(0); // 確保有做嘢
+
+        const snapshotIndex = writeOrder.findIndex(action => action.includes('CREATE_SNAPSHOT'));
+        const modifyIndex = writeOrder.findIndex(action => action.includes('MODIFY_ORIGINAL'));
+
+        expect(snapshotIndex).not.toBe(-1);
+        expect(modifyIndex).not.toBe(-1);
+
+        // 最重要嘅防線：備份動作必須發生喺修改動作「之前」！
+        expect(snapshotIndex).toBeLessThan(modifyIndex);
+    });
 
 
 });

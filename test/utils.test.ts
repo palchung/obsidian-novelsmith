@@ -143,4 +143,34 @@ describe('utils.ts - 核心字串與解析邏輯', () => {
         expect(finalContent).toContain('> 如果這兩行消失了，就是發生了 P0 級別的資料遺失災難！');
     });
 
+    test('parseUniversalScenes - 混沌測試：遇到極端損壞的 HTML 或惡意排版，解析器必須優雅處理，不能崩潰', () => {
+        // 準備極度惡劣嘅垃圾數據：
+        // 1. 未閂好嘅 span
+        // 2. 空白標題
+        // 3. 亂七八糟嘅換行同標記
+        const garbageContent = `
+###### 
+<span class="ns-id" data-scene-id="broken-uuid" 
+> [!NSmith]
+> - POV:: 
+###### 正常場景 <span class="ns-id" data-scene-id="good-uuid"></span>
+這是一段文字
+###### 
+        `;
+
+        // 執行解析，確保唔會 Throw Error 或死機
+        expect(() => {
+            const scenes = parseUniversalScenes(garbageContent);
+
+            // 系統應該要自動略過/修復錯誤，並至少認出「正常場景」
+            const goodScene = scenes.find(s => s.id === 'good-uuid');
+            expect(goodScene).toBeDefined();
+            expect(goodScene?.title).toBe('正常場景');
+        }).not.toThrow();
+    });
+
+
+
+
+
 });

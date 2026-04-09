@@ -1,8 +1,38 @@
+/**
+ * @jest-environment jsdom
+ */
 import { WorldboardView } from '../src/managers/WorldboardView';
 
-jest.mock('obsidian', () => ({
-    ItemView: class { }, Notice: jest.fn(), TFile: jest.fn()
-}), { virtual: true });
+// =========================================================
+// 🎭 假扮 Obsidian API (全副武裝版)
+// =========================================================
+jest.mock('obsidian', () => {
+    // 假扮 Obsidian 嘅 Setting 介面 (因為入面有大量連續呼叫 .setName().setDesc())
+    class MockSetting {
+        setName() { return this; }
+        setDesc() { return this; }
+        addText() { return this; }
+        addDropdown() { return this; }
+        addToggle() { return this; }
+        addButton() { return this; }
+        addColorPicker() { return this; }
+        addExtraButton() { return this; }
+    }
+
+    return {
+        App: jest.fn(),
+        Notice: jest.fn(),
+        TFile: jest.fn(),
+        TFolder: jest.fn(),
+        ItemView: class { contentEl = document.createElement('div'); },
+        // 🌟 補番 Modal 嘅定義
+        Modal: class { app: any; constructor(app: any) { this.app = app; } close() { } open() { } },
+        // 🌟 補番 Setting 嘅定義
+        Setting: MockSetting,
+        setIcon: jest.fn(),
+        MarkdownRenderer: { render: jest.fn() }
+    };
+}, { virtual: true });
 
 describe('WorldboardView - YAML 印章防呆測試', () => {
     let app: any, plugin: any, view: any;
