@@ -238,7 +238,7 @@ export class ScrivenerManager {
 
 
         let cachedTemplateText: string | null = null;
-        const backstageTplPath = `${this.settings.bookFolderPath}/${TEMPLATES_DIR}/NovelSmith_Template.md`;
+        const backstageTplPath = `${this.settings.bookFolderPath}/${TEMPLATES_DIR}/${DRAFT_FILENAME}`;
         const tplFile = this.app.vault.getAbstractFileByPath(backstageTplPath);
         if (tplFile instanceof TFile) {
             cachedTemplateText = await this.app.vault.read(tplFile);

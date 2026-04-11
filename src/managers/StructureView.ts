@@ -605,6 +605,15 @@ export class StructureView extends ItemView {
                 menu.addSeparator();
             }
 
+            // 🌟 插入呢段：Word Count Report 按鈕
+            menu.addItem((item) => {
+                item.setTitle("Word count report").setIcon("bar-chart").onClick(() => {
+                    import('../modals').then(({ WordCountModal }) => {
+                        new WordCountModal(this.plugin).open();
+                    });
+                });
+            });
+
             menu.addItem((item) => {
                 item.setTitle("Insert dashboard").setIcon("bar-chart-3").onClick(async () => {
                     const availableAttributes = await this.plugin.dashboardManager.getAvailableAttributes();
@@ -1167,8 +1176,8 @@ export class StructureView extends ItemView {
         // 🎯 智能判定：如果係草稿，就用「FOLDER_ + 資料夾路徑」做鎖匙；否則用檔案路徑。
         const targetKey = (isDraftMode && view.file?.parent) ? `FOLDER_${view.file.parent.path}` : currentPath;
 
-        // 3. 讀取目標字數
-        const targetCount = this.plugin.settings.wordTargets[targetKey] || 2000;
+        // 3. 讀取目標字數 (優先讀取獨立設定 -> 再讀取全域預設 -> 最後先用 2000 墊底)
+        const targetCount = this.plugin.settings.wordTargets[targetKey] || this.plugin.settings.defaultChapterWordTarget || 2000;
 
         // 4. 計算百分比
         let percentage = Math.round((currentCount / targetCount) * 100);

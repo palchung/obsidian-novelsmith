@@ -162,7 +162,7 @@ export class PlotGridView extends ItemView {
 
         // 智能掃描器
         const allFiles = this.plugin.app.vault.getMarkdownFiles().filter(f => {
-            if (f.name.startsWith("_") || f.name.startsWith("Script_") || f.name === "NovelSmith_Template.md") return false;
+            if (f.name.startsWith("_") || f.name.startsWith("Script_") || f.name === '${DRAFT_FILENAME}') return false;
             if (f.path.includes(`/_Backstage/`)) return false;
             if (this.plugin.settings.exportFolderPath && f.path.startsWith(this.plugin.settings.exportFolderPath)) return false;
             if (this.plugin.settings.wikiFolderPath && f.path.startsWith(this.plugin.settings.wikiFolderPath)) return false;

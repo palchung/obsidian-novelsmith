@@ -58,7 +58,7 @@ export interface ExtractedTags {
 // 🧹 檔名過濾器 (確保建立檔案時唔會因為特殊符號報錯)
 // ============================================================
 export const sanitizeFileName = (name: string): string => {
-    return name.replace(/[\[\]#<>:"|?*\\/]/g, '').trim();
+    return name.replace(/[\[\]#<>:"|?*\\/.]/g, '').trim();
 };
 
 
@@ -351,7 +351,8 @@ export const generateSceneId = (): string => {
 
 // 3. Archived Draft Detector
 export const isScriveningsDraft = (content: string, fileName: string = ""): boolean => {
-    return fileName === DRAFT_FILENAME || content.includes('++ FILE_ID:') || content.includes('## 📜');
+    return fileName === DRAFT_FILENAME ||
+        content.includes('<span class="ns-file-id">++ FILE_ID:');
 };
 
 

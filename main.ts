@@ -154,7 +154,7 @@ export default class NovelSmithPlugin extends Plugin {
                     if (activeFile.name === DRAFT_FILENAME) return;
                     if (activeFile.name.startsWith("_")) return;
                     // const templateName = this.settings.templateFilePath.split('/').pop();
-                    if (activeFile.name === "NovelSmith_Template.md") return;
+                    if (activeFile.name === "${DRAFT_FILENAME}") return;
 
                     const now = Date.now();
                     if (now - this.lastDraftWarningTime < 5 * 60 * 1000) return;
@@ -492,7 +492,7 @@ export default class NovelSmithPlugin extends Plugin {
         const folder = this.settings.bookFolderPath;
         if (!folder || folder.trim() === "") return;
 
-        const tplPath = `${folder}/_Backstage/Templates/NovelSmith_Template.md`;
+        const tplPath = `${folder}/${TEMPLATES_DIR}/${DRAFT_FILENAME}`;
         const tplFile = this.app.vault.getAbstractFileByPath(tplPath);
         if (!(tplFile instanceof TFile)) return;
 
@@ -595,7 +595,7 @@ export default class NovelSmithPlugin extends Plugin {
 
         // 🔥 Performance and Architecture Upgrade: Use central constants and shared functions, extremely clean!
         const folderPath = `${this.settings.bookFolderPath}/${TEMPLATES_DIR}`;
-        const tplPath = `${folderPath}/NovelSmith_Template.md`;
+        const tplPath = `${folderPath}/${DRAFT_FILENAME}`;
 
         await ensureFolderExists(this.app, folderPath);
 

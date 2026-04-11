@@ -5,7 +5,7 @@ import { SCENE_COLORS, createIconButton } from './utils';
 export { SprintSetupModal } from './modals/SprintModal';
 export { StatsDashboardModal } from './modals/StatsModal';
 export { CorkboardModal, CorkboardDraftActionModal } from './modals/CorkboardModal';
-
+export { WordCountModal } from './modals/WordCountModal';
 
 // ============================================================
 // 1. Generic Input Modal (Upgraded with Default Value)

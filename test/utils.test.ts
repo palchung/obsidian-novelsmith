@@ -35,7 +35,7 @@ describe('utils.ts - 核心字串與解析邏輯', () => {
 
     test('isScriveningsDraft - 應該準確辨認串聯草稿', () => {
         expect(isScriveningsDraft('', 'NSmith_Scrivenering.md')).toBe(true);
-        expect(isScriveningsDraft('++ FILE_ID: 123 ++', 'other.md')).toBe(true);
+        expect(isScriveningsDraft('<span class="ns-file-id">++ FILE_ID: 123 ++</span>', 'other.md')).toBe(true);
         expect(isScriveningsDraft('普通內文', 'normal.md')).toBe(false);
     });
 

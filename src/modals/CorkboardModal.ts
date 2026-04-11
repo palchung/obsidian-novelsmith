@@ -2,7 +2,7 @@
 import { App, TFolder, Menu, setIcon, Modal, TFile, Notice, MarkdownView, MarkdownRenderer, Component } from 'obsidian';
 import Sortable from 'sortablejs';
 import NovelSmithPlugin from '../../main';
-import { sanitizeFileName, extractSynopsisAndTags, TEMPLATES_DIR, getColorById, generateSceneId, SCENE_COLORS, createIconButton, getManuscriptFiles, parseUniversalScenes, parseContent } from '../utils';
+import { sanitizeFileName, extractSynopsisAndTags, DRAFT_FILENAME, TEMPLATES_DIR, getColorById, generateSceneId, SCENE_COLORS, createIconButton, getManuscriptFiles, parseUniversalScenes, parseContent } from '../utils';
 import { InputModal, SimpleConfirmModal, SceneCreateModal } from '../modals';
 
 
@@ -613,7 +613,7 @@ export class CorkboardModal extends Modal {
 
             let metaBlock = `> [!${calloutType}] Scene Info\n> - Status:: #Writing\n> - Note:: `;
             if (TEMPLATES_DIR) {
-                const tplFile = this.app.vault.getAbstractFileByPath(`${this.plugin.settings.bookFolderPath}/${TEMPLATES_DIR}/NovelSmith_Template.md`);
+                const tplFile = this.app.vault.getAbstractFileByPath(`${this.plugin.settings.bookFolderPath}/${TEMPLATES_DIR}/${DRAFT_FILENAME}`);
                 if (tplFile && tplFile instanceof TFile) {
                     const cachedTemplateText = await this.app.vault.read(tplFile);
                     const metaBlockMatch = cachedTemplateText.match(/> \[!NSmith\][\s\S]*?(?=\n[^>]|$)/);
@@ -948,7 +948,7 @@ export class CorkboardModal extends Modal {
 
             let cachedTemplateText: string | null = null;
             if (TEMPLATES_DIR) {
-                const tplFile = this.app.vault.getAbstractFileByPath(`${this.plugin.settings.bookFolderPath}/${TEMPLATES_DIR}/NovelSmith_Template.md`);
+                const tplFile = this.app.vault.getAbstractFileByPath(`${this.plugin.settings.bookFolderPath}/${TEMPLATES_DIR}/${DRAFT_FILENAME}`);
                 if (tplFile && tplFile instanceof TFile) cachedTemplateText = await this.app.vault.read(tplFile);
             }
 

@@ -1,7 +1,7 @@
 import { App, PluginSettingTab, Setting, Notice, setIcon } from 'obsidian';
 import NovelSmithPlugin from './../main';
 import { StatsData, DEFAULT_STATS } from 'src/managers/StatsManager';
-
+import { DRAFT_FILENAME, TEMPLATES_DIR } from './utils';
 
 
 export interface WikiCategory {
@@ -23,6 +23,8 @@ export interface NovelSmithSettings {
     relationColors: Record<string, string>;
     plotGridColumns: { name: string, type: "tracking" | "scene" }[];
     wordTargets: Record<string, number>;
+    bookWordTarget: number;
+    defaultChapterWordTarget: number;
 }
 
 export const DEFAULT_SETTINGS: NovelSmithSettings = {
@@ -35,7 +37,9 @@ export const DEFAULT_SETTINGS: NovelSmithSettings = {
     worldboardCoords: {},
     relationColors: {},
     plotGridColumns: [],
-    wordTargets: {}
+    wordTargets: {},
+    bookWordTarget: 100000,           // 預設寫十萬字
+    defaultChapterWordTarget: 2000    // 預設每章兩千字
 }
 
 export class NovelSmithSettingTab extends PluginSettingTab {
@@ -233,7 +237,7 @@ export class NovelSmithSettingTab extends PluginSettingTab {
                 .setIcon('refresh-cw')
                 .setButtonText('Rebuild template')
                 .onClick(async () => {
-                    const tplPath = `${this.plugin.settings.bookFolderPath}/_Backstage/Templates/NovelSmith_Template.md`;
+                    const tplPath = `${this.plugin.settings.bookFolderPath}/${TEMPLATES_DIR}/${DRAFT_FILENAME}`;
                     const file = this.plugin.app.vault.getAbstractFileByPath(tplPath);
                     if (file) {
                         // 🌟 如果檔案已存在，就執行「逆向同步」，幫佢補返齊啲屬性！
