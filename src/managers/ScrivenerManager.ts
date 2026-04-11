@@ -3,7 +3,7 @@ import { App, Notice, TFile, TFolder, MarkdownView } from 'obsidian';
 import { parseContent, RE_FILE_ID, DraftCard, ParseResult } from '../utils';
 import { NovelSmithSettings } from '../settings';
 import { ChapterSelectionModal, SimpleConfirmModal } from '../modals';
-import { HISTORY_DIR, ST_WARNING, generateSceneId, DRAFT_FILENAME, TEMPLATES_DIR, DRAFTS_DIR, ensureFolderExists } from '../utils';
+import { HISTORY_DIR, ST_WARNING, generateSceneId, DRAFT_FILENAME, TEMPLATES_DIR, TEMPLATES_FILENAME, DRAFTS_DIR, ensureFolderExists } from '../utils';
 
 
 export class ScrivenerManager {
@@ -238,7 +238,7 @@ export class ScrivenerManager {
 
 
         let cachedTemplateText: string | null = null;
-        const backstageTplPath = `${this.settings.bookFolderPath}/${TEMPLATES_DIR}/${DRAFT_FILENAME}`;
+        const backstageTplPath = `${this.settings.bookFolderPath}/${TEMPLATES_DIR}/${TEMPLATES_FILENAME}`;
         const tplFile = this.app.vault.getAbstractFileByPath(backstageTplPath);
         if (tplFile instanceof TFile) {
             cachedTemplateText = await this.app.vault.read(tplFile);

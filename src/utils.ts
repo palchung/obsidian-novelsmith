@@ -34,6 +34,8 @@ export const ST_FILE_ID_HEADER = "++ FILE_ID";
 // 📂 System Constants - Unified management, eliminating magic strings
 // ============================================================
 export const DRAFT_FILENAME = "NSmith_Scrivenering.md";
+export const TEMPLATES_FILENAME = "NovelSmith_Template.md";
+
 export const BACKSTAGE_DIR = "_Backstage";
 export const TEMPLATES_DIR = `${BACKSTAGE_DIR}/Templates`;
 export const DRAFTS_DIR = `${BACKSTAGE_DIR}/Drafts`;

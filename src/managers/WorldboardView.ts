@@ -1,7 +1,7 @@
 import { ItemView, WorkspaceLeaf, Notice, TFolder, TFile, MarkdownRenderer, setIcon, Modal, Setting, App } from 'obsidian';
 import NovelSmithPlugin from '../../main';
 import { Network, Options } from 'vis-network';
-import { sanitizeFileName, IMAGE_PROPERTY_KEYS, GROUP_COLORS, getConvexHull } from '../utils';
+import { sanitizeFileName, IMAGE_PROPERTY_KEYS, GROUP_COLORS, getConvexHull, TEMPLATES_DIR } from '../utils';
 
 export const VIEW_TYPE_WORLDBOARD = "novelsmith-worldboard-view";
 
@@ -180,7 +180,7 @@ export class WorldboardView extends ItemView {
                     const safeName = sanitizeFileName(name);
                     const path = `${cleanFolderPath}/${safeName}.md`;
                     await this.plugin.app.vault.adapter.mkdir(cleanFolderPath);
-                    const tplPath = `${this.plugin.settings.bookFolderPath}/_Backstage/Templates/${primaryName}.md`;
+                    const tplPath = `${this.plugin.settings.bookFolderPath}/${TEMPLATES_DIR}/${primaryName}.md`;
                     const tplFile = this.app.vault.getAbstractFileByPath(tplPath);
                     let content = `---\ntags:\n  - ${primaryName}\n---\n# ${safeName}\n\n`;
                     if (tplFile instanceof TFile) {

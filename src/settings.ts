@@ -1,7 +1,7 @@
 import { App, PluginSettingTab, Setting, Notice, setIcon } from 'obsidian';
 import NovelSmithPlugin from './../main';
 import { StatsData, DEFAULT_STATS } from 'src/managers/StatsManager';
-import { DRAFT_FILENAME, TEMPLATES_DIR } from './utils';
+import { DRAFT_FILENAME, TEMPLATES_FILENAME, TEMPLATES_DIR } from './utils';
 
 
 export interface WikiCategory {
@@ -237,7 +237,7 @@ export class NovelSmithSettingTab extends PluginSettingTab {
                 .setIcon('refresh-cw')
                 .setButtonText('Rebuild template')
                 .onClick(async () => {
-                    const tplPath = `${this.plugin.settings.bookFolderPath}/${TEMPLATES_DIR}/${DRAFT_FILENAME}`;
+                    const tplPath = `${this.plugin.settings.bookFolderPath}/${TEMPLATES_DIR}/${TEMPLATES_FILENAME}`;
                     const file = this.plugin.app.vault.getAbstractFileByPath(tplPath);
                     if (file) {
                         // 🌟 如果檔案已存在，就執行「逆向同步」，幫佢補返齊啲屬性！

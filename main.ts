@@ -14,7 +14,7 @@ import { StatsManager } from './src/managers/StatsManager';
 import { redundantHighlighter, dialogueHighlighter, structureHighlighter, systemTagsProtector, alignPropertyProcessor } from './src/decorators';
 import { StructureView, VIEW_TYPE_STRUCTURE } from './src/managers/StructureView';
 import { WorldboardView, VIEW_TYPE_WORLDBOARD } from './src/managers/WorldboardView';
-import { ST_WARNING, DRAFT_FILENAME, BACKSTAGE_DIR, TEMPLATES_DIR, ensureFolderExists, isScriveningsDraft } from './src/utils';
+import { ST_WARNING, DRAFT_FILENAME, BACKSTAGE_DIR, TEMPLATES_FILENAME, TEMPLATES_DIR, ensureFolderExists, isScriveningsDraft } from './src/utils';
 import { DashboardBuilderModal } from './src/modals';
 
 export default class NovelSmithPlugin extends Plugin {
@@ -492,7 +492,7 @@ export default class NovelSmithPlugin extends Plugin {
         const folder = this.settings.bookFolderPath;
         if (!folder || folder.trim() === "") return;
 
-        const tplPath = `${folder}/${TEMPLATES_DIR}/${DRAFT_FILENAME}`;
+        const tplPath = `${folder}/${TEMPLATES_DIR}/${TEMPLATES_FILENAME}`;
         const tplFile = this.app.vault.getAbstractFileByPath(tplPath);
         if (!(tplFile instanceof TFile)) return;
 
@@ -595,7 +595,7 @@ export default class NovelSmithPlugin extends Plugin {
 
         // 🔥 Performance and Architecture Upgrade: Use central constants and shared functions, extremely clean!
         const folderPath = `${this.settings.bookFolderPath}/${TEMPLATES_DIR}`;
-        const tplPath = `${folderPath}/${DRAFT_FILENAME}`;
+        const tplPath = `${folderPath}/${TEMPLATES_FILENAME}`;
 
         await ensureFolderExists(this.app, folderPath);
 
