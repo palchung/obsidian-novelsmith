@@ -727,9 +727,24 @@ export default class NovelSmithPlugin extends Plugin {
 
 
     onunload() {
-        //console.log('NovelSmith shutting down');
-        // 🔥 Defense Upgrade 2: When the plugin is disabled or updated, completely detach the panel to prevent ghost panels from multiplying infinitely!
+        // 🔥 清理計時器，防止記憶體洩漏
+        if (this.draftCheckTimer) {
+            window.clearTimeout(this.draftCheckTimer);
+            this.draftCheckTimer = null;
+        }
+        if (this.inkDropTimer) {
+            window.clearTimeout(this.inkDropTimer);
+            this.inkDropTimer = null;
+        }
 
+        // 清理面板資源
+        this.app.workspace.getLeavesOfType(VIEW_TYPE_STRUCTURE).forEach(leaf => {
+            if (leaf.view instanceof StructureView) {
+                leaf.view.onClose();
+            }
+        });
+
+        //console.log('NovelSmith cleaned up and shut down.');
     }
 
     async loadSettings() {
