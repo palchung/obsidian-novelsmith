@@ -1,8 +1,8 @@
 import { App, Notice, MarkdownView, TFile, Editor } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import { NovelSmithSettings } from '../settings';
-import { updateRedundantPatterns } from '../decorators';
-import { AIDS_DIR, ensureFolderExists, replaceEntireDocument } from '../utils';
+import { updateRedundantPatterns, updateSyntaxPatterns } from '../decorators';
+import { AIDS_DIR, ensureFolderExists, SYNTAX_GAP_CN, SYNTAX_GAP_EN, SENTENCE_END_REGEX } from '../utils';
 import { CleanDraftModal } from '../modals';
 
 interface EditorWithCM extends Editor {
@@ -69,7 +69,7 @@ export class WritingManager {
             await ensureFolderExists(this.app, this.getAidsFolderPath());
             try {
                 await this.app.vault.create(configPath, `// Correction List\nMainCharacterName | Typo1`);
-                if (forceShowNotice) new Notice(`✅ Successfully generated Correction List: ${configPath}`);
+                if (forceShowNotice) new Notice(`Successfully generated Correction List: ${configPath}`);
             } catch {
                 if (forceShowNotice) new Notice(`Creation failed, please check the path.`);
             }
@@ -77,6 +77,26 @@ export class WritingManager {
             if (forceShowNotice) new Notice(`File already exists (${configPath}), generation stopped.`);
         }
     }
+
+    public async ensureSyntaxListExists(forceShowNotice: boolean = false) {
+        const configPath = `${this.getAidsFolderPath()}/SyntaxList.md`;
+        const configFile = this.app.vault.getAbstractFileByPath(configPath);
+        if (!configFile) {
+            await ensureFolderExists(this.app, this.getAidsFolderPath());
+            try {
+                const defaultContent = `// 句式雷達清單 (Syntax Radar List)\n// 支援中英混合，使用 "..." 作為萬能匹配符，系統會自動識別語言並跨行掃描。\n\n之所以...是因為\n當...的時候\n與其說...不如說\n雖然...但是\n被...給\n\nThe reason...is because\nNot only...but also\nThere are...who\nWhether...or not`;
+                await this.app.vault.create(configPath, defaultContent);
+                if (forceShowNotice) new Notice(`✅ Successfully generated Syntax List: ${configPath}`);
+            } catch {
+                if (forceShowNotice) new Notice(`Creation failed, please check the path.`);
+            }
+        } else {
+            if (forceShowNotice) new Notice(`File already exists (${configPath}), generation stopped.`);
+        }
+    }
+
+
+
 
     // =================================================================
     // 🔍 Redundant Words Mode
@@ -128,6 +148,66 @@ export class WritingManager {
             }
         }
     }
+
+
+    // =================================================================
+    // 📡 Syntax Radar Mode (跨行句式雷達)
+    // =================================================================
+    async toggleSyntaxMode(view: MarkdownView) {
+        const isModeOn = document.body.classList.contains('mode-syntax');
+
+        if (isModeOn) {
+            document.body.classList.remove('mode-syntax');
+            updateSyntaxPatterns(null); // 此函數需要在 decorators.ts 匯出
+            this.triggerEditorUpdate();
+            new Notice("Disabled: syntax radar");
+        } else {
+            await this.ensureSyntaxListExists(false); // Ensure the file exists
+            const configPath = `${this.getAidsFolderPath()}/SyntaxList.md`;
+            const configFile = this.app.vault.getAbstractFileByPath(configPath);
+
+            if (configFile instanceof TFile) {
+                const configContent = await this.app.vault.cachedRead(configFile);
+                const badSyntaxes = configContent.split('\n')
+                    .map(w => w.trim())
+                    .filter(w => w.length > 0 && !w.startsWith("//"));
+
+                if (badSyntaxes.length === 0) { new Notice("The active syntax list is empty."); return; }
+
+                const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                badSyntaxes.sort((a, b) => b.length - a.length);
+
+                const patternString = badSyntaxes.map(w => {
+                    let escaped = escapeRegExp(w);
+                    // 偵測是否包含英文字母
+                    const hasEnglish = /[a-zA-Z]/.test(w);
+
+                    // 轉換 "..." 為跨行正則匹配 [\s\S]
+                    // 🌟 核心升級：加入「尾巴追蹤」
+                    if (escaped.includes('\\.\\.\\.')) {
+                        const gap = hasEnglish ? SYNTAX_GAP_EN : SYNTAX_GAP_CN;
+                        // 將「A...B」變成「A...B + 後續文字 + 標點」
+                        escaped = escaped.replace(/\\\.\\\.\\\./g, `[\\s\\S]{1,${gap}}?`) + SENTENCE_END_REGEX;
+                    }
+
+                    // 英文句式頭尾加上單詞邊界 \b
+                    if (hasEnglish) {
+                        return `\\b${escaped}\\b`;
+                    }
+                    return escaped;
+                }).join("|");
+
+                const combinedRegex = new RegExp(`(${patternString})`, 'g');
+
+                updateSyntaxPatterns(combinedRegex); // 更新 Regex
+                document.body.classList.add('mode-syntax'); // 觸發 CSS 渲染
+                this.triggerEditorUpdate();
+                new Notice(`📡 Syntax Radar: Monitoring (${badSyntaxes.length} patterns)`);
+            }
+        }
+    }
+
+
 
     // =================================================================
     // 💬 Dialogue Mode

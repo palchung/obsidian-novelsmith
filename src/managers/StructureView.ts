@@ -591,6 +591,14 @@ export class StructureView extends ItemView {
                 menu.addSeparator();
                 menu.addItem((item) => { item.setTitle("Dialogue mode").setIcon("message-circle").onClick(() => { this.plugin.writingManager.toggleDialogueMode(currentView); }); });
                 menu.addItem((item) => { item.setTitle("Redundant mode").setIcon("search").onClick(() => { void this.plugin.writingManager.toggleRedundantMode(currentView); }); });
+
+                // 🌟 新增：句式雷達 (Syntax Radar) 選項
+                menu.addItem((item) => {
+                    item.setTitle("Syntax radar").setIcon("scan-text").onClick(() => {
+                        void this.plugin.writingManager.toggleSyntaxMode(currentView);
+                    });
+                });
+
                 menu.addSeparator();
                 menu.addItem((item) => { item.setTitle("Clean draft").setIcon("eraser").onClick(() => { this.plugin.writingManager.cleanDraft(currentView); }); });
                 if (!isDraftMode) {

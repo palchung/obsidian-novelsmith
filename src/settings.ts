@@ -259,6 +259,16 @@ export class NovelSmithSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
+            .setName('Regenerate: syntax list')
+            .addButton(button => button
+                .setIcon('refresh-cw')
+                .setButtonText('Rebuild syntax list')
+                .onClick(() => {
+                    void this.plugin.writingManager.ensureSyntaxListExists(true);
+                }));
+
+
+        new Setting(containerEl)
             .setName('Regenerate: correction list')
             .addButton(button => button
                 .setIcon('refresh-cw')

@@ -63,6 +63,51 @@ export const dialogueHighlighter = ViewPlugin.fromClass(class {
 
 
 // ============================================================
+// 📡 1.5 Syntax Radar Mode (句式雷達：紫色波浪底線)
+// ============================================================
+export let activeSyntaxRegex: RegExp | null = null;
+export function updateSyntaxPatterns(regex: RegExp | null) { activeSyntaxRegex = regex; }
+
+// 🌟 貼心設計：直接注入 Inline CSS，免卻設定 styles.css 嘅煩惱
+const syntaxDecoration = Decoration.mark({
+    attributes: {
+        style: 'text-decoration: underline wavy #9c4be5; text-underline-offset: 3px; text-decoration-thickness: 2px;'
+    }
+});
+
+export const syntaxHighlighter = ViewPlugin.fromClass(class {
+    decorations: DecorationSet;
+    matcher: MatchDecorator | null = null;
+    lastPattern: RegExp | null = null;
+
+    constructor(view: EditorView) {
+        this.decorations = Decoration.none;
+        if (document.body.classList.contains('mode-syntax')) this.rebuildMatcher(view);
+    }
+
+    update(update: ViewUpdate) {
+        const isModeOn = document.body.classList.contains('mode-syntax');
+        if (!isModeOn || !activeSyntaxRegex) {
+            this.decorations = Decoration.none; this.matcher = null; this.lastPattern = null; return;
+        }
+        if (update.docChanged || update.viewportChanged || this.lastPattern !== activeSyntaxRegex) this.rebuildMatcher(update.view);
+    }
+
+    rebuildMatcher(view: EditorView) {
+        if (!activeSyntaxRegex) return;
+        if (!this.matcher || this.lastPattern !== activeSyntaxRegex) {
+            this.matcher = new MatchDecorator({ regexp: activeSyntaxRegex, decoration: (match) => syntaxDecoration });
+            this.lastPattern = activeSyntaxRegex;
+        }
+        this.decorations = this.matcher.createDeco(view);
+    }
+}, { decorations: v => v.decorations });
+
+
+
+
+
+// ============================================================
 // 🔥 4. Structure Decorators (Safe scaled-down version - No Widgets)
 // ============================================================
 
