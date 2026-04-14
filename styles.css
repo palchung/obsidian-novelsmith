@@ -55,6 +55,16 @@
     padding: 0 2px;
 }
 
+/* --- 橘色回聲 (重複用字) 樣式 --- */
+.cm-echo-text {
+    background-color: rgba(var(--color-orange-rgb), 0.25);
+    border-bottom: 2px solid rgba(var(--color-orange-rgb), 0.6);
+    border-radius: 4px;
+    padding: 0 2px;
+}
+
+
+
 body.ns-mode-dialogue .cm-content,
 body.ns-mode-dialogue .markdown-preview-view {
     color: var(--text-faint) !important;

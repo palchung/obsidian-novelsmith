@@ -589,8 +589,31 @@ export class StructureView extends ItemView {
                 menu.addItem((item) => { item.setTitle("Auto wiki").setIcon("book").onClick(() => { void this.plugin.wikiManager.scanAndCreateWiki(currentView); }); });
                 menu.addItem((item) => { item.setTitle("Typo correction").setIcon("pencil").onClick(() => { void this.plugin.writingManager.correctNames(currentView); }); });
                 menu.addSeparator();
-                menu.addItem((item) => { item.setTitle("Dialogue mode").setIcon("message-circle").onClick(() => { this.plugin.writingManager.toggleDialogueMode(currentView); }); });
+                // 🌟 修改這裡：強制繞過慳電檢查，即刻重畫側邊欄！
+                menu.addItem((item) => {
+                    item.setTitle("Dialogue mode").setIcon("message-circle").onClick(() => {
+                        this.plugin.writingManager.toggleDialogueMode(currentView);
+                        this.lastOutlineHash = ""; // 🔥 關鍵：強行洗走緩存
+                        setTimeout(() => this.parseAndRender(), 50); // 50ms 後即刻彈百分比！
+                    });
+                });
+
+
+
+
+
                 menu.addItem((item) => { item.setTitle("Redundant mode").setIcon("search").onClick(() => { void this.plugin.writingManager.toggleRedundantMode(currentView); }); });
+
+                // 🌟 新增：獨立出來的 Echo Radar 按鈕 (用 activity 波浪線 Icon)
+                menu.addItem((item) => {
+                    item.setTitle("Echo radar").setIcon("activity").onClick(() => {
+                        void this.plugin.writingManager.toggleEchoMode(currentView);
+                    });
+                });
+
+
+
+
 
                 // 🌟 新增：句式雷達 (Syntax Radar) 選項
                 menu.addItem((item) => {
@@ -749,8 +772,20 @@ export class StructureView extends ItemView {
         existingChapters.forEach(ch => chapterMap.set(ch.dataset.name || "", ch));
 
         let chIndex = 0;
+
+        // 🌟 檢查目前係咪開緊「對話模式」
+        const isDialogueMode = document.body.classList.contains('ns-mode-dialogue');
+
+        // 🌟 新增：準備計算成篇文稿嘅總字數
+        let grandTotalChars = 0;
+        let grandTotalDialogues = 0;
+
         tree.forEach((chapter) => {
             if (chapter.name === "root" && chapter.scenes.length === 0) return;
+
+            let totalChChars = 0;       // 🌟 新增：全章總字數
+            let totalChDialogues = 0;   // 🌟 新增：全章對話字數
+
 
             let chapterBox = chapterMap.get(chapter.name);
             if (!chapterBox) {
@@ -794,6 +829,19 @@ export class StructureView extends ItemView {
             existingScenes.forEach(sc => sceneMap.set(sc.dataset.safeKey || "", sc));
 
             chapter.scenes.forEach((scene) => {
+                // 🌟 1. 計算場景熱度 (對話百分比)
+                const dialogueMatches = scene.content.match(/「[^」]*」|『[^』]*』|“[^”]*”|"[^"]*"/g) || [];
+                const dialogueLen = dialogueMatches.join("").length;
+                const totalLen = scene.content.replace(/[#\s]/g, "").length || 1;
+                const scenePct = Math.round((dialogueLen / totalLen) * 100);
+
+                totalChChars += totalLen;
+                totalChDialogues += dialogueLen;
+
+                // 🌟 新增：累積成篇文稿嘅總字數
+                grandTotalChars += totalLen;
+                grandTotalDialogues += dialogueLen;
+
                 let safeKey = scene.id;
                 if (!safeKey) {
                     const count = renderNameCount.get(scene.name) || 0;
@@ -818,6 +866,10 @@ export class StructureView extends ItemView {
 
                     titleContainer.createSpan({ cls: "ns-scene-title-text" });
 
+                    // 🌟 2. 建立熱度百分比 DOM (放喺標題同顏色掣中間)
+                    const heatEl = scCard.createSpan({ cls: "ns-scene-heat" });
+                    heatEl.setCssStyles({ fontSize: "0.8em", opacity: "0.5", marginLeft: "8px", marginRight: "8px", flexShrink: "0" });
+
                     const colorBtn = scCard.createDiv();
                     setIcon(colorBtn, "palette");
                     colorBtn.setCssStyles({ cursor: "pointer", opacity: "0.3", marginLeft: "auto", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: "0" });
@@ -829,10 +881,16 @@ export class StructureView extends ItemView {
                 scCard.dataset.sceneId = scene.id || "";
                 scCard.dataset.sceneName = scene.name || "";
 
+                // 🌟 3. 更新熱度數值，並且只喺「對話模式」先顯示出嚟
+                const heatEl = scCard.querySelector(".ns-scene-heat") as HTMLElement;
+                if (heatEl) {
+                    heatEl.innerText = `${scenePct}%`;
+                    heatEl.style.display = isDialogueMode ? "block" : "none";
+                }
+
                 // 處理顏色更新
                 const colorObj = getColorById(scene.colorId);
                 scCard.className = "ns-scene-card"; // Reset
-                // 🌟 換成注入變數：
                 scCard.style.setProperty('--scene-bg', colorObj.bg);
                 scCard.style.setProperty('--scene-border', colorObj.border);
 
@@ -843,7 +901,7 @@ export class StructureView extends ItemView {
                     scCard.setCssProps({ borderLeftWidth: "", filter: "" });
                 }
 
-                // 處理標題更新 (唔好盲目覆寫，避免浪費效能)
+                // 處理標題更新
                 const titleText = scCard.querySelector(".ns-scene-title-text") as HTMLElement;
                 if (titleText.innerText !== scene.name) titleText.innerText = scene.name;
 
@@ -873,24 +931,34 @@ export class StructureView extends ItemView {
                     this.selectedSceneId = scene.id || null;
                     this.selectedSceneTitle = scene.name;
 
-                    // 1. 瞬間跳轉去編輯器目標行數
                     this.jumpToLine(scene.lineNumber);
 
-                    // 2. 🌟 極速高亮魔法 (取代原本嘅拆屋重建)
-                    // 只係用 Javascript 搵返所有卡片熄滅佢哋，然後點亮自己！
-                    // 咁樣做係 0 毫秒延遲，而且絕對唔會令到面板飛返上頂！
                     const allCards = container.querySelectorAll(".ns-scene-card");
                     allCards.forEach(card => (card as HTMLElement).setCssProps({ borderLeftWidth: "", filter: "" }));
                     scCard.setCssProps({ borderLeftWidth: "4px", filter: "brightness(0.9)" });
                 };
 
-                this.sceneContentMap.set(scCard, scene.content); // 更新 WeakMap 內容
-                sceneList.appendChild(scCard); // 確保順序
-                sceneMap.delete(safeKey); // 從刪除名單剔除
+                this.sceneContentMap.set(scCard, scene.content);
+                sceneList.appendChild(scCard);
+                sceneMap.delete(safeKey);
             });
 
             // 👉 清除已經喺 Markdown 刪除咗嘅舊場景卡片
             sceneMap.forEach(sc => sc.remove());
+
+            // 🌟 4. 更新章節標題旁邊嘅總百分比 (只在對話模式顯示)
+            if (chapter.name !== "root") {
+                const chCard = chapterBox.querySelector(".ns-chapter-card") as HTMLElement;
+                if (chCard) {
+                    if (isDialogueMode) {
+                        const chPct = Math.round((totalChDialogues / (totalChChars || 1)) * 100);
+                        chCard.innerText = `${chapter.name} (${chPct}%)`;
+                    } else {
+                        chCard.innerText = `${chapter.name}`;
+                    }
+                }
+            }
+
             chIndex++;
         });
 
@@ -906,6 +974,18 @@ export class StructureView extends ItemView {
             }
             ch.remove();
         });
+
+        // 🌟 終極修復：將總百分比加落「最頂部嘅檔案標題」！
+        const topTitleEl = container.querySelector(".ns-outline-header h3") as HTMLElement;
+        if (topTitleEl && view.file) {
+            let baseName = view.file.name === DRAFT_FILENAME ? "Scrivenering draft" : view.file.basename;
+            if (isDialogueMode && grandTotalChars > 0) {
+                const docPct = Math.round((grandTotalDialogues / grandTotalChars) * 100);
+                topTitleEl.innerText = `${baseName} (${docPct}%)`;
+            } else {
+                topTitleEl.innerText = baseName;
+            }
+        }
     }
 
     async renderHistory(container: HTMLElement, view: MarkdownView) {

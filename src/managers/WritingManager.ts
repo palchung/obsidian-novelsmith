@@ -1,8 +1,8 @@
-import { App, Notice, MarkdownView, TFile, Editor } from 'obsidian';
+import { App, Notice, MarkdownView, TFile, Editor, TFolder } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import { NovelSmithSettings } from '../settings';
-import { updateRedundantPatterns, updateSyntaxPatterns } from '../decorators';
-import { AIDS_DIR, ensureFolderExists, SYNTAX_GAP_CN, SYNTAX_GAP_EN, SENTENCE_END_REGEX } from '../utils';
+import { setRedundantPattern, setEchoPattern, updateSyntaxPatterns } from '../decorators';
+import { AIDS_DIR, ensureFolderExists, SYNTAX_GAP_CN, SYNTAX_GAP_EN, SENTENCE_END_REGEX, ECHO_SCAN_RANGE, ECHO_MIN_REPEATS, ECHO_STOP_WORDS } from '../utils';
 import { CleanDraftModal } from '../modals';
 
 interface EditorWithCM extends Editor {
@@ -86,7 +86,7 @@ export class WritingManager {
             try {
                 const defaultContent = `// 句式雷達清單 (Syntax Radar List)\n// 支援中英混合，使用 "..." 作為萬能匹配符，系統會自動識別語言並跨行掃描。\n\n之所以...是因為\n當...的時候\n與其說...不如說\n雖然...但是\n被...給\n\nThe reason...is because\nNot only...but also\nThere are...who\nWhether...or not`;
                 await this.app.vault.create(configPath, defaultContent);
-                if (forceShowNotice) new Notice(`✅ Successfully generated Syntax List: ${configPath}`);
+                if (forceShowNotice) new Notice(`Successfully generated syntax List: ${configPath}`);
             } catch {
                 if (forceShowNotice) new Notice(`Creation failed, please check the path.`);
             }
@@ -96,56 +96,139 @@ export class WritingManager {
     }
 
 
-
-
     // =================================================================
-    // 🔍 Redundant Words Mode
+    // 🔍 1. Redundant Words Mode (紅字贅詞)
     // =================================================================
     async toggleRedundantMode(view: MarkdownView) {
         const isModeOn = document.body.classList.contains('mode-redundant');
 
         if (isModeOn) {
             document.body.classList.remove('mode-redundant');
-            updateRedundantPatterns(null);
+            setRedundantPattern(null);
             this.triggerEditorUpdate();
             new Notice("Disabled: redundant words mode");
         } else {
             document.body.classList.remove('ns-mode-dialogue');
-
-            await this.ensureRedundantListExists(false); // Ensure the file exists
+            await this.ensureRedundantListExists(false);
             const configPath = `${this.getAidsFolderPath()}/RedundantList.md`;
             const configFile = this.app.vault.getAbstractFileByPath(configPath);
 
             if (configFile instanceof TFile) {
                 const configContent = await this.app.vault.cachedRead(configFile);
-                const badWords = configContent.split(/[,，、\n]+/)
+                let badWords = configContent.split(/[,，、\n]+/)
                     .map(w => w.trim())
                     .filter(w => w.length > 0 && !w.startsWith("//"));
 
-                if (badWords.length === 0) { new Notice("The active redundant words list is empty."); return; }
+                if (badWords.length === 0) { new Notice("Redundant list is empty."); return; }
 
                 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 badWords.sort((a, b) => b.length - a.length);
 
-                // 🔥 Masterful fix: Bilingual (Chinese/English) compatible Regex builder
-                const patternString = badWords.map(w => {
-                    const escaped = escapeRegExp(w);
-                    // Condition: If the word starts and ends with alphanumeric characters, add \b (word boundary)
-                    const isEnglishWord = /^[a-zA-Z0-9].*[a-zA-Z0-9]$|^[a-zA-Z0-9]$/.test(w);
-                    if (isEnglishWord) {
-                        return `\\b${escaped}\\b`;
-                    }
-                    return escaped; // Chinese or other symbols remain unchanged
+                const pattern = badWords.map(w => {
+                    const isEn = /^[a-zA-Z0-9].*[a-zA-Z0-9]$|^[a-zA-Z0-9]$/.test(w);
+                    return isEn ? `\\b${escapeRegExp(w)}\\b` : escapeRegExp(w);
                 }).join("|");
 
-                const combinedRegex = new RegExp(`(${patternString})`, 'g');
-
-
-                updateRedundantPatterns(combinedRegex);
+                setRedundantPattern(new RegExp(`(${pattern})`, 'g'));
                 document.body.classList.add('mode-redundant');
                 this.triggerEditorUpdate();
-                new Notice(`🔍 Redundant Words Mode: Monitoring (${badWords.length} words)`);
+                // new Notice(`🔍 Redundant Mode Active: ${badWords.length} targets`);
             }
+        }
+    }
+
+    // =================================================================
+    // 📡 2. Echo Radar Mode (橘色回聲)
+    // =================================================================
+    async toggleEchoMode(view: MarkdownView) {
+        const isModeOn = document.body.classList.contains('mode-echo');
+
+        if (isModeOn) {
+            document.body.classList.remove('mode-echo');
+            setEchoPattern(null);
+            this.triggerEditorUpdate();
+            new Notice("Disabled: echo radar");
+        } else {
+            document.body.classList.remove('ns-mode-dialogue');
+
+            // 1. 獲取 AutoWiki 豁免名單
+            const excludedWikiNames = new Set<string>();
+            if (this.settings.wikiCategories) {
+                for (const cat of this.settings.wikiCategories) {
+                    if (!cat.folderPath) continue;
+                    const folder = this.app.vault.getAbstractFileByPath(cat.folderPath);
+                    if (folder && folder instanceof TFolder) {
+                        folder.children.forEach(f => {
+                            if (f instanceof TFile && f.extension === "md") {
+                                excludedWikiNames.add(f.basename);
+                                const parts = f.basename.match(/[\u4e00-\u9fa5]{2,}|[a-zA-Z]{3,}/g);
+                                if (parts) parts.forEach(p => excludedWikiNames.add(p));
+                            }
+                        });
+                    }
+                }
+            }
+
+            const editorText = view.editor.getValue();
+            let scanText = editorText;
+            const echoWords = new Set<string>();
+            const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+            // 結構屏蔽魔法
+            scanText = scanText.replace(/^###### .*$/gm, (match) => ' '.repeat(match.length));
+            scanText = scanText.replace(/^> .*$/gm, (match) => ' '.repeat(match.length));
+            scanText = scanText.replace(/^# 📄 .*$/gm, (match) => ' '.repeat(match.length));
+            scanText = scanText.replace(/<span[^>]*>.*?<\/span>/g, (match) => ' '.repeat(match.length));
+
+            // 防碎化屏蔽魔法
+            const sortedWikiNames = Array.from(excludedWikiNames).sort((a, b) => b.length - a.length);
+            for (const name of sortedWikiNames) {
+                if (name.length > 0) scanText = scanText.replace(new RegExp(escapeRegExp(name), 'g'), ' '.repeat(name.length));
+            }
+
+            // 英文單詞
+            const enRegex = /[a-zA-Z]{3,}/g;
+            let enMatch;
+            while ((enMatch = enRegex.exec(scanText)) !== null) {
+                const word = enMatch[0];
+                if (ECHO_STOP_WORDS.has(word.toLowerCase())) continue;
+
+                const searchStart = enMatch.index + word.length;
+                const lookaheadText = scanText.substring(searchStart, searchStart + ECHO_SCAN_RANGE);
+                const wordPattern = new RegExp(`\\b${escapeRegExp(word)}\\b`, 'gi');
+                const matchesInWindow = (lookaheadText.match(wordPattern) || []).length;
+                if (matchesInWindow >= ECHO_MIN_REPEATS - 1) echoWords.add(word);
+            }
+
+            // 中文 N-gram 碎片掃描
+            const cnRegex = /[\u4e00-\u9fa5]{2,}/g;
+            let cnMatch;
+            while ((cnMatch = cnRegex.exec(scanText)) !== null) {
+                const block = cnMatch[0];
+                const blockIndex = cnMatch.index;
+
+                for (let i = 0; i <= block.length - 2; i++) {
+                    for (let len = 2; len <= 4 && i + len <= block.length; len++) {
+                        const ngram = block.substring(i, i + len);
+                        if (ECHO_STOP_WORDS.has(ngram)) continue;
+
+                        const searchStart = blockIndex + i + len;
+                        const lookaheadText = scanText.substring(searchStart, searchStart + ECHO_SCAN_RANGE);
+                        const matchesInWindow = lookaheadText.split(ngram).length - 1;
+                        if (matchesInWindow >= ECHO_MIN_REPEATS - 1) echoWords.add(ngram);
+                    }
+                }
+            }
+
+            const finalEchoWords = Array.from(echoWords).sort((a, b) => b.length - a.length);
+            if (finalEchoWords.length === 0) { new Notice("No echo words found."); return; }
+
+            const pattern = finalEchoWords.map(w => escapeRegExp(w)).join("|");
+            setEchoPattern(new RegExp(`(${pattern})`, 'g'));
+
+            document.body.classList.add('mode-echo');
+            this.triggerEditorUpdate();
+            new Notice(`📡 Echo Radar Active: ${finalEchoWords.length} Echoes`);
         }
     }
 
@@ -202,7 +285,7 @@ export class WritingManager {
                 updateSyntaxPatterns(combinedRegex); // 更新 Regex
                 document.body.classList.add('mode-syntax'); // 觸發 CSS 渲染
                 this.triggerEditorUpdate();
-                new Notice(`📡 Syntax Radar: Monitoring (${badSyntaxes.length} patterns)`);
+                // new Notice(`📡 Syntax Radar: Monitoring (${badSyntaxes.length} patterns)`);
             }
         }
     }
@@ -221,9 +304,10 @@ export class WritingManager {
             new Notice("Disabled: dialogue mode");
         } else {
             document.body.classList.remove('mode-redundant');
+            document.body.classList.remove('mode-echo');
             document.body.classList.add('ns-mode-dialogue');
             this.triggerEditorUpdate();
-            new Notice("Dialogue mode: focused");
+            // new Notice("Dialogue mode: focused");
         }
     }
 

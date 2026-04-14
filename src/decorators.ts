@@ -1,3 +1,4 @@
+import { RangeSetBuilder } from "@codemirror/state";
 import { ViewUpdate, ViewPlugin, DecorationSet, Decoration, EditorView, MatchDecorator, WidgetType } from '@codemirror/view';
 import { MarkdownPostProcessorContext } from 'obsidian';
 
@@ -5,33 +6,66 @@ import { MarkdownPostProcessorContext } from 'obsidian';
 // ============================================================
 // 1. Global Variables & Redundant Words/Dialogue Mode (Unchanged)
 // ============================================================
+// ============================================================
+// 1. 雙重雷達：贅詞 (紅) 與 回聲 (橘) + 隱形遮罩 (獨立控制版)
+// ============================================================
 export let activeRedundantRegex: RegExp | null = null;
-export function updateRedundantPatterns(regex: RegExp | null) { activeRedundantRegex = regex; }
+export let activeEchoRegex: RegExp | null = null;
+
+// 🌟 拆分成兩個獨立設定函數
+export function setRedundantPattern(regex: RegExp | null) { activeRedundantRegex = regex; }
+export function setEchoPattern(regex: RegExp | null) { activeEchoRegex = regex; }
 
 const redundantDecoration = Decoration.mark({ class: 'cm-redundant-text' });
+const echoDecoration = Decoration.mark({ class: 'cm-echo-text' });
 
 export const redundantHighlighter = ViewPlugin.fromClass(class {
     decorations: DecorationSet;
-    matcher: MatchDecorator | null = null;
-    lastPattern: RegExp | null = null;
-    constructor(view: EditorView) {
-        this.decorations = Decoration.none;
-        if (document.body.classList.contains('mode-redundant')) this.rebuildMatcher(view);
-    }
+    constructor(view: EditorView) { this.decorations = Decoration.none; }
+
     update(update: ViewUpdate) {
-        const isModeOn = document.body.classList.contains('mode-redundant');
-        if (!isModeOn || !activeRedundantRegex) {
-            this.decorations = Decoration.none; this.matcher = null; this.lastPattern = null; return;
+        // 🌟 檢查有邊個模式開緊
+        const isRedundantOn = document.body.classList.contains('mode-redundant');
+        const isEchoOn = document.body.classList.contains('mode-echo');
+
+        if (!isRedundantOn && !isEchoOn) { this.decorations = Decoration.none; return; }
+
+        const builder = new RangeSetBuilder<Decoration>();
+        let text = update.view.state.doc.toString();
+
+        // 🛡️ 屏蔽魔法：將標題同屬性變成空白，保護佢哋唔被 Highlight！
+        text = text.replace(/^###### .*$/gm, (match) => ' '.repeat(match.length));
+        text = text.replace(/^> .*$/gm, (match) => ' '.repeat(match.length));
+        text = text.replace(/^# 📄 .*$/gm, (match) => ' '.repeat(match.length));
+        text = text.replace(/<span[^>]*>.*?<\/span>/g, (match) => ' '.repeat(match.length));
+
+        const matches: { from: number, to: number, deco: Decoration }[] = [];
+
+        // 只在 Redundant 模式開啟時收集紅色
+        if (isRedundantOn && activeRedundantRegex) {
+            let match;
+            activeRedundantRegex.lastIndex = 0;
+            while ((match = activeRedundantRegex.exec(text)) !== null) {
+                matches.push({ from: match.index, to: match.index + match[0].length, deco: redundantDecoration });
+            }
         }
-        if (update.docChanged || update.viewportChanged || this.lastPattern !== activeRedundantRegex) this.rebuildMatcher(update.view);
-    }
-    rebuildMatcher(view: EditorView) {
-        if (!activeRedundantRegex) return;
-        if (!this.matcher || this.lastPattern !== activeRedundantRegex) {
-            this.matcher = new MatchDecorator({ regexp: activeRedundantRegex, decoration: (match) => redundantDecoration });
-            this.lastPattern = activeRedundantRegex;
+        // 只在 Echo 模式開啟時收集橘色
+        if (isEchoOn && activeEchoRegex) {
+            let match;
+            activeEchoRegex.lastIndex = 0;
+            while ((match = activeEchoRegex.exec(text)) !== null) {
+                matches.push({ from: match.index, to: match.index + match[0].length, deco: echoDecoration });
+            }
         }
-        this.decorations = this.matcher.createDeco(view);
+
+        let lastTo = -1;
+        matches.sort((a, b) => a.from - b.from).forEach(m => {
+            if (m.from >= lastTo) {
+                builder.add(m.from, m.to, m.deco);
+                lastTo = m.to;
+            }
+        });
+        this.decorations = builder.finish();
     }
 }, { decorations: v => v.decorations });
 

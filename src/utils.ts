@@ -58,11 +58,24 @@ export interface ExtractedTags {
 // ============================================================
 // 📏 Syntax Radar 句式雷達設定 (萬能匹配符 ... 嘅最大跨越字數)
 // ============================================================
+export const ECHO_SCAN_RANGE = 100; // 🌟 偵測 100 字內重複出現兩次以上嘅詞
+export const ECHO_MIN_REPEATS = 3;  // 🌟 觸發門檻：喺範圍內加埋出現最少 3 次先會變橘色
 export const SYNTAX_GAP_CN = 20; // 中文句式：中間最多隔 20 個字元
 export const SYNTAX_GAP_EN = 60; // 英文句式：中間最多隔 60 個字元 (約 10-12 個單詞)
 // 🌟 終極包容防爆版：加入齊全嘅中英雙語「斷句」標點，並使用 40 字安全鎖
 // 包含：。，！？；：、… (中文) 以及 .,!?;:—- (英文/破折號)
 export const SENTENCE_END_REGEX = '[^。，！？；：、….,!?;:—\\n\\r-]{0,40}[。，！？；：、….,!?;:—\\n\\r-]?';
+
+// 🌟 中英雙語虛詞過濾名單 (避免高亮無意義嘅詞)
+export const ECHO_STOP_WORDS = new Set([
+    // 中文虛詞
+    "一個", "我們", "你們", "他們", "這個", "那個", "然後", "但是", "因為", "所以", "如果", "就是", "可以", "沒有", "什麼", "這樣", "還是", "時候", "知道", "覺得", "自己", "開始", "已經", "不是", "也是", "這麼", "那麼", "怎麼", "起來", "這裡", "那裡", "現在", "突然", "那些", "這些", "的話", "只見", "忽然", "接著", "於是", "不過",
+
+    // 英文虛詞 (Stop words)
+    "the", "and", "that", "have", "for", "not", "with", "you", "this", "but", "his", "from", "they", "she", "her", "was", "are", "will", "would", "could", "should", "what", "there", "their", "when", "make", "can", "like", "time", "just", "him", "know", "take", "people", "into", "year", "your", "good", "some", "them", "see", "other", "than", "then", "now", "look", "only", "come", "its", "over", "think", "also", "back", "after", "use", "two", "how", "our", "work", "first", "well", "way", "even", "new", "want", "because", "any", "these", "give", "day", "most", "out", "who", "which", "has", "had", "been", "were", "did"
+]);
+
+
 
 // ============================================================
 // 🧹 檔名過濾器 (確保建立檔案時唔會因為特殊符號報錯)
