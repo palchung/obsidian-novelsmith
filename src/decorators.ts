@@ -250,3 +250,78 @@ export function alignPropertyProcessor(el: HTMLElement, ctx: MarkdownPostProcess
     });
 }
 
+
+
+// ============================================================
+// 🛡️ 7. ID Validator (終極防禦：實時偵測遺失的 ID)
+// ============================================================
+class MissingIdWidget extends WidgetType {
+    toDOM() {
+        const span = document.createElement("span");
+        span.className = "ns-id-warning-msg";
+        span.textContent = "ID lose！Please Undo or press sync to generate a new one";
+        return span;
+    }
+    ignoreEvent() { return true; }
+}
+
+const missingIdLineDeco = Decoration.line({ class: 'ns-id-missing-line' });
+const missingIdWidgetDeco = Decoration.widget({ widget: new MissingIdWidget(), side: 1 });
+
+export const idValidatorPlugin = ViewPlugin.fromClass(class {
+    decorations: DecorationSet;
+
+    constructor(view: EditorView) {
+        this.decorations = this.buildDeco(view);
+    }
+
+    update(update: ViewUpdate) {
+        // 只要文件有改動，或者畫面捲動過，就即時重新掃描眼前嘅文字
+        if (update.docChanged || update.viewportChanged) {
+            this.decorations = this.buildDeco(update.view);
+        }
+    }
+
+    buildDeco(view: EditorView) {
+        const builder = new RangeSetBuilder<Decoration>();
+        const doc = view.state.doc;
+
+        // 🌟 慳電魔法：只掃描目前熒幕顯示緊嗰幾十行文字！
+        for (const { from, to } of view.visibleRanges) {
+            let pos = from;
+            while (pos <= to) {
+                const line = doc.lineAt(pos);
+                const text = line.text;
+
+                // 1. 檢查場景標題 (######)
+                if (text.startsWith("###### ")) {
+                    const hasSceneId = text.includes('class="ns-id"') || text.includes('data-scene-id=');
+                    if (!hasSceneId) {
+                        builder.add(line.from, line.from, missingIdLineDeco); // 成行變紅
+                        builder.add(line.to, line.to, missingIdWidgetDeco);   // 行尾加警告
+                    }
+                }
+
+                // 2. 檢查章節標題 (# 📄)
+                // (因為章節嘅 ID 係寫喺下一行，所以我哋要 Check 多一行)
+                if (text.startsWith("# 📄 ")) {
+                    let hasChapterId = false;
+                    const nextLineNo = line.number + 1;
+                    if (nextLineNo <= doc.lines) {
+                        const nextText = doc.line(nextLineNo).text;
+                        if (nextText.includes('class="ns-file-id"')) {
+                            hasChapterId = true;
+                        }
+                    }
+                    if (!hasChapterId) {
+                        builder.add(line.from, line.from, missingIdLineDeco);
+                        builder.add(line.to, line.to, missingIdWidgetDeco);
+                    }
+                }
+
+                pos = line.to + 1;
+            }
+        }
+        return builder.finish();
+    }
+}, { decorations: v => v.decorations });
