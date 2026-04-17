@@ -71,7 +71,20 @@ export class CompilerManager {
             if (options.removeStrikethrough) content = content.replace(/~~[\s\S]*?~~/g, "");
             if (options.mergeBold) content = content.replace(/\*\*(.*?)\*\*/g, "$1");
             if (options.removeHighlights) content = content.replace(/==/g, "");
-            if (options.removeInternalLinks) content = content.replace(/(?<!!)\[\[(?:[^\]]*\|)?([^\]]+)\]\]/g, "$1");
+            if (options.removeInternalLinks) {
+                content = content.split('\n').map(line => {
+                    const trimmed = line.trim();
+                    // 🛡️ 魔法護盾：保護場景標題、章節標題、系統標籤，以及卡片屬性 (包含 :: 或 [!NSmith)
+                    if (trimmed.startsWith("######") ||
+                        trimmed.startsWith("# 📄") ||
+                        line.includes("++ FILE_ID") ||
+                        (trimmed.startsWith(">") && (line.includes("::") || line.includes("[!NSmith")))) {
+                        return line; // 👈 原封不動，保留雙括號
+                    }
+                    // 其他正文部分：正常剝除雙括號，只保留顯示文字
+                    return line.replace(/(?<!!)\[\[(?:[^\]]*\|)?([^\]]+)\]\]/g, "$1");
+                }).join('\n');
+            }
             if (options.hashtagAction === 'remove-all') content = content.replace(/(^|\s)#[a-zA-Z0-9_\-\u4e00-\u9fa5]+/g, "$1");
             else if (options.hashtagAction === 'remove-hash') content = content.replace(/(^|\s)#([a-zA-Z0-9_\-\u4e00-\u9fa5]+)/g, "$1$2");
 

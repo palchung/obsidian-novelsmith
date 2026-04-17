@@ -146,4 +146,51 @@ describe('SceneManager - 防禦陣地與效能測試', () => {
         // 斷言：無論頭先撳咗幾多次，最終都只會執行【1 次】！
         expect(generateSpy).toHaveBeenCalledTimes(1);
     });
+
+
+    // =========================================================
+    // 🛡️ 測試四：標題治癒引擎 (Title Healer) 極限測試
+    // =========================================================
+    test('executeAssignIDsSilent - 標題治癒引擎：清理各種殘骸，拯救錯位文字', () => {
+        // 準備各種被用家「暴力破壞」的極端情況
+        fakeEditor.lines = [
+            '###### 場景A <span class="ns-i',           // 情況 1：刪除結尾
+            '###### 場景B class="ns-id" data-scene-',   // 情況 2：刪除開頭的 <span
+            '###### 場景C <span class="ns-id" ></span>',// 情況 3：刪除了中間的 UUID
+            '###### 場景D data-warning="⛔️ ID',         // 情況 4：剩下後半截
+            '###### 標題E <span class="ns-id" data-scene-id="abc-123" data-warning="⛔️ ID (Do not edit)"></span>這是我新加的字', // 情況 5：文字被擠到 </span> 後面
+            // 🌟 情況 6：極端亂碼破壞測試 (完全模擬真實報錯)
+            '###### 莉安娜帶着艾莉亞逃亡ofodjfodjfodjfodjnd="07644160-25f" data-warning="⛔️ ID (Do not edit)"> </span>'
+        ];
+
+        jest.spyOn(manager, 'scheduleGenerateDatabase').mockImplementation();
+
+        // 執行標題治癒與 ID 派發
+        manager.executeAssignIDsSilent(fakeView as any);
+
+        // 獲取修改後寫入編輯器的內容
+        const newContent = fakeEditor.replaceRange.mock.calls[0][0];
+
+        // 1-4. 驗證所有垃圾殘骸都被清得一乾二淨，並補上全新 ID
+        expect(newContent).toContain('###### 場景A <span class="ns-id" data-scene-id="uuid-1-00000"');
+        expect(newContent).toContain('###### 場景B <span class="ns-id" data-scene-id="uuid-2-00000"');
+        expect(newContent).toContain('###### 場景C <span class="ns-id" data-scene-id="uuid-3-00000"');
+        expect(newContent).toContain('###### 場景D <span class="ns-id" data-scene-id="uuid-4-00000"');
+
+        // 5. 驗證被擠到後面的文字成功搬回前面 (保留原本的 ID abc-123，因為 ID 冇爛)
+        expect(newContent).toContain('###### 標題E這是我新加的字 <span class="ns-id" data-scene-id="abc-123"');
+
+        // 🌟 6. 驗證極端亂碼被切走！系統認出 d="07644..." 係 UUID 殘骸，從亂碼開頭一刀切！
+        // 留意：因為 5 號標題保留咗舊 ID，所以 6 號標題會獲派 uuid-5-00000
+        expect(newContent).toContain('###### 莉安娜帶着艾莉亞逃亡 <span class="ns-id" data-scene-id="uuid-5-00000"');
+
+        // 🛡️ 最終斷言：確保冇任何代碼殘骸留低喺畫面上
+        expect(newContent).not.toMatch(/ns-i\b/);
+        expect(newContent).not.toMatch(/data-scene-$/);
+
+    });
+
+
+
+
 });

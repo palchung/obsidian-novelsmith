@@ -487,9 +487,19 @@ export class WritingManager {
             if (options.removeStrikethrough) content = content.replace(/~~[\s\S]*?~~/g, "");
             if (options.removeHighlights) content = content.replace(/==/g, "");
 
-            // Remove internal links
-            if (options.removeInternalLinks) content = content.replace(/(?<!!)\[\[(?:[^\]]*\|)?([^\]]+)\]\]/g, "$1");
-
+            // Remove internal links (🛡️ 加入護盾：保護場景卡片內的連結)
+            if (options.removeInternalLinks) {
+                content = content.split('\n').map(line => {
+                    const trimmed = line.trim();
+                    if (trimmed.startsWith("######") ||
+                        trimmed.startsWith("# 📄") ||
+                        line.includes("++ FILE_ID") ||
+                        (trimmed.startsWith(">") && (line.includes("::") || line.includes("[!NSmith")))) {
+                        return line;
+                    }
+                    return line.replace(/(?<!!)\[\[(?:[^\]]*\|)?([^\]]+)\]\]/g, "$1");
+                }).join('\n');
+            }
             // Remove Bold
             if (options.removeBold) content = content.replace(/\*\*([\s\S]*?)\*\*/g, "$1");
 

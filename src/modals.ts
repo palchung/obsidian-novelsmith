@@ -415,7 +415,7 @@ export class CleanDraftModal extends Modal {
         removeComments: true,
         removeStrikethrough: true,
         removeHighlights: true,
-        removeInternalLinks: false,
+        removeInternalLinks: true,
         removeBold: true
     };
     onSubmit: (options: CleanDraftOptions) => void;

@@ -28,6 +28,23 @@ export class SceneManager {
         this.settings = settings;
     }
 
+    // 🛡️ 終極碎骨機：專門處理極端損毀嘅標題殘骸
+    private sanitizeTitle(line: string): string {
+        // 匹配常見的標籤殘骸特徵：
+        // 1. <span 或 </span>
+        // 2. data-xxx
+        // 3. ⛔️ 警告符號
+        // 4. "> (標籤結尾)
+        // 5. 🌟 神級防禦：任何以 =" 開頭，且內容包含 UUID/顏色/ns-id/⛔️ 的殘骸
+        // (這會將前面連著的英文字母、亂碼一併當作屬性名殘骸，從根部精準切走！)
+        const match = line.match(/(<span\b|<\/span>|data-[a-z-]+|⛔️|">|[a-z-]*="(?:ns-id|[a-z0-9-]{5,}|⛔️[^"]*|default|red|orange|yellow|green|blue|purple|grey)")/i);
+
+        if (match && match.index !== undefined) {
+            return line.substring(0, match.index).trimEnd();
+        }
+        return line.trimEnd();
+    }
+
     // 🔥 New: Schedule database generation (Debounce) to avoid frantic disk read/writes within a second
     public scheduleGenerateDatabase(delayMs = 1500) {
         if (this.dbTimer) window.clearTimeout(this.dbTimer);
@@ -79,24 +96,56 @@ export class SceneManager {
                 const idMatch = line.match(RE_EXTRACT_ID);
 
                 if (!idMatch) {
-                    // Case A：No ID -> Assign ID
+                    // 👉 Case A：冇 ID 或者得返半截殘骸 -> 清理殘骸，派發新 ID
+                    // 🛡️ 治癒魔法 1：一刀切走所有疑似 <span 嘅殘餘物
+                    // 🛡️ 治癒魔法 1 升級：無論佢刪除咗 <span，定係淨低 class，或者 data-scene，我哋都一刀切！
+                    const cleanTitle = this.sanitizeTitle(line);
                     const idTag = ` <span class="ns-id" data-scene-id="${generateSceneId()}" data-warning="${ST_WARNING}"></span>`;
-                    newLines.push(line.trimEnd() + idTag);
+                    newLines.push(cleanTitle + idTag);
                     hasChanges = true;
                 } else {
                     const currentId = idMatch[1];
+                    let healedLine = line;
+
+                    // 🛡️ 治癒魔法 2：偵測有冇文字被錯誤擠咗去 </span> 後面，有就搬返去前面！
+                    const spanRegex = /(<span class="ns-id"[^>]*>.*?<\/span>)/i;
+                    const spanMatch = line.match(spanRegex);
+
+                    if (spanMatch) {
+                        const fullSpan = spanMatch[0];
+                        const textBefore = line.substring(0, spanMatch.index);
+                        const textAfter = line.substring(spanMatch.index! + fullSpan.length);
+
+                        // 如果 span 後面有字，或者有奇怪嘅空格，即刻重新組裝！
+                        if (textAfter.trim() !== "" || line.endsWith(" ")) {
+                            healedLine = (textBefore.trimEnd() + textAfter).trimEnd() + " " + fullSpan;
+                        }
+                    } else {
+                        // 雖然有 ID，但 span 標籤爛咗 (例如冇咗 </span>)，幫佢重建
+                        const colorMatch = line.match(/data-color="([^"]+)"/);
+                        const color = colorMatch ? colorMatch[1] : "default";
+                        // 🛡️ 治癒魔法 1 升級：無論佢刪除咗 <span，定係淨低 class，或者 data-scene，我哋都一刀切！
+                        const cleanTitle = this.sanitizeTitle(line);
+                        const idTag = ` <span class="ns-id" data-scene-id="${currentId}" data-warning="${ST_WARNING}" data-color="${color}"></span>`;
+                        healedLine = cleanTitle + idTag;
+                    }
+
                     if (seenIds.has(currentId)) {
-                        // Case B：Found duplicated ID -> assign new ID
+                        // Case B：發現重複 ID -> 換新 ID
                         const newId = generateSceneId();
-                        const fixedLine = line.replace(currentId, newId);
+                        const fixedLine = healedLine.replace(currentId, newId);
                         newLines.push(fixedLine);
                         seenIds.add(newId);
                         hasChanges = true;
-                        //console.log(`NovelSmith Intercept：Duplicate ID ${currentId}, replaced with ${newId}`);
                     } else {
-                        // Case C：valid ID -> Record it
+                        // Case C：正常 ID -> 記錄，並檢查需唔需要寫入「治癒後」嘅文字
                         seenIds.add(currentId);
-                        newLines.push(line);
+                        if (healedLine !== line) {
+                            newLines.push(healedLine);
+                            hasChanges = true;
+                        } else {
+                            newLines.push(line);
+                        }
                     }
                 }
             } else {
@@ -135,24 +184,53 @@ export class SceneManager {
                     const idMatch = line.match(RE_EXTRACT_ID);
 
                     if (!idMatch) {
-                        // Case A: No ID -> Issue one
+                        // 👉 Case A：冇 ID -> 清理殘骸並派發
+                        // 🛡️ 治癒魔法 1 升級：無論佢刪除咗 <span，定係淨低 class，或者 data-scene，我哋都一刀切！
+                        const cleanTitle = this.sanitizeTitle(line);
                         const idTag = ` <span class="ns-id" data-scene-id="${generateSceneId()}" data-warning="${ST_WARNING}"></span>`;
-                        newLines.push(line.trimEnd() + idTag);
+                        newLines.push(cleanTitle + idTag);
                         fileHasChanges = true;
                     } else {
                         const currentId = idMatch[1];
+                        let healedLine = line;
+
+                        // 🛡️ 治癒魔法：搬字過紙
+                        const spanRegex = /(<span class="ns-id"[^>]*>.*?<\/span>)/i;
+                        const spanMatch = line.match(spanRegex);
+
+                        if (spanMatch) {
+                            const fullSpan = spanMatch[0];
+                            const textBefore = line.substring(0, spanMatch.index);
+                            const textAfter = line.substring(spanMatch.index! + fullSpan.length);
+
+                            if (textAfter.trim() !== "" || line.endsWith(" ")) {
+                                healedLine = (textBefore.trimEnd() + textAfter).trimEnd() + " " + fullSpan;
+                            }
+                        } else {
+                            const colorMatch = line.match(/data-color="([^"]+)"/);
+                            const color = colorMatch ? colorMatch[1] : "default";
+                            // 🛡️ 治癒魔法 1 升級：無論佢刪除咗 <span，定係淨低 class，或者 data-scene，我哋都一刀切！
+                            const cleanTitle = this.sanitizeTitle(line);
+                            const idTag = ` <span class="ns-id" data-scene-id="${currentId}" data-warning="${ST_WARNING}" data-color="${color}"></span>`;
+                            healedLine = cleanTitle + idTag;
+                        }
+
                         if (seenIds.has(currentId)) {
-                            // Case B: Duplicate ID found across or within files! -> Force a new one
+                            // Case B：重複 ID
                             const newId = generateSceneId();
-                            const fixedLine = line.replace(currentId, newId);
+                            const fixedLine = healedLine.replace(currentId, newId);
                             newLines.push(fixedLine);
                             seenIds.add(newId);
                             fileHasChanges = true;
-                            //console.log(`NovelSmith Intercept：File ${file.name} was found duplicated ID ${currentId}, replaced with ${newId}`);
                         } else {
-                            // Case C: Valid ID -> Record it
+                            // Case C：正常 ID
                             seenIds.add(currentId);
-                            newLines.push(line);
+                            if (healedLine !== line) {
+                                newLines.push(healedLine);
+                                fileHasChanges = true;
+                            } else {
+                                newLines.push(line);
+                            }
                         }
                     }
                 } else newLines.push(line);
