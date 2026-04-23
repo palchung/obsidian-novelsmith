@@ -8,7 +8,7 @@ export { CorkboardModal, CorkboardDraftActionModal } from './modals/CorkboardMod
 export { WordCountModal } from './modals/WordCountModal';
 
 // ============================================================
-// 1. Generic Input Modal (Upgraded with Default Value)
+// 1. Generic Input Modal (Upgraded with Default Value & Enter Fix)
 // ============================================================
 export class InputModal extends Modal {
     result: string;
@@ -36,7 +36,9 @@ export class InputModal extends Modal {
                     this.result = value;
                 });
                 text.inputEl.addEventListener('keydown', (e: KeyboardEvent) => {
-                    if (e.key === 'Enter') {
+                    // 🌟 終極防護：確保唔係打緊中文選字 (isComposing) 先至觸發
+                    if (e.key === 'Enter' && !e.isComposing) {
+                        e.preventDefault(); // 防止觸發其他預設行為 (例如表單提交)
                         this.onSubmit(this.result);
                         this.close();
                     }
@@ -454,7 +456,7 @@ export class CleanDraftModal extends Modal {
 }
 
 // ============================================================
-// 🎨 Premium Scene Card Creator (Supports color selection)
+// 🎨 Premium Scene Card Creator (Supports color selection & Enter Fix)
 // ============================================================
 export class SceneCreateModal extends Modal {
     titleText: string;
@@ -481,7 +483,11 @@ export class SceneCreateModal extends Modal {
                 text.onChange(value => { this.defaultName = value; });
                 this.inputEl = text.inputEl;
                 text.inputEl.addEventListener("keydown", (e) => {
-                    if (e.key === "Enter") this.submit();
+                    // 🌟 同步防護
+                    if (e.key === "Enter" && !e.isComposing) {
+                        e.preventDefault();
+                        this.submit();
+                    }
                 });
             });
 

@@ -92,7 +92,7 @@ export class CorkboardModal extends Modal {
         contentEl.setCssStyles({ display: "flex", flexDirection: "column", height: "100%" });
         this.modalEl.addClass("ns-corkboard-modal");
 
-        const defaultCloseBtn = this.modalEl.querySelector('.modal-close-button') as HTMLElement;
+        const defaultCloseBtn = this.modalEl.querySelector('.modal-close-button');
         if (defaultCloseBtn) defaultCloseBtn.setCssStyles({ display: "none" });
 
         const headerRow = contentEl.createDiv({ cls: "ns-corkboard-header-row" });
@@ -272,9 +272,9 @@ export class CorkboardModal extends Modal {
             e.stopPropagation();
             new SimpleConfirmModal(this.app, "Save corkboard and jump to this scene?", async () => {
                 this.anchorSceneId = card.dataset.sceneId || card.dataset.sceneTitle || null;
-                const saveBtn = this.contentEl.querySelector(".ns-save-btn") as HTMLButtonElement;
+                const saveBtn = this.contentEl.querySelector(".ns-save-btn");
                 if (saveBtn) { saveBtn.disabled = true; saveBtn.innerText = "Saving & jumping..."; }
-                const gridContainer = this.contentEl.querySelector(".ns-corkboard-grid") as HTMLElement;
+                const gridContainer = this.contentEl.querySelector(".ns-corkboard-grid");
                 await this.saveGlobalCorkboard(gridContainer, saveBtn);
             }).open();
         };
@@ -460,7 +460,7 @@ export class CorkboardModal extends Modal {
 
         this.sortables.push(new Sortable(listContainer, {
             group: 'global-kanban-board', animation: 150, handle: '.ns-corkboard-card', delay: 100, delayOnTouchOnly: true, ghostClass: 'ns-sortable-ghost',
-            onEnd: (evt: any) => {
+            onEnd: (evt: unknown) => {
                 if (evt.oldIndex !== evt.newIndex || evt.from !== evt.to) this.isDirty = true; // 🌟 標記：拖拉卡片
             }
         }));
@@ -545,7 +545,7 @@ export class CorkboardModal extends Modal {
 
         this.sortables.push(new Sortable(container, {
             animation: 150, handle: '.ns-column-drag-handle', delay: 100, delayOnTouchOnly: true, ghostClass: 'ns-sortable-ghost',
-            onEnd: (evt: any) => {
+            onEnd: (evt: unknown) => {
                 if (evt.oldIndex !== evt.newIndex) this.isDirty = true; // 🌟 標記：拖拉章節列
             }
         }));

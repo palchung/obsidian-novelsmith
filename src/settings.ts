@@ -25,6 +25,16 @@ export interface NovelSmithSettings {
     wordTargets: Record<string, number>;
     bookWordTarget: number;
     defaultChapterWordTarget: number;
+    // 🌟 加入以下呢段：Plot Grid 專用 UI 數據庫
+    plotColors: {
+        chapters: Record<string, string>;   // 紀錄 [檔案路徑] -> 顏色ID
+        storylines: Record<string, string>; // 紀錄 [故事線名稱] -> 顏色ID
+    };
+    plotBeatsState: Record<string, boolean>; // 紀錄 Checkbox 完成狀態 (格式: "檔案路徑::故事線名稱" -> true)
+    plotStorylineOrder: string[];
+    // 🌟 新增：紀錄每個資料夾隱藏咗邊幾條線
+    plotCollapsedLines: Record<string, string[]>;
+
 }
 
 export const DEFAULT_SETTINGS: NovelSmithSettings = {
@@ -39,7 +49,13 @@ export const DEFAULT_SETTINGS: NovelSmithSettings = {
     plotGridColumns: [],
     wordTargets: {},
     bookWordTarget: 100000,           // 預設寫十萬字
-    defaultChapterWordTarget: 2000    // 預設每章兩千字
+    defaultChapterWordTarget: 2000,   // 預設每章兩千字
+    // 🌟 加入以下呢段：初始化為空資料庫
+    plotColors: { chapters: {}, storylines: {} },
+    plotBeatsState: {},
+    plotStorylineOrder: [],
+    // 🌟 新增：初始化為空
+    plotCollapsedLines: {},
 }
 
 export class NovelSmithSettingTab extends PluginSettingTab {

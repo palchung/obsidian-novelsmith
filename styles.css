@@ -1701,6 +1701,59 @@ body.is-mobile .ns-button-row .ns-btn-discard:active,
     }
 }
 
+
+/* ==========================================
+   Plot Grid 專用樣式修正
+   ========================================== */
+/* 限制 Markdown 語法撐爆格仔 */
+.ns-plot-card-text h1,
+.ns-plot-card-text h2,
+.ns-plot-card-text h3,
+.ns-plot-card-text h4,
+.ns-plot-card-text h5,
+.ns-plot-card-text h6 {
+    margin: 4px 0 !important;
+    font-size: 1.1em !important;
+    line-height: 1.2 !important;
+}
+
+.ns-plot-card-text hr {
+    margin: 8px 0 !important;
+}
+
+.ns-plot-card-text ul,
+.ns-plot-card-text ol,
+.ns-plot-card-text p {
+    margin: 4px 0 !important;
+}
+
+/* 故事線隱藏/摺疊模式 */
+.ns-grid-base-cell.is-collapsed {
+    min-height: 36px !important;
+    height: 36px !important;
+    padding: 4px 10px !important;
+    overflow: hidden;
+}
+
+.ns-grid-base-cell.is-collapsed .ns-plot-card {
+    min-height: 28px !important;
+    height: 28px !important;
+    padding: 0 10px !important;
+    display: flex;
+    align-items: center;
+}
+
+.ns-grid-base-cell.is-collapsed .ns-plot-card-text,
+.ns-grid-base-cell.is-collapsed .ns-plot-card-placeholder,
+.ns-grid-base-cell.is-collapsed .ns-plot-card textarea {
+    display: none !important;
+}
+
+
+
+
+
+
 /* ============================================================
    🎨 Stylish
    ============================================================ */

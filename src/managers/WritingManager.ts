@@ -478,7 +478,7 @@ export class WritingManager {
     // =================================================================
     cleanDraft(view: MarkdownView) {
         // 🌟 注意呢度加咗 async
-        new CleanDraftModal(this.app, async (options: any) => {
+        new CleanDraftModal(this.app, async (options: unknown) => {
             let content = view.editor.getValue();
             const originalContent = content;
 

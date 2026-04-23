@@ -3,7 +3,7 @@ import Sortable, { SortableEvent } from 'sortablejs';
 import NovelSmithPlugin from '../../main';
 import { SimpleConfirmModal, DashboardBuilderModal, CorkboardModal, CorkboardDraftActionModal } from '../modals';
 import { getAnchorSceneIdFromCursor, createIconButton, isScriveningsDraft, extractSceneId, cleanSceneTitle, DRAFT_FILENAME, extractSceneColor, getColorById, SCENE_COLORS } from '../utils';
-
+import { PlotGridView, VIEW_TYPE_PLOTGRID } from './PlotGridView'; // 🌟 新增呢句 Import
 
 export const VIEW_TYPE_STRUCTURE = "novelsmith-structure-view";
 
@@ -75,6 +75,7 @@ export class StructureView extends ItemView {
 
 
     private activeTab: 'outline' | 'history' | 'info' | 'target' = 'outline';
+    private activeInfoSubTab: 'scene' | 'plot' = 'scene'; // 🌟 新增：用嚟記住 Info 裡面開緊邊個版面
     private lastTab: string = "";
     private lastDraftMode: boolean = false;
     private selectedSceneId: string | null = null;
@@ -242,7 +243,7 @@ export class StructureView extends ItemView {
                 return;
             }
 
-            const container = this.contentEl.querySelector(".ns-structure-container") as HTMLElement;
+            const container = this.contentEl.querySelector(".ns-structure-container");
             if (!container) return;
 
             // 🌟 變身魔法：如果衝刺緊，清空大綱，畫出巨大時鐘，直接 return！
@@ -328,8 +329,8 @@ export class StructureView extends ItemView {
             // ==========================================
             // 🚀 神級優化：防止頻繁清空整個側邊欄 (DOM Reuse)
             // ==========================================
-            let header = container.querySelector(":scope > .ns-control-header") as HTMLElement;
-            let contentDiv = container.querySelector(":scope > .ns-tab-content") as HTMLElement;
+            let header = container.querySelector(":scope > .ns-control-header");
+            let contentDiv = container.querySelector(":scope > .ns-tab-content");
 
             const isDraftMode = view && view.file && view.file.name === DRAFT_FILENAME;
             const draftModeChanged = this.lastDraftMode !== !!isDraftMode;
@@ -406,41 +407,37 @@ export class StructureView extends ItemView {
         const row1 = header.createDiv({ cls: "ns-button-row" });
         row1.setCssStyles({ display: "flex", gap: "6px", marginBottom: "6px" });
 
-        // 1. 📖 串聯模式 (Draft) OR 捨棄草稿 (Discard)
-        let btnDraft;
-        if (isDraftMode) {
-            btnDraft = createIconButton(row1, "trash-2", "Discard", { flex: "1", padding: "6px 0", backgroundColor: "var(--background-modifier-error)", color: "white" });
-            btnDraft.addClass("ns-btn-discard"); // 🌟 加入呢句：賦予專屬 Class 畀 iPad 識別！
+        // 3. 🌍 世界觀畫布 (World)
+        const btnWorldboard = createIconButton(row1, "globe", "World", { flex: "1", padding: "6px 0", backgroundColor: "var(--interactive-accent)", color: "var(--text-on-accent)" });
+        btnWorldboard.onclick = () => {
+            void this.plugin.activateWorldboardView();
+        };
 
-            btnDraft.onclick = () => {
-                const currentView = this.getValidMarkdownView();
-                if (currentView) {
-                    new SimpleConfirmModal(
-                        this.plugin.app,
-                        "Are you sure to discard this darft?\n\nWill close & delete this file, all your word will not be synced",
-                        () => { void this.plugin.scrivenerManager.discardDraft(currentView.file); }
-                    ).open();
-                }
-            };
-        } else {
-            btnDraft = createIconButton(row1, "book-open", "Draft", { flex: "1", padding: "6px 0" });
-            btnDraft.onclick = () => {
-                const currentView = this.getValidMarkdownView();
-                if (currentView && this.plugin.checkInBookFolder(currentView.file)) {
-                    const content = currentView.editor.getValue();
-                    if (isArchivedDraft(currentView.file, content)) {
-                        new Notice("Abort: this is a archived draft, scrivenering may cause infinite loop.");
-                    } else {
-                        const folder = currentView.file.parent;
-                        if (folder) {
-                            void this.plugin.sceneManager.assignIDsToAllFiles(folder).then(() => {
-                                void this.plugin.scrivenerManager.toggleScrivenings(currentView.file);
-                            });
-                        }
-                    }
-                }
-            };
-        }
+
+        // 🌟 新增：劇情網絡按鈕      
+        const btnPlotGrid = createIconButton(
+            row1,
+            "table",
+            "Plot",
+            { flex: "1", padding: "6px 0", backgroundColor: "var(--interactive-normal)" }
+        );
+        btnPlotGrid.onclick = async () => {
+            const file = this.app.workspace.getActiveFile();
+            if (!file || !file.path.startsWith(this.plugin.settings.bookFolderPath)) {
+                new Notice("You are not inside the manuscript folder.");
+                return;
+            }
+
+            // 🌟 核心修復：直接呼叫 main.ts 裡面已經寫好嘅完美啟動函數！
+            // 咁樣可以保證同 Ribbon 按鈕嘅行為 100% 一致，杜絕炒車！
+            let targetFolder = this.plugin.settings.bookFolderPath;
+            if (file.parent) {
+                targetFolder = file.parent.path;
+            }
+            await this.plugin.activatePlotGridView(targetFolder);
+        };
+
+
 
         // 2. 🎯 軟木板 (Board)
         const btnCorkboard = createIconButton(row1, "layout-dashboard", "Board", { flex: "1", padding: "6px 0", backgroundColor: "var(--interactive-normal)" });
@@ -477,11 +474,43 @@ export class StructureView extends ItemView {
             }
         };
 
-        // 3. 🌍 世界觀畫布 (World)
-        const btnWorldboard = createIconButton(row1, "globe", "World", { flex: "1", padding: "6px 0", backgroundColor: "var(--interactive-accent)", color: "var(--text-on-accent)" });
-        btnWorldboard.onclick = () => {
-            void this.plugin.activateWorldboardView();
-        };
+
+
+        // 1. 📖 串聯模式 (Draft) OR 捨棄草稿 (Discard)
+        let btnDraft;
+        if (isDraftMode) {
+            btnDraft = createIconButton(row1, "trash-2", "Discard", { flex: "1", padding: "6px 0", backgroundColor: "var(--background-modifier-error)", color: "white" });
+            btnDraft.addClass("ns-btn-discard"); // 🌟 加入呢句：賦予專屬 Class 畀 iPad 識別！
+
+            btnDraft.onclick = () => {
+                const currentView = this.getValidMarkdownView();
+                if (currentView) {
+                    new SimpleConfirmModal(
+                        this.plugin.app,
+                        "Are you sure to discard this darft?\n\nWill close & delete this file, all your word will not be synced",
+                        () => { void this.plugin.scrivenerManager.discardDraft(currentView.file); }
+                    ).open();
+                }
+            };
+        } else {
+            btnDraft = createIconButton(row1, "book-open", "Draft", { flex: "1", padding: "6px 0" });
+            btnDraft.onclick = () => {
+                const currentView = this.getValidMarkdownView();
+                if (currentView && this.plugin.checkInBookFolder(currentView.file)) {
+                    const content = currentView.editor.getValue();
+                    if (isArchivedDraft(currentView.file, content)) {
+                        new Notice("Abort: this is a archived draft, scrivenering may cause infinite loop.");
+                    } else {
+                        const folder = currentView.file.parent;
+                        if (folder) {
+                            void this.plugin.sceneManager.assignIDsToAllFiles(folder).then(() => {
+                                void this.plugin.scrivenerManager.toggleScrivenings(currentView.file);
+                            });
+                        }
+                    }
+                }
+            };
+        }
 
         // =========================================================
         // 🌟 Row 2: 工具與操作 (Sync | Scene | Split | Merge | Tools)
@@ -767,7 +796,7 @@ export class StructureView extends ItemView {
         // ==========================================
         // 🌟 DOM Diffing 魔法開始：只更新有變動嘅卡片！
         // ==========================================
-        const existingChapters = Array.from(bodyContainer.querySelectorAll(":scope > .ns-chapter-box")) as HTMLElement[];
+        const existingChapters = Array.from(bodyContainer.querySelectorAll(":scope > .ns-chapter-box"));
         const chapterMap = new Map<string, HTMLElement>();
         existingChapters.forEach(ch => chapterMap.set(ch.dataset.name || "", ch));
 
@@ -816,15 +845,15 @@ export class StructureView extends ItemView {
             this.chapterPreambleMap.set(chapterBox, chapter.preamble);
 
             if (chapter.name !== "root") {
-                const chCard = chapterBox.querySelector(".ns-chapter-card") as HTMLElement;
+                const chCard = chapterBox.querySelector(".ns-chapter-card");
                 chCard.onclick = (e: MouseEvent) => { e.stopPropagation(); e.preventDefault(); this.jumpToLine(chapter.lineNumber); };
             }
 
-            const sceneList = chapterBox.querySelector(".ns-scene-list") as HTMLElement;
+            const sceneList = chapterBox.querySelector(".ns-scene-list");
             sceneList.dataset.chapterIndex = chIndex.toString();
 
             // --- 處理 Scene Card (卡片層級比對) ---
-            const existingScenes = Array.from(sceneList.querySelectorAll(":scope > .ns-scene-card")) as HTMLElement[];
+            const existingScenes = Array.from(sceneList.querySelectorAll(":scope > .ns-scene-card"));
             const sceneMap = new Map<string, HTMLElement>();
             existingScenes.forEach(sc => sceneMap.set(sc.dataset.safeKey || "", sc));
 
@@ -882,7 +911,7 @@ export class StructureView extends ItemView {
                 scCard.dataset.sceneName = scene.name || "";
 
                 // 🌟 3. 更新熱度數值，並且只喺「對話模式」先顯示出嚟
-                const heatEl = scCard.querySelector(".ns-scene-heat") as HTMLElement;
+                const heatEl = scCard.querySelector(".ns-scene-heat");
                 if (heatEl) {
                     heatEl.innerText = `${scenePct}%`;
                     heatEl.style.display = isDialogueMode ? "block" : "none";
@@ -902,7 +931,7 @@ export class StructureView extends ItemView {
                 }
 
                 // 處理標題更新
-                const titleText = scCard.querySelector(".ns-scene-title-text") as HTMLElement;
+                const titleText = scCard.querySelector(".ns-scene-title-text");
                 if (titleText.innerText !== scene.name) titleText.innerText = scene.name;
 
                 // 重新綁定事件
@@ -948,7 +977,7 @@ export class StructureView extends ItemView {
 
             // 🌟 4. 更新章節標題旁邊嘅總百分比 (只在對話模式顯示)
             if (chapter.name !== "root") {
-                const chCard = chapterBox.querySelector(".ns-chapter-card") as HTMLElement;
+                const chCard = chapterBox.querySelector(".ns-chapter-card");
                 if (chCard) {
                     if (isDialogueMode) {
                         const chPct = Math.round((totalChDialogues / (totalChChars || 1)) * 100);
@@ -976,7 +1005,7 @@ export class StructureView extends ItemView {
         });
 
         // 🌟 終極修復：將總百分比加落「最頂部嘅檔案標題」！
-        const topTitleEl = container.querySelector(".ns-outline-header h3") as HTMLElement;
+        const topTitleEl = container.querySelector(".ns-outline-header h3");
         if (topTitleEl && view.file) {
             let baseName = view.file.name === DRAFT_FILENAME ? "Scrivenering draft" : view.file.basename;
             if (isDialogueMode && grandTotalChars > 0) {
@@ -1096,9 +1125,63 @@ export class StructureView extends ItemView {
     }
 
     // =========================================================
-    // Info Tab
+    // Info Tab (主控台：負責畫切換掣)
     // =========================================================
     renderInfo(container: HTMLElement, view: MarkdownView) {
+        // 1. 畫出雙分頁切換掣
+        const subTabRow = container.createDiv({ cls: "ns-info-subtabs" });
+        subTabRow.setCssStyles({ display: "flex", gap: "8px", marginBottom: "15px", borderBottom: "1px solid var(--background-modifier-border)", paddingBottom: "10px" });
+
+        // 場景屬性掣 (Scene Info)
+        const btnScene = subTabRow.createEl("button");
+        btnScene.setCssStyles({ flex: "1", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", backgroundColor: this.activeInfoSubTab === 'scene' ? "var(--interactive-accent)" : "transparent", color: this.activeInfoSubTab === 'scene' ? "var(--text-on-accent)" : "var(--text-muted)", boxShadow: "none", border: "1px solid var(--background-modifier-border)", borderRadius: "6px", cursor: "pointer" });
+        const iconScene = btnScene.createSpan();
+        setIcon(iconScene, "clapperboard");
+        btnScene.createSpan({ text: "Scene Info" });
+
+        // 劇情節拍掣 (Plot Beats)
+        const btnPlot = subTabRow.createEl("button");
+        btnPlot.setCssStyles({ flex: "1", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", backgroundColor: this.activeInfoSubTab === 'plot' ? "var(--interactive-accent)" : "transparent", color: this.activeInfoSubTab === 'plot' ? "var(--text-on-accent)" : "var(--text-muted)", boxShadow: "none", border: "1px solid var(--background-modifier-border)", borderRadius: "6px", cursor: "pointer" });
+        const iconPlot = btnPlot.createSpan();
+        setIcon(iconPlot, "list-todo");
+        btnPlot.createSpan({ text: "Plot Beats" });
+
+        // 下方內容區塊
+        const contentLayer = container.createDiv();
+
+        // 綁定點擊事件
+        btnScene.onclick = () => {
+            this.activeInfoSubTab = 'scene';
+            contentLayer.empty();
+            this.renderSceneInfoTab(contentLayer, view);
+
+            // 更新掣顏色
+            btnScene.setCssStyles({ backgroundColor: "var(--interactive-accent)", color: "var(--text-on-accent)" });
+            btnPlot.setCssStyles({ backgroundColor: "transparent", color: "var(--text-muted)" });
+        };
+
+        btnPlot.onclick = () => {
+            this.activeInfoSubTab = 'plot';
+            contentLayer.empty();
+            void this.renderPlotBeatsTab(contentLayer, view);
+
+            // 更新掣顏色
+            btnPlot.setCssStyles({ backgroundColor: "var(--interactive-accent)", color: "var(--text-on-accent)" });
+            btnScene.setCssStyles({ backgroundColor: "transparent", color: "var(--text-muted)" });
+        };
+
+        // 首次載入渲染
+        if (this.activeInfoSubTab === 'scene') {
+            this.renderSceneInfoTab(contentLayer, view);
+        } else {
+            void this.renderPlotBeatsTab(contentLayer, view);
+        }
+    }
+
+    // =========================================================
+    // Info Sub-Tab 1: 傳統場景屬性 (Scene Info)
+    // =========================================================
+    renderSceneInfoTab(container: HTMLElement, view: MarkdownView) {
         const editor = view.editor;
         const cursor = editor.getCursor();
         let foundTitle = null;
@@ -1135,13 +1218,7 @@ export class StructureView extends ItemView {
             }
         }
 
-
-
-
-
-        // ==========================================
         // 🏗️ Info page layer
-        // ==========================================
         const layer1 = container.createDiv({ cls: "ns-info-layer-list" });
         const layer2 = container.createDiv({ cls: "ns-info-layer-reader" });
         layer2.hide();
@@ -1175,16 +1252,13 @@ export class StructureView extends ItemView {
                 const row = infoBox.createDiv();
                 row.setCssStyles({ marginBottom: "8px", lineHeight: "1.5", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px" });
 
-
                 const keyEl = row.createSpan();
                 keyEl.innerText = `${key} : `;
                 keyEl.setCssStyles({ fontWeight: "bold", color: "var(--text-muted)" });
 
-
                 const wikiCategory = this.plugin.settings.wikiCategories?.find(c => c.name.split(/[,，、]/).map(s => s.trim()).includes(key));
 
                 if (wikiCategory && value) {
-
                     const rawItems = value.replace(/[\[\]]/g, '').split(/[,，、/|\\;；]+/).map(i => i.trim()).filter(i => i);
 
                     rawItems.forEach(item => {
@@ -1192,11 +1266,8 @@ export class StructureView extends ItemView {
                         chip.setCssStyles({ padding: "2px 8px", backgroundColor: "var(--interactive-accent)", color: "var(--text-on-accent)", borderRadius: "10px", fontSize: "0.85em", cursor: "pointer", fontWeight: "bold", transition: "filter 0.2s" });
                         chip.addEventListener("mouseover", () => chip.setCssProps({ filter: "brightness(1.2)" }));
                         chip.addEventListener("mouseout", () => chip.setCssProps({ filter: "brightness(1)" }));
-
-
                         chip.onclick = () => this.openWikiNote(item, wikiCategory.folderPath, layer1, layer2);
                     });
-
 
                     const btnAll = row.createSpan();
                     setIcon(btnAll, "folder-open");
@@ -1206,30 +1277,141 @@ export class StructureView extends ItemView {
 
                     btnAll.addEventListener("mouseover", () => { btnAll.setCssProps({ opacity: "1", color: "var(--interactive-accent)" }); });
                     btnAll.addEventListener("mouseout", () => { btnAll.setCssProps({ opacity: "0.5", color: "initial" }); });
-
-
                     btnAll.onclick = () => this.renderAllWikiItems(primaryName, wikiCategory.folderPath, layer1, layer2);
-
                 } else {
-
                     const valEl = row.createSpan();
                     valEl.innerText = value || " -- ";
                     if (!value) valEl.setCssStyles({ opacity: "0.5" });
                 }
             } else {
-
                 const row = infoBox.createDiv();
                 row.innerText = line.replace(/^- /, "");
                 row.setCssStyles({ marginBottom: "6px", lineHeight: "1.5" });
             }
         });
 
-
         if (this.activeWikiNoteToRestore) {
             void this.openWikiNote(this.activeWikiNoteToRestore.name, this.activeWikiNoteToRestore.folder, layer1, layer2);
         }
+    }
 
+    // =========================================================
+    // Info Sub-Tab 2: 劇情線追蹤 (Plot Beats - 智能過濾版)
+    // =========================================================
+    async renderPlotBeatsTab(container: HTMLElement, view: MarkdownView) {
+        let targetFile = view.file;
 
+        // 智能尋找章節檔案：如果用家喺 Draft 裡面，根據游標搵返真正嘅檔案名
+        if (targetFile && targetFile.name === DRAFT_FILENAME) {
+            const editor = view.editor;
+            const cursor = editor.getCursor();
+            let chapterName = "";
+            for (let i = cursor.line; i >= 0; i--) {
+                const line = editor.getLine(i);
+                if (line.trim().startsWith("# 📄")) {
+                    chapterName = line.replace("# 📄", "").replace('<span class="ns-chapter-center"></span>', "").trim();
+                    break;
+                }
+            }
+            if (chapterName && targetFile.parent) {
+                const matched = targetFile.parent.children.find(f => f instanceof TFile && f.basename === chapterName);
+                if (matched) targetFile = matched as TFile;
+            }
+        }
+
+        if (!targetFile || targetFile.name === DRAFT_FILENAME) {
+            container.createDiv({ text: "Please place cursor inside a specific chapter to view its plot beats.", attr: { style: "opacity: 0.6; text-align: center; font-style: italic; padding: 20px;" } });
+            return;
+        }
+
+        const cache = this.app.metadataCache.getFileCache(targetFile);
+        const frontmatter = cache?.frontmatter || {};
+
+        // 🌟 核心修復：使用主清單排序，確保同 Plot Grid 一致
+        const storylines = this.plugin.settings.plotStorylineOrder || [];
+
+        // 標題行
+        const titleEl = container.createEl("h4");
+        titleEl.setCssStyles({ display: "flex", alignItems: "center", gap: "8px", color: "var(--text-accent)", marginBottom: "12px", borderBottom: "1px solid var(--background-modifier-border)", paddingBottom: "8px" });
+        const iconSpan = titleEl.createSpan();
+        setIcon(iconSpan, "file-text");
+        titleEl.createSpan({ text: targetFile.basename });
+
+        const list = container.createDiv({ cls: "ns-storyline-inspector-list" });
+        list.setCssStyles({ display: "flex", flexDirection: "column", gap: "10px", padding: "4px" });
+
+        let visibleCount = 0;
+
+        storylines.forEach(lineName => {
+            const summary = frontmatter[lineName] || "";
+
+            // 🌟 終極過濾：如果呢一章嘅呢條故事線冇內容，直接 Return 唔畫出嚟！
+            if (!summary || summary.trim() === "") return;
+
+            visibleCount++;
+
+            const row = list.createDiv();
+
+            // 🌟 讀取顏色 (由 data.json 讀取，唔再讀 YAML)
+            const slColorId = this.plugin.settings.plotColors?.storylines?.[lineName] || 'default';
+            const slColorObj = getColorById(slColorId);
+
+            row.setCssStyles({
+                display: "flex", flexDirection: "column", gap: "6px",
+                padding: "12px", borderRadius: "8px",
+                border: "1px solid var(--background-modifier-border)",
+                // 實色化處理，防止穿透
+                background: slColorId !== 'default' ? `linear-gradient(${slColorObj.bg}, ${slColorObj.bg}), var(--background-primary)` : "var(--background-secondary)",
+                borderLeft: slColorId !== 'default' ? `4px solid ${slColorObj.color}` : "1px solid var(--background-modifier-border)"
+            });
+
+            // 頂部：標題 + Checkbox
+            const topRow = row.createDiv({ attr: { style: "display: flex; align-items: flex-start; gap: 8px;" } });
+
+            // 🌟 Checkbox 狀態讀取 (由 data.json 讀取)
+            const statusKey = `${targetFile.path}::${lineName}`;
+            const isDone = this.plugin.settings.plotBeatsState?.[statusKey] === true;
+
+            const cb = topRow.createEl("input", { type: "checkbox" });
+            cb.checked = isDone;
+            cb.setCssStyles({ marginTop: "2px", cursor: "pointer" });
+
+            topRow.createSpan({ text: lineName, attr: { style: "font-weight: bold; font-size: 0.9em; color: var(--text-accent);" } });
+
+            if (isDone) row.setCssStyles({ opacity: "0.5", filter: "grayscale(100%)" });
+
+            // 點擊 Checkbox，寫入 data.json
+            cb.onchange = async () => {
+                if (!this.plugin.settings.plotBeatsState) this.plugin.settings.plotBeatsState = {};
+
+                if (cb.checked) {
+                    this.plugin.settings.plotBeatsState[statusKey] = true;
+                } else {
+                    delete this.plugin.settings.plotBeatsState[statusKey];
+                }
+
+                await this.plugin.saveSettings();
+                row.setCssStyles({
+                    opacity: cb.checked ? "0.5" : "1",
+                    filter: cb.checked ? "grayscale(100%)" : "none"
+                });
+                new Notice(`${lineName} status updated!`);
+            };
+
+            // 下方：內容
+            const summaryEl = row.createDiv({
+                text: summary,
+                attr: { style: "font-size: 0.95em; line-height: 1.4; white-space: pre-wrap; margin-left: 21px;" }
+            });
+        });
+
+        // 如果全部故事線都係吉嘅，顯示一個友善提示
+        if (visibleCount === 0) {
+            list.createDiv({
+                text: "No plot beats planned for this chapter.",
+                attr: { style: "opacity: 0.5; text-align: center; padding: 20px; font-style: italic;" }
+            });
+        }
     }
 
     // =========================================================
@@ -1238,11 +1420,11 @@ export class StructureView extends ItemView {
     renderTarget(container: HTMLElement, view: MarkdownView) {
         // 1. 取得文本並過濾出純淨正文
         const text = view.editor.getValue();
-        const parsed = (this.plugin as any).utils?.parseContent ? (this.plugin as any).utils.parseContent(text, false) : { preamble: text, cards: [] };
+        const parsed = (this.plugin as unknown).utils?.parseContent ? (this.plugin as unknown).utils.parseContent(text, false) : { preamble: text, cards: [] };
 
         let pureText = parsed.preamble + "\n";
         if (parsed.cards && parsed.cards.length > 0) {
-            parsed.cards.forEach((card: any) => pureText += card.body + "\n");
+            parsed.cards.forEach((card: unknown) => pureText += card.body + "\n");
         }
 
         // 剷走不需要計算嘅 Markdown 區塊

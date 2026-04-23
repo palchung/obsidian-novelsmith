@@ -144,7 +144,7 @@ export class WorldboardView extends ItemView {
     }
 
     async renderWorkspace() {
-        let workspaceEl = this.contentEl.querySelector(".ns-worldboard-workspace") as HTMLElement;
+        let workspaceEl = this.contentEl.querySelector(".ns-worldboard-workspace");
         if (workspaceEl) workspaceEl.remove();
 
         workspaceEl = this.contentEl.createDiv({ cls: "ns-worldboard-workspace" });
@@ -232,7 +232,7 @@ export class WorldboardView extends ItemView {
         // 🌟 我哋將個搜尋框由「畫布上面 (absolute)」搬去「頂部導航列 (flex)」！
         // 咁樣可以 100% 避開 iOS Safari 所有絕對座標 Bug 同鍵盤衝突！
         const headerEl = this.contentEl.querySelector(".ns-worldboard-header");
-        let searchBox = headerEl?.querySelector(".ns-wb-search-box") as HTMLElement;
+        let searchBox = headerEl?.querySelector(".ns-wb-search-box");
         if (searchBox) searchBox.remove();
 
         if (headerEl) {
@@ -478,7 +478,7 @@ export class WorldboardView extends ItemView {
             };
 
             // 🗂️ 2. 卡片基礎設定 (加入 3D 懸浮陰影)
-            const nodeObj: any = {
+            const nodeObj: unknown = {
                 id: file.basename,
                 label: file.basename,
                 color: origColor,
@@ -544,7 +544,7 @@ export class WorldboardView extends ItemView {
                     const relationLabel = key;
                     const customColor = this.plugin.settings.relationColors?.[relationLabel];
 
-                    const edgeObj: any = { id: `edge-${edgeCounter++}`, from: file.basename, to: target, label: relationLabel, arrows: 'to' };
+                    const edgeObj: unknown = { id: `edge-${edgeCounter++}`, from: file.basename, to: target, label: relationLabel, arrows: 'to' };
 
                     if (customColor) {
                         const customEdgeFont = { align: 'middle', color: customColor, size: 13, strokeWidth: 2, strokeColor: bgColor, bold: true };
@@ -584,7 +584,7 @@ export class WorldboardView extends ItemView {
                 if (!vals) return;
                 if (!Array.isArray(vals)) vals = [vals];
 
-                vals.forEach((v: any) => {
+                vals.forEach((v: unknown) => {
                     const cleanV = String(v).replace(/[\[\]]/g, '').trim();
                     if (!cleanV) return;
                     if (!groups[cleanV]) groups[cleanV] = [];
@@ -654,7 +654,7 @@ export class WorldboardView extends ItemView {
         this.network.on("dragEnd", async (params) => {
             if (params.nodes && params.nodes.length > 0) {
                 const updates = params.nodes.map((id: string) => ({ id: id, physics: false }));
-                (this.network as any).body.data.nodes.update(updates);
+                (this.network as unknown).body.data.nodes.update(updates);
                 const positions = this.network?.getPositions(params.nodes);
                 if (!positions) return;
                 if (!this.plugin.settings.worldboardCoords) this.plugin.settings.worldboardCoords = {};
@@ -811,8 +811,8 @@ export class WorldboardView extends ItemView {
     // ==========================================
     private handleSearch(query: string) {
         if (!this.network) return;
-        const nodesData = (this.network as any).body.data.nodes;
-        const edgesData = (this.network as any).body.data.edges;
+        const nodesData = (this.network as unknown).body.data.nodes;
+        const edgesData = (this.network as unknown).body.data.edges;
 
         const q = query.toLowerCase().trim();
         const nodeUpdates: unknown[] = [];
@@ -821,14 +821,14 @@ export class WorldboardView extends ItemView {
         let lastMatchId = null;
 
         if (q === "") {
-            nodesData.forEach((node: any) => {
+            nodesData.forEach((node: unknown) => {
                 nodeUpdates.push({ id: node.id, color: node._origColor, font: node._origFont });
             });
-            edgesData.forEach((edge: any) => {
+            edgesData.forEach((edge: unknown) => {
                 edgeUpdates.push({ id: edge.id, color: edge._origColor, font: edge._origFont });
             });
         } else {
-            nodesData.forEach((node: any) => {
+            nodesData.forEach((node: unknown) => {
                 const isMatch = node._searchString && node._searchString.includes(q);
                 if (isMatch) {
                     nodeUpdates.push({ id: node.id, color: node._origColor, font: node._origFont });
@@ -843,7 +843,7 @@ export class WorldboardView extends ItemView {
                 }
             });
 
-            edgesData.forEach((edge: any) => {
+            edgesData.forEach((edge: unknown) => {
                 const fromNode = nodesData.get(edge.from);
                 const toNode = nodesData.get(edge.to);
                 const isFromMatch = fromNode && fromNode._searchString && fromNode._searchString.includes(q);
@@ -872,7 +872,7 @@ export class WorldboardView extends ItemView {
     // ==========================================
     private focusSearchMatches() {
         if (!this.network) return;
-        const searchInput = this.contentEl.querySelector(".ns-wb-search-input") as HTMLInputElement;
+        const searchInput = this.contentEl.querySelector(".ns-wb-search-input");
         if (!searchInput) return;
         const q = searchInput.value.toLowerCase().trim();
 
@@ -885,9 +885,9 @@ export class WorldboardView extends ItemView {
                 return;
             }
 
-            const nodesData = (this.network as any).body.data.nodes;
+            const nodesData = (this.network as unknown).body.data.nodes;
             const matchIds: string[] = [];
-            nodesData.forEach((node: any) => {
+            nodesData.forEach((node: unknown) => {
                 if (node._searchString && node._searchString.includes(q)) {
                     matchIds.push(node.id);
                 }
@@ -942,8 +942,8 @@ export class WorldboardView extends ItemView {
     // ==========================================
     // 🖱️ 獨立事件 2：處理關係線顏色點擊 (Edge Color Picker)
     // ==========================================
-    private handleEdgeColorClick(edgeId: string, pointerDOM: { x: number, y: number }, edgesData: any[], canvasContainer: HTMLElement) {
-        const edgeData = edgesData.find((e: any) => e.id === edgeId);
+    private handleEdgeColorClick(edgeId: string, pointerDOM: { x: number, y: number }, edgesData: unknown[], canvasContainer: HTMLElement) {
+        const edgeData = edgesData.find((e: unknown) => e.id === edgeId);
         if (!edgeData || !edgeData.label) return;
 
         const relationLabel = edgeData.label;

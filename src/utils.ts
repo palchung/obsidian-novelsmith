@@ -468,3 +468,26 @@ export function getConvexHull(points: { x: number, y: number }[]): { x: number, 
     upper.pop(); lower.pop();
     return lower.concat(upper);
 }
+
+
+// ==========================================
+// 📚 Plot Grid 大綱範本庫 (Templates)
+// ==========================================
+export const PLOT_TEMPLATES: Record<string, { name: string, storylines: string[] }> = {
+    "3act": {
+        name: "Three-Act Structure (三幕劇)",
+        storylines: ["Protagonist_Arc", "Antagonist_Arc", "Theme_Beat"]
+    },
+    "stc": {
+        name: "Save the Cat! (救貓咪)",
+        storylines: ["A_Story", "B_Story", "C_Story"]
+    },
+    "hero": {
+        name: "Hero's Journey (英雄旅程)",
+        storylines: ["Call_to_Action", "Mentorship", "Abyss_and_Rebirth", "Return"]
+    },
+    "romance": {
+        name: "Romance Arc (愛情線)",
+        storylines: ["Meet_Cute", "Development", "Conflict", "Resolution"]
+    }
+};

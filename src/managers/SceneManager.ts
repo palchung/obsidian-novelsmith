@@ -114,7 +114,7 @@ export class SceneManager {
                     if (spanMatch) {
                         const fullSpan = spanMatch[0];
                         const textBefore = line.substring(0, spanMatch.index);
-                        const textAfter = line.substring(spanMatch.index! + fullSpan.length);
+                        const textAfter = line.substring(spanMatch.index + fullSpan.length);
 
                         // 如果 span 後面有字，或者有奇怪嘅空格，即刻重新組裝！
                         if (textAfter.trim() !== "" || line.endsWith(" ")) {
@@ -201,7 +201,7 @@ export class SceneManager {
                         if (spanMatch) {
                             const fullSpan = spanMatch[0];
                             const textBefore = line.substring(0, spanMatch.index);
-                            const textAfter = line.substring(spanMatch.index! + fullSpan.length);
+                            const textAfter = line.substring(spanMatch.index + fullSpan.length);
 
                             if (textAfter.trim() !== "" || line.endsWith(" ")) {
                                 healedLine = (textBefore.trimEnd() + textAfter).trimEnd() + " " + fullSpan;
