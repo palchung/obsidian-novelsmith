@@ -1751,7 +1751,173 @@ body.is-mobile .ns-button-row .ns-btn-discard:active,
 
 
 
+/* ==========================================
+   側邊欄 (Structure View) 大一統 UI 樣式庫
+   ========================================== */
 
+/* --- 1. 子分頁切換掣 (Sub-tabs) --- */
+.ns-subtab-container {
+    display: flex;
+    gap: 8px;
+    padding-top: 8px;
+}
+
+.ns-subtab-btn {
+    flex: 1;
+    padding: 4px 8px;
+    font-size: 0.85em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background-color: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ns-subtab-btn:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.ns-subtab-btn.is-active {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-color: var(--interactive-accent);
+}
+
+/* --- 2. 統一 Tab 標題 (h4) --- */
+.ns-tab-header-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 0;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--background-modifier-border);
+    padding-bottom: 8px;
+    color: var(--text-accent);
+}
+
+.ns-tab-header-title.is-draft {
+    color: var(--interactive-accent);
+}
+
+/* --- 3. 劇情追蹤 & 備註列表 (Plot Beats / Comments) --- */
+.ns-storyline-inspector-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 4px;
+}
+
+.ns-inspector-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--background-modifier-border);
+    background-color: var(--background-secondary);
+    transition: opacity 0.2s, filter 0.2s;
+}
+
+.ns-inspector-row.is-resolved {
+    opacity: 0.5;
+    filter: grayscale(100%);
+}
+
+.ns-inspector-top-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.ns-inspector-checkbox {
+    margin-top: 2px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.ns-inspector-title {
+    font-weight: bold;
+    font-size: 0.9em;
+    color: var(--text-accent);
+}
+
+.ns-inspector-summary {
+    font-size: 0.95em;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    margin-left: 21px;
+}
+
+.ns-inspector-summary-clickable {
+    font-size: 0.95em;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    cursor: pointer;
+    flex: 1;
+}
+
+.ns-inspector-summary-clickable.is-resolved {
+    text-decoration: line-through;
+}
+
+/* --- 4. 場景屬性面板 (Scene Info) --- */
+.ns-info-property-row {
+    margin-bottom: 8px;
+    line-height: 1.5;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.ns-info-property-key {
+    font-weight: bold;
+    color: var(--text-muted);
+}
+
+.ns-info-chip {
+    padding: 2px 8px;
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-radius: 10px;
+    font-size: 0.85em;
+    cursor: pointer;
+    font-weight: bold;
+    transition: filter 0.2s;
+}
+
+.ns-info-chip:hover {
+    filter: brightness(1.2);
+}
+
+.ns-folder-open-btn {
+    cursor: pointer;
+    opacity: 0.5;
+    margin-left: 4px;
+    display: flex;
+    align-items: center;
+    padding: 2px;
+    transition: all 0.2s;
+}
+
+.ns-folder-open-btn:hover {
+    opacity: 1;
+    color: var(--interactive-accent);
+}
+
+/* --- 5. Header 按鈕間距輔助 --- */
+.ns-button-row-top {
+    margin-bottom: 6px;
+}
+
+.ns-button-row-bottom {
+    margin-bottom: 12px;
+}
 
 
 /* ============================================================
