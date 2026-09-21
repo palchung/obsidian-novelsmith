@@ -16,10 +16,10 @@ import { StructureView, VIEW_TYPE_STRUCTURE } from './src/managers/StructureView
 import { WorldboardView, VIEW_TYPE_WORLDBOARD } from './src/managers/WorldboardView';
 import { ST_WARNING, DRAFT_FILENAME, BACKSTAGE_DIR, TEMPLATES_FILENAME, TEMPLATES_DIR, ensureFolderExists, isScriveningsDraft } from './src/utils';
 import { DashboardBuilderModal } from './src/modals';
+import { EditorView } from "@codemirror/view";
 
 export default class NovelSmithPlugin extends Plugin {
     settings: NovelSmithSettings;
-
     scrivenerManager: ScrivenerManager;
     historyManager: HistoryManager;
     writingManager: WritingManager;
@@ -29,6 +29,10 @@ export default class NovelSmithPlugin extends Plugin {
     sceneManager: SceneManager;
     dashboardManager: DashboardManager;
     statsManager: StatsManager;
+
+    // 🌟 1. 加呢個變數：預設為 false (每次開 App 都係 OFF)
+    public isPencilMode: boolean = false;
+
 
     // 🌟 2. Cache to track typed characters
     private fileLengthCache: Map<string, number> = new Map();
@@ -54,6 +58,22 @@ export default class NovelSmithPlugin extends Plugin {
         this.compilerManager = new CompilerManager(this.app, this.settings);
         this.sceneManager = new SceneManager(this.app, this.settings);
         this.dashboardManager = new DashboardManager(this.app, this.settings);
+
+
+
+        // 🌟 2. 加入呢段「神級觸控攔截器」
+        this.registerEditorExtension([
+            EditorView.domEventHandlers({
+                pointerdown: (event: PointerEvent) => {
+                    if (this.isPencilMode && event.pointerType === 'touch') {
+                        // 只攔截手指點擊，唔阻礙 Apple Pencil
+                        return true;
+                    }
+                    return false;
+                }
+            })
+        ]);
+
 
 
         // 🌟 3. Instantiate the StatsManager and load data

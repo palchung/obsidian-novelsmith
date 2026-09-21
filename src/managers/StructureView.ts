@@ -494,6 +494,27 @@ export class StructureView extends ItemView {
             const isInBookFolder = this.plugin.checkInBookFolderSilent(currentView.file);
             const menu = new Menu();
 
+            // 🌟 安全調用 this.plugin.isPencilMode (因為建構子已定義 this.plugin: NovelSmithPlugin)
+            const isPencil = this.plugin.isPencilMode;
+
+            // 🌟 喺 Tools 選單最頂，加入 Pencil Mode 開關！
+            menu.addItem((item) => {
+                item.setTitle(isPencil ? "Pencil Mode: ON" : "Pencil Mode: OFF")
+                    .setIcon(isPencil ? "check-square" : "square")
+                    .onClick(() => {
+                        this.plugin.isPencilMode = !isPencil;
+
+                        if (this.plugin.isPencilMode) {
+                            new Notice("✏️ Pencil Mode ON: 編輯器已忽略手指觸控。", 3000);
+                        } else {
+                            new Notice("🖐️ Pencil Mode OFF: 恢復正常觸控。", 3000);
+                        }
+                    });
+            });
+
+            menu.addSeparator(); // 畫一條分界線
+
+
             menu.addItem((item) => {
                 item.setTitle("Writer's journey").setIcon("trophy").onClick(() => {
                     // @ts-ignore
