@@ -502,13 +502,7 @@ export class StructureView extends ItemView {
                 item.setTitle(isPencil ? "Pencil Mode: ON" : "Pencil Mode: OFF")
                     .setIcon(isPencil ? "check-square" : "square")
                     .onClick(() => {
-                        this.plugin.isPencilMode = !isPencil;
-
-                        if (this.plugin.isPencilMode) {
-                            new Notice("✏️ Pencil Mode ON: 編輯器已忽略手指觸控。", 3000);
-                        } else {
-                            new Notice("🖐️ Pencil Mode OFF: 恢復正常觸控。", 3000);
-                        }
+                        this.plugin.togglePencilMode(); // 🌟 一句搞掂！
                     });
             });
 

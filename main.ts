@@ -1,4 +1,4 @@
-import { MarkdownView, Notice, Plugin, TFile } from 'obsidian';
+import { MarkdownView, Notice, Plugin, TFile, setIcon } from 'obsidian';
 import { WorkspaceLeaf } from 'obsidian';
 import { NovelSmithSettings, DEFAULT_SETTINGS, NovelSmithSettingTab } from './src/settings';
 import { ScrivenerManager } from './src/managers/ScrivenerManager';
@@ -32,6 +32,10 @@ export default class NovelSmithPlugin extends Plugin {
 
     // 🌟 1. 加呢個變數：預設為 false (每次開 App 都係 OFF)
     public isPencilMode: boolean = false;
+    private pencilStatusBarItem: HTMLElement | null = null;
+    // 🌟 將單一按鈕，升級為工具箱容器與鍵盤狀態
+    private floatingToolsContainer: HTMLElement | null = null;
+    private isKeyboardUnlocked: boolean = false;
 
 
     // 🌟 2. Cache to track typed characters
@@ -61,18 +65,92 @@ export default class NovelSmithPlugin extends Plugin {
 
 
 
-        // 🌟 2. 加入呢段「神級觸控攔截器」
+        // 🌟 1. 初始化狀態列 (預設隱藏)
+        this.pencilStatusBarItem = this.addStatusBarItem();
+        this.pencilStatusBarItem.setText("✏️ Pencil Mode");
+        this.pencilStatusBarItem.style.color = "var(--interactive-accent)"; // 畀少少顏色佢，等佢明顯啲
+        this.pencilStatusBarItem.style.fontWeight = "bold";
+        this.pencilStatusBarItem.hide();
+
+        // 🌟 2. 觸控攔截器 (維持不變，因為已經證實完美運作)
         this.registerEditorExtension([
             EditorView.domEventHandlers({
                 pointerdown: (event: PointerEvent) => {
                     if (this.isPencilMode && event.pointerType === 'touch') {
-                        // 只攔截手指點擊，唔阻礙 Apple Pencil
                         return true;
                     }
                     return false;
                 }
             })
         ]);
+
+        // 🌟 3. (可選) 註冊一個 Obsidian 快捷命令，方便你用 Command Palette 或快捷鍵開關
+        this.addCommand({
+            id: 'toggle-pencil-mode',
+            name: 'Toggle Pencil Writing Mode',
+            callback: () => {
+                this.togglePencilMode();
+            }
+        });
+
+        // 🌟 1. 加呢段：當你切換筆記/開新 File 嗰陣，確保鍵盤封印依然生效
+        this.registerEvent(this.app.workspace.on('active-leaf-change', () => {
+            if (this.isPencilMode) {
+                // 畀少少時間等新編輯器載入完成，然後套用封印
+                setTimeout(() => this.updateKeyboardPolicy(), 100);
+            }
+        }));
+
+        // 🌟 加入呢段：神級同步！監聽編輯器失去焦點 (即係你用原生掣收起咗鍵盤)
+        this.registerDomEvent(document, 'focusout', (evt: FocusEvent) => {
+            // 只有當 Pencil Mode 開緊，而且鍵盤處於「解鎖」狀態先需要處理
+            if (this.isPencilMode && this.isKeyboardUnlocked) {
+
+                // 如果你點擊嘅下一個目標係我哋嘅浮動工具箱 (例如 Enter 掣)，就放行唔好重置
+                const related = evt.relatedTarget as HTMLElement;
+                if (related && related.closest('.ns-floating-tools-container')) {
+                    return;
+                }
+
+                // 延遲 50 微秒，等 iOS 徹底完成焦點轉移
+                setTimeout(() => {
+                    const activeEl = document.activeElement;
+                    // 如果游標焦點已經唔喺 CodeMirror 編輯器入面 (代表鍵盤已被原生收起)
+                    if (!activeEl || !activeEl.closest('.cm-editor')) {
+
+                        // 1. 自動更新背後嘅邏輯狀態
+                        this.isKeyboardUnlocked = false;
+                        this.updateKeyboardPolicy(); // 重新落返「封印鍵盤」嘅屬性
+
+                        // 2. 自動將畫面個 ⌨️ 掣變返做灰色 (移除發光狀態)
+                        if (this.floatingToolsContainer) {
+                            const kbBtn = this.floatingToolsContainer.querySelector(".ns-kb-btn");
+                            if (kbBtn) kbBtn.classList.remove("is-unlocked");
+                        }
+                    }
+                }, 50);
+            }
+        });
+
+        // 🌟 新增：偵測左/右側邊欄嘅開合狀態，自動隱藏或顯示浮動工具箱
+        this.registerEvent(this.app.workspace.on('layout-change', () => {
+            if (this.isPencilMode && this.floatingToolsContainer) {
+                // 檢查右側邊欄係咪展開緊
+                const rightLeaf = this.app.workspace.rightSplit;
+                // @ts-ignore (檢查 internal collapsed 狀態)
+                const isRightCollapsed = rightLeaf && rightLeaf.collapsed;
+
+                if (isRightCollapsed) {
+                    // 如果右側邊欄收埋咗，顯示浮動工具箱
+                    this.floatingToolsContainer.style.display = "flex";
+                } else {
+                    // 如果右側邊欄打開咗，自動隱藏浮動工具箱，讓路畀側邊欄嘅掣！
+                    this.floatingToolsContainer.style.display = "none";
+                }
+            }
+        }));
+
+
 
 
 
@@ -512,6 +590,100 @@ export default class NovelSmithPlugin extends Plugin {
 
 
     }
+
+
+    public togglePencilMode() {
+        this.isPencilMode = !this.isPencilMode;
+
+        if (this.isPencilMode) {
+            this.pencilStatusBarItem?.show();
+            document.body.classList.add("ns-pencil-mode");
+            this.showFloatingTools(); // 🌟 顯示浮動工具箱
+            this.updateKeyboardPolicy();
+            new Notice("✏️ Pencil Mode ON: 手掌鎖定，鍵盤已隱藏", 3000);
+        } else {
+            this.pencilStatusBarItem?.hide();
+            document.body.classList.remove("ns-pencil-mode");
+            this.hideFloatingTools(); // 🌟 隱藏浮動工具箱
+            this.updateKeyboardPolicy();
+            new Notice("🖐️ Pencil Mode OFF: 恢復正常觸控", 3000);
+        }
+    }
+
+    // 🌟 核心 1：建立浮動工具箱 (包含 Keyboard 同 Enter)
+    private showFloatingTools() {
+        if (!this.floatingToolsContainer) {
+            this.floatingToolsContainer = document.body.createDiv({ cls: "ns-floating-tools-container" });
+
+            // --- ⌨️ 虛擬鍵盤召喚掣 ---
+            const kbBtn = this.floatingToolsContainer.createDiv({ cls: "ns-floating-btn ns-kb-btn" });
+            setIcon(kbBtn, "keyboard");
+            kbBtn.onclick = () => this.toggleVirtualKeyboard(kbBtn);
+
+            // --- ⏎ 換行 Enter 掣 ---
+            // const enterBtn = this.floatingToolsContainer.createDiv({ cls: "ns-floating-btn" });
+            // setIcon(enterBtn, "corner-down-left");
+            // enterBtn.onclick = () => {
+            //     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+            //     if (view) {
+            //         view.editor.replaceSelection("\n");
+            //         view.editor.focus();
+            //     }
+            // };
+        }
+
+        this.floatingToolsContainer.style.display = "flex";
+        this.isKeyboardUnlocked = false; // 每次開 Pencil Mode 預設封印鍵盤
+
+        // 重置鍵盤掣外觀
+        const kbBtn = this.floatingToolsContainer.querySelector(".ns-kb-btn") as HTMLElement;
+        if (kbBtn) kbBtn.classList.remove("is-unlocked");
+    }
+
+    private hideFloatingTools() {
+        if (this.floatingToolsContainer) {
+            this.floatingToolsContainer.style.display = "none";
+        }
+    }
+
+    // 🌟 核心 2：手動切換鍵盤邏輯
+    private toggleVirtualKeyboard(btn: HTMLElement) {
+        this.isKeyboardUnlocked = !this.isKeyboardUnlocked;
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+
+        if (this.isKeyboardUnlocked) {
+            // 🔓 解鎖：移除封印屬性，並強制聚焦編輯器叫出鍵盤
+            btn.classList.add("is-unlocked");
+            this.updateKeyboardPolicy();
+            if (view) view.editor.focus();
+            new Notice("⌨️ 虛擬鍵盤已召喚", 2000);
+        } else {
+            // 🔒 封印：加返封印屬性，並「強制失去焦點」令 iPad 收起鍵盤
+            btn.classList.remove("is-unlocked");
+            this.updateKeyboardPolicy();
+
+            if (document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur(); // 呢句係強制收起鍵盤嘅魔法！
+            }
+            new Notice("🔒 虛擬鍵盤已收起", 2000);
+        }
+    }
+
+    // 🌟 核心 3：更新鍵盤封印狀態
+    private updateKeyboardPolicy() {
+        const editors = document.querySelectorAll('.cm-content');
+        editors.forEach(editor => {
+            // 只有喺 Pencil Mode 開啟，而且「未解鎖」嘅時候，先至封印鍵盤
+            if (this.isPencilMode && !this.isKeyboardUnlocked) {
+                editor.setAttribute('inputmode', 'none');
+                editor.setAttribute('virtualkeyboardpolicy', 'manual');
+            } else {
+                editor.removeAttribute('inputmode');
+                editor.removeAttribute('virtualkeyboardpolicy');
+            }
+        });
+    }
+
 
     // =================================================================
     // 🔥 Phase 3: Reverse Sync Engine (逆向同步劇情卡模板)
